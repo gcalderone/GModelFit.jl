@@ -300,8 +300,8 @@ function quick_evaluate(model::Model)
 end
 
 
-function Base.push!(m::Model, p::Prediction)
-    push!(m.preds, p)
+function Base.push!(model::Model, p::Prediction)
+    push!(model.preds, p)
     evaluate(model)
     return model
 end
