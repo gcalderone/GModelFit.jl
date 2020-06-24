@@ -138,6 +138,7 @@ function extract_components(things...; prefix="")
             if isa(thing, AbstractDict)
                 for (name, v) in thing
                     #println("Dict: Walk through $name :: $(typeof(v))")
+                    isa(v, Number)  &&  (v = SimplePar(v))
                     merge!(out, extract_components(v; prefix=prefix * string(name)))
                 end
             elseif isa(thing, Pair)
