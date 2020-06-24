@@ -85,12 +85,14 @@ end
 
 
 function show(io::IO, data::AbstractData)
-    section(io, typeof(data), "   length: ", (length(data.val)))
+    label = (haskey(data.meta, :label)  ?  data.meta[:label]  :  "")
+    section(io, typeof(data), ": ", label, " (length: ", (length(data.val)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
     for name in names
+        (name == :meta)  &&  continue
         a = getfield(data, name)
         nan = length(findall(isnan.(a))) + length(findall(isinf.(a)))
         a = a[findall(isfinite.(a))]
@@ -178,7 +180,8 @@ function show(io::IO, model::Model)
 
     for i in 1:length(model.preds)
         println(io)
-        section(io, "Prediction #$i: " * model.preds[1].label)
+        label = (haskey(model.preds[i].meta, :label)  ?  model.preds[i].meta[:label]  :  "")
+        section(io, "Prediction #$i: " * label)
         show(io, model.preds[i])
     end
 end

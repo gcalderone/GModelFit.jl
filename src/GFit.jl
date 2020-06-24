@@ -166,7 +166,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    label::String
+    meta::Dict
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     eval::Vector{Float64}
@@ -175,13 +175,13 @@ mutable struct Prediction
     counter::Int
 
     function Prediction(domain::AbstractDomain, things...;
-                        prefix="", reduce=reduce, label="")
+                        prefix="", reduce=reduce, meta=Dict())
         comps = extract_components(things...; prefix=prefix)
         cevals = OrderedDict{Symbol, CompEval}()
         for (name, comp) in comps
             cevals[name] = CompEval(domain, comp)
         end
-        out = new(label, domain, cevals, Vector{Float64}(), false, reduce, 0)
+        out = new(meta, domain, cevals, Vector{Float64}(), false, reduce, 0)
         evaluate(out)  # TODO: is this correct?
         return out
     end
@@ -341,9 +341,9 @@ function dump(filename::String, model::Model, args...; kw...)
     return filename
 end
 
-function dump(io::IO, model::Model; format=:JSON, meta::AbstractDict=Dict())
+function dump(io::IO, model::Model, data::Vararg{T,N};
+              format=:JSON, meta::AbstractDict=Dict()) where {T <: AbstractData, N}
     out = Vector{OrderedDict}()
-    @info meta
     (length(meta) > 0)  &&  push!(out, meta)
     for i in 1:length(model.preds)
         pred = model.preds[i]
