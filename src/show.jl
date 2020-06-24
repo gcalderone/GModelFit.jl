@@ -218,7 +218,7 @@ function show(io::IO, pred::Prediction)
     table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
     push!(error, (nan+inf > 0))
 
-    printtable(io, table, ["Label", "Counter", "Min", "Max", "Mean", "NaN/Inf"], alignment=:l,
+    printtable(io, table, ["Component", "Counter", "Min", "Max", "Mean", "NaN/Inf"], alignment=:l,
                hlines=[0,1,length(pred.cevals)+1,length(pred.cevals)+2],
                formatters=ft_printf(showsettings.floatformat, 3:5),
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
