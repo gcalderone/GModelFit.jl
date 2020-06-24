@@ -4,6 +4,7 @@ using Printf, PrettyTables
 using Statistics, Distributions
 using DataStructures
 using LsqFit
+using JSON
 
 import Base.push!
 import Base.show
@@ -17,10 +18,11 @@ import Base.getproperty
 import Base.getindex
 import Base.setindex!
 import Base.iterate
+import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
-    Prediction, Model, evaluate, parindex, thaw, freeze, fit!
+    Prediction, Model, evaluate, parindex, thaw, freeze, fit!, dump
 
 
 include("domain.jl")
@@ -164,6 +166,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
+    label::String
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     eval::Vector{Float64}
@@ -172,13 +175,13 @@ mutable struct Prediction
     counter::Int
 
     function Prediction(domain::AbstractDomain, things...;
-                        prefix="", reduce=reduce)
+                        prefix="", reduce=reduce, label="")
         comps = extract_components(things...; prefix=prefix)
         cevals = OrderedDict{Symbol, CompEval}()
         for (name, comp) in comps
             cevals[name] = CompEval(domain, comp)
         end
-        out = new(domain, cevals, Vector{Float64}(), false, reduce, 0)
+        out = new(label, domain, cevals, Vector{Float64}(), false, reduce, 0)
         evaluate(out)  # TODO: is this correct?
         return out
     end
@@ -324,6 +327,36 @@ function thaw(model::Model, cname::Symbol)
     model
 end
 
+
+function dump(model::Model, args...; kw...)
+    io = IOBuffer()
+    dump(io, model, args...; kw...)
+    return String(take!(io))
+end
+
+function dump(filename::String, model::Model, args...; kw...)
+    io = open(filename, "w")
+    dump(io, model, args...; kw...)
+    close(io)
+    return filename
+end
+
+function dump(io::IO, model::Model; format=:JSON, meta::AbstractDict=Dict())
+    out = Vector{OrderedDict}()
+    @info meta
+    (length(meta) > 0)  &&  push!(out, meta)
+    for i in 1:length(model.preds)
+        pred = model.preds[i]
+        label = pred.label
+        (label == "")  &&  (label = "Prediction$i")
+        @assert isa(pred.domain, Domain_1D)
+        push!(out, OrderedDict("x"=>pred.domain[1],
+                               label=>pred.eval))
+    end
+    JSON.print(io, out)
+end
+
+
 # ====================================================================
 # Fit results
 #
@@ -407,6 +440,7 @@ end
 
 macro with_CMPFit()
     return esc(:(
+        using CMPFit;
         import GFit.minimize;
 
         mutable struct cmpfit <: GFit.AbstractMinimizer;
@@ -431,7 +465,6 @@ macro with_CMPFit()
         end;
     ))
 end
-
 
 
 fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =

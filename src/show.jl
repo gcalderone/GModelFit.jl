@@ -178,7 +178,7 @@ function show(io::IO, model::Model)
 
     for i in 1:length(model.preds)
         println(io)
-        section(io, "Prediction #$i ")
+        section(io, "Prediction #$i: " * model.preds[1].label)
         show(io, model.preds[i])
     end
 end
