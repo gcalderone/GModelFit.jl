@@ -190,7 +190,7 @@ end
 
 function show(io::IO, pred::Prediction)
     (length(pred.cevals) == 0)  &&  (return nothing)
-    table = Matrix{Union{String,Int,Float64}}(undef, length(pred.cevals) + 1, 6)
+    table = Matrix{Union{String,Int,Float64}}(undef, length(pred.revals), 6)
     error = Vector{Bool}()
 
     i = 1
@@ -208,18 +208,22 @@ function show(io::IO, pred::Prediction)
         i += 1
     end
 
-    result = pred.eval
-    v = view(result, findall(isfinite.(result)))
-    nan = length(findall(isnan.(result)))
-    inf = length(findall(isinf.(result)))
-    table[i, 1] = "Reduced"
-    table[i, 2] = pred.counter
-    table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
-    table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
-    push!(error, (nan+inf > 0))
+    for (rname, reducer) in pred.reducers
+        result = reducer.eval
+        v = view(result, findall(isfinite.(result)))
+        (length(v) == 0)  &&  (v = [NaN])
+        nan = length(findall(isnan.(result)))
+        inf = length(findall(isinf.(result)))
+        table[i, 1] = string(rname)
+        table[i, 2] = pred.counter
+        table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
+        table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
+        push!(error, (nan+inf > 0))
+        i += 1
+    end
 
     printtable(io, table, ["Component", "Counter", "Min", "Max", "Mean", "NaN/Inf"], alignment=:l,
-               hlines=[0,1,length(pred.cevals)+1,length(pred.cevals)+2],
+               hlines=[0,1,length(pred.cevals)+1, length(pred.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 3:5),
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
 end

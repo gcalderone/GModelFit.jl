@@ -22,7 +22,8 @@ import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
-    Prediction, Model, evaluate, parindex, thaw, freeze, fit!, dump
+    Prediction, addcomp!,
+    Model, evaluate, parindex, thaw, freeze, fit!, dump
 
 
 include("domain.jl")
@@ -131,7 +132,7 @@ function extract_components(things...; prefix="")
         #println()
         #println("Thing $(typeof(thing))  (prefix = $(prefix))")
         if isa(thing, AbstractComponent)
-            #println("Adding...")
+            #println("Adding $prefix ...")
             out[Symbol(prefix)] = thing
         else
             (length(prefix) > 0)  &&  (prefix *= "_")
@@ -153,8 +154,8 @@ function extract_components(things...; prefix="")
                 end
             elseif isstructtype(typeof(thing))
                 for name in fieldnames(typeof(thing))
-                    v = getfield(thing, name)
                     #println("Structure: Walk through $name :: $(typeof(v))")
+                    v = getfield(thing, name)
                     merge!(out, extract_components(v; prefix=prefix * string(name)))
                 end
             end
@@ -165,56 +166,106 @@ end
 
 
 # ====================================================================
+mutable struct Reducer
+    names::Vector{Symbol}
+    rfunct::Function
+    eval::Vector{Float64}
+    Reducer(names::Vector{Symbol}, rfunct::Function) =
+        new(names, rfunct, Vector{Float64}())
+
+end
+
+
+# ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
     meta::Dict
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    eval::Vector{Float64}
-    reduce_with_dict::Bool
-    reducer::Union{Nothing, Function}
+    revals::OrderedDict{Symbol, Vector{Float64}}
+    reducers::OrderedDict{Symbol, Reducer}
+    rname::Symbol
     counter::Int
 
-    function Prediction(domain::AbstractDomain, things...;
-                        prefix="", reduce=reduce, meta=Dict())
-        comps = extract_components(things...; prefix=prefix)
+    Prediction(domain::AbstractDomain, rfunct::T, things...; kw...) where T <: Function =
+        Prediction(domain, :_1 => rfunct, things...; kw...)
+
+    function Prediction(domain::AbstractDomain, rfunct::Pair{Symbol, T},
+                        things...; kw...) where T <: Function
         cevals = OrderedDict{Symbol, CompEval}()
-        for (name, comp) in comps
-            cevals[name] = CompEval(domain, comp)
-        end
-        out = new(meta, domain, cevals, Vector{Float64}(), false, reduce, 0)
-        evaluate(out)  # TODO: is this correct?
+        revals = OrderedDict{Symbol, Vector{Float64}}()
+        reducers = OrderedDict{Symbol, Vector{Reducer}}
+        out = new(Dict(), domain,
+                  OrderedDict{Symbol, CompEval}(),
+                  OrderedDict{Symbol, Vector{Float64}}(),
+                  OrderedDict{Symbol, Reducer}(),
+                  rfunct[1], 0)
+        addcomp!(out, rfunct, things...; kw...)
         return out
     end
 end
 
-# Default reducer: add all components
-reduce(domain::AbstractDomain, args...) = .+(args...)
+addcomp!(base::Prediction, rfunct::T, things...; kw...) where T <: Function =
+    addcomp!(base, Symbol(:_, length(base.reducers)) => rfunct, things...; kw...)
 
-# Reduce prediction by combining individual components
-function reduce(pred::Prediction)
-    if pred.reduce_with_dict
-        d = Dict([(cname, ceval.eval) for (cname, ceval) in pred.cevals])
-        expr = pred.reducer(pred.domain, d)
-    else
-        d = [ceval.eval for (cname, ceval) in pred.cevals]
-        expr = pred.reducer(pred.domain, d...)
+function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
+                  things...; prefix="", meta=Dict()) where T <: Function
+    rname = rfunct[1]
+    @assert !haskey(base.revals, rname)  "Name $(rname) already exists"
+    merge!(base.meta, meta)
+
+    # Collect new components
+    newnames = Vector{Symbol}()
+    for (cname, comp) in extract_components(things...; prefix=prefix)
+        @assert !haskey(base.revals, cname)  "Name $cname already exists"
+        base.cevals[cname] = CompEval(base.domain, comp)
+        base.revals[cname] = base.cevals[cname].eval
+        push!(newnames, cname)
     end
-    if length(pred.eval) == 0
-        append!(pred.eval, expr)
-    else
-        pred.eval .= expr
+
+    # Reducer
+    if length(base.reducers) > 0
+        prepend!(newnames, [base.rname])
     end
-    pred.counter += 1
+    f = rfunct[2]
+    (f === sum)  &&  (f = rfunct_sum)
+    base.reducers[rname] = Reducer(newnames, f)
+    base.revals[rname] = base.reducers[rname].eval
+    base.rname = rname
+
+    evaluate(base)
+    return base
 end
+
 
 function evaluate(pred::Prediction)
     for (name, ceval) in pred.cevals
         update(ceval)
     end
     reduce(pred)
+    return pred
 end
 
+
+# Default rfunct: add all components
+rfunct_sum(domain::AbstractDomain,
+           dict::OrderedDict{Symbol, Vector{Float64}},
+           args...) = .+(args...)
+
+function reduce(pred::Prediction)
+    for (rname, reducer) in pred.reducers
+        args = [pred.revals[rname] for rname in reducer.names]
+
+        if length(reducer.eval) == 0
+            append!(reducer.eval, reducer.rfunct(pred.domain, pred.revals, args...))
+        else
+            reducer.eval .= reducer.rfunct(pred.domain, pred.revals, args...)
+        end
+    end
+    pred.counter += 1
+end
+
+final(pred::Prediction) = pred.revals[pred.rname]
 
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
@@ -275,7 +326,7 @@ function evaluate(model::Model)
             update(ceval)
         end
         reduce(pred)
-        ndata += length(pred.eval)
+        ndata += length(final(pred))
     end
 
     model.pvalues = [par.val for par in values(model.params)]
@@ -310,7 +361,7 @@ function Base.push!(model::Model, p::Prediction)
     return model
 end
 
-Base.getindex(m::Model, i::Int) = m.preds[i].eval
+Base.getindex(m::Model, i::Int) = final(m.preds[i])
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
 
 parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
@@ -398,7 +449,7 @@ function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
     out = Vector{Measures_1D}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        @assert(length(data[i]) == length(pred.eval),
+        @assert(length(data[i]) == length(final(pred)),
                 "Length of dataset $i do not match corresponding model prediction.")
         push!(out, flatten(data[i], pred.domain))
     end
@@ -410,8 +461,9 @@ function residuals1d(model::Model, data1d::Vector{Measures_1D})
     c1 = 1
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        c2 = c1 + length(pred.eval) - 1
-        model.buffer[c1:c2] .= ((pred.eval .- data1d[i].val) ./ data1d[i].unc)
+        eval = final(pred)
+        c2 = c1 + length(eval) - 1
+        model.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
         c1 = c2 + 1
     end
     return model.buffer
