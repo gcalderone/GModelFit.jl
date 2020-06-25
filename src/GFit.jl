@@ -168,18 +168,17 @@ end
 # ====================================================================
 mutable struct Reducer
     names::Vector{Symbol}
+    args::Vector{Vector{Float64}}
     rfunct::Function
     eval::Vector{Float64}
-    Reducer(names::Vector{Symbol}, rfunct::Function) =
-        new(names, rfunct, Vector{Float64}())
-
+    Reducer(names::Vector{Symbol}, args::Vector{Vector{Float64}}, rfunct::Function) =
+        new(names, args, rfunct, Vector{Float64}())
 end
 
 
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    meta::Dict
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, Vector{Float64}}
@@ -195,7 +194,7 @@ mutable struct Prediction
         cevals = OrderedDict{Symbol, CompEval}()
         revals = OrderedDict{Symbol, Vector{Float64}}()
         reducers = OrderedDict{Symbol, Vector{Reducer}}
-        out = new(Dict(), domain,
+        out = new(domain,
                   OrderedDict{Symbol, CompEval}(),
                   OrderedDict{Symbol, Vector{Float64}}(),
                   OrderedDict{Symbol, Reducer}(),
@@ -209,10 +208,9 @@ addcomp!(base::Prediction, rfunct::T, things...; kw...) where T <: Function =
     addcomp!(base, Symbol(:_, length(base.reducers)) => rfunct, things...; kw...)
 
 function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
-                  things...; prefix="", meta=Dict()) where T <: Function
+                  things...; prefix="") where T <: Function
     rname = rfunct[1]
     @assert !haskey(base.revals, rname)  "Name $(rname) already exists"
-    merge!(base.meta, meta)
 
     # Collect new components
     newnames = Vector{Symbol}()
@@ -227,9 +225,10 @@ function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
     if length(base.reducers) > 0
         prepend!(newnames, [base.rname])
     end
+    args = [base.revals[name] for name in newnames]
     f = rfunct[2]
     (f === sum)  &&  (f = rfunct_sum)
-    base.reducers[rname] = Reducer(newnames, f)
+    base.reducers[rname] = Reducer(newnames, args, f)
     base.revals[rname] = base.reducers[rname].eval
     base.rname = rname
 
@@ -254,12 +253,10 @@ rfunct_sum(domain::AbstractDomain,
 
 function reduce(pred::Prediction)
     for (rname, reducer) in pred.reducers
-        args = [pred.revals[rname] for rname in reducer.names]
-
         if length(reducer.eval) == 0
-            append!(reducer.eval, reducer.rfunct(pred.domain, pred.revals, args...))
+            append!(reducer.eval, reducer.rfunct(pred.domain, pred.revals, reducer.args...))
         else
-            reducer.eval .= reducer.rfunct(pred.domain, pred.revals, args...)
+            reducer.eval .= reducer.rfunct(pred.domain, pred.revals, reducer.args...)
         end
     end
     pred.counter += 1
@@ -377,35 +374,6 @@ function thaw(model::Model, cname::Symbol)
     @assert cname in keys(model.cfree) "Component $c is not defined"
     model.cfree[cname] = true
     model
-end
-
-
-function dump(model::Model, args...; kw...)
-    io = IOBuffer()
-    dump(io, model, args...; kw...)
-    return String(take!(io))
-end
-
-function dump(filename::String, model::Model, args...; kw...)
-    io = open(filename, "w")
-    dump(io, model, args...; kw...)
-    close(io)
-    return filename
-end
-
-function dump(io::IO, model::Model, data::Vararg{T,N};
-              format=:JSON, meta::AbstractDict=Dict()) where {T <: AbstractData, N}
-    out = Vector{OrderedDict}()
-    (length(meta) > 0)  &&  push!(out, meta)
-    for i in 1:length(model.preds)
-        pred = model.preds[i]
-        label = pred.label
-        (label == "")  &&  (label = "Prediction$i")
-        @assert isa(pred.domain, Domain_1D)
-        push!(out, OrderedDict("x"=>pred.domain[1],
-                               label=>pred.eval))
-    end
-    JSON.print(io, out)
 end
 
 

@@ -110,7 +110,6 @@ macro define_ndim(ndim::Int)
     name = Symbol(:Measures_, ndim, :D)
     push!(out.args, :(
         struct $name <: AbstractMeasures
-            meta::Dict
             val::Array{Float64, $(ndim)}
             unc::Array{Float64, $(ndim)}
         end;
@@ -118,32 +117,31 @@ macro define_ndim(ndim::Int)
     ))
 
     push!(out.args, :(
-        function Measures(measure::Array{Float64, $ndim}, uncert::Array{Float64, $(ndim)}; meta=Dict())
+        function Measures(measure::Array{Float64, $ndim}, uncert::Array{Float64, $(ndim)})
             @assert length(measure) == length(uncert) "Measure and uncertainty arrays must have same size"
-            $(name)(meta, measure, uncert)
+            $(name)(measure, uncert)
         end;
     ))
 
     push!(out.args, :(
-        function Measures(measure::Array{Float64, $ndim}, uncert::Float64=one(Float64); meta=Dict())
+        function Measures(measure::Array{Float64, $ndim}, uncert::Float64=one(Float64))
             u = similar(measure)
             fill!(u, uncert)
-            $(name)(meta, measure, u)
+            $(name)(measure, u)
         end;
     ))
 
     name = Symbol(:Counts_, ndim, :D)
     push!(out.args, :(
         struct $name <: AbstractCounts
-            meta::Dict
             val::Array{Int, $(ndim)}
         end;
         Base.ndims(dom::$name) = $ndim;
     ))
 
     push!(out.args, :(
-        function Counts(measure::Array{Int, $ndim}; meta=Dict())
-            $(name)(meta, measure)
+        function Counts(measure::Array{Int, $ndim})
+            $(name)(measure)
         end
     ))
 
