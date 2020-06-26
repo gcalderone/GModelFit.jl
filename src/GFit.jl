@@ -15,14 +15,13 @@ import Base.getindex
 import Base.reshape
 import Base.propertynames
 import Base.getproperty
-import Base.getindex
 import Base.setindex!
 import Base.iterate
 import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
-    Prediction, addcomp!,
+    Prediction, addcomp!, domain,
     Model, evaluate, parindex, thaw, freeze, fit!, dump
 
 
@@ -127,6 +126,7 @@ include("components/Gaussian.jl")
 # Parse a user defined structure or dictionary to extract all
 # components
 function extract_components(things...; prefix="")
+    subprefix() = prefix * (length(prefix) > 0  ?  "_"  : "")
     out = OrderedDict{Symbol, AbstractComponent}()
     for thing in things
         #println()
@@ -135,12 +135,11 @@ function extract_components(things...; prefix="")
             #println("Adding $prefix ...")
             out[Symbol(prefix)] = thing
         else
-            (length(prefix) > 0)  &&  (prefix *= "_")
             if isa(thing, AbstractDict)
                 for (name, v) in thing
                     #println("Dict: Walk through $name :: $(typeof(v))")
                     isa(v, Number)  &&  (v = SimplePar(v))
-                    merge!(out, extract_components(v; prefix=prefix * string(name)))
+                    merge!(out, extract_components(v; prefix=subprefix() * string(name)))
                 end
             elseif isa(thing, Pair)
                 #println("Pair: $(thing[1]), $(typeof(thing[2]))")
@@ -149,14 +148,14 @@ function extract_components(things...; prefix="")
                     v = thing[2]
                     isa(v, Number)  &&  (v = SimplePar(v))
                     if isa(v, AbstractComponent)
-                        merge!(out, extract_components(v; prefix=prefix * string(name)))
+                        merge!(out, extract_components(v; prefix=subprefix() * string(name)))
                     end
                 end
             elseif isstructtype(typeof(thing))
                 for name in fieldnames(typeof(thing))
                     #println("Structure: Walk through $name :: $(typeof(v))")
                     v = getfield(thing, name)
-                    merge!(out, extract_components(v; prefix=prefix * string(name)))
+                    merge!(out, extract_components(v; prefix=subprefix() * string(name)))
                 end
             end
         end
@@ -205,7 +204,7 @@ mutable struct Prediction
 end
 
 addcomp!(base::Prediction, rfunct::T, things...; kw...) where T <: Function =
-    addcomp!(base, Symbol(:_, length(base.reducers)) => rfunct, things...; kw...)
+    addcomp!(base, Symbol(:_, length(base.reducers)+1) => rfunct, things...; kw...)
 
 function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
                   things...; prefix="") where T <: Function
@@ -228,6 +227,7 @@ function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
     args = [base.revals[name] for name in newnames]
     f = rfunct[2]
     (f === sum)  &&  (f = rfunct_sum)
+    (f === identity)  &&  (f = rfunct_sum)
     base.reducers[rname] = Reducer(newnames, args, f)
     base.revals[rname] = base.reducers[rname].eval
     base.rname = rname
@@ -262,7 +262,12 @@ function reduce(pred::Prediction)
     pred.counter += 1
 end
 
-final(pred::Prediction) = pred.revals[pred.rname]
+(pred::Prediction)() = pred(pred.rname)
+(pred::Prediction)(rname::Symbol) = pred.revals[rname]
+Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
+Base.getindex(pred::Prediction, prefix::String, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
+Base.getindex(pred::Prediction, prefix::Symbol, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
+domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
@@ -323,7 +328,7 @@ function evaluate(model::Model)
             update(ceval)
         end
         reduce(pred)
-        ndata += length(final(pred))
+        ndata += length(pred())
     end
 
     model.pvalues = [par.val for par in values(model.params)]
@@ -358,8 +363,14 @@ function Base.push!(model::Model, p::Prediction)
     return model
 end
 
-Base.getindex(m::Model, i::Int) = final(m.preds[i])
+
+(m::Model)() = m(1)
+(m::Model)(i::Int) = m.preds[i]()
+(m::Model)(i::Int, rname::Symbol) = m.preds[i](rname)
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
+Base.getindex(m::Model, prefix::String, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
+Base.getindex(m::Model, prefix::Symbol, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
+domain(m::Model, i::Int=1, dim::Int=1) = domain(m.preds[i], dim)
 
 parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
     findfirst(keys(model.params) .== Ref((cname, pname, i)))
@@ -417,7 +428,7 @@ function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
     out = Vector{Measures_1D}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        @assert(length(data[i]) == length(final(pred)),
+        @assert(length(data[i]) == length(pred()),
                 "Length of dataset $i do not match corresponding model prediction.")
         push!(out, flatten(data[i], pred.domain))
     end
@@ -429,7 +440,7 @@ function residuals1d(model::Model, data1d::Vector{Measures_1D})
     c1 = 1
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        eval = final(pred)
+        eval = pred()
         c2 = c1 + length(eval) - 1
         model.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
         c1 = c2 + 1
@@ -555,5 +566,6 @@ function fit!(model::Model, data::Vector{T};
 end
 
 include("show.jl")
+include("viewer.jl")
 
 end

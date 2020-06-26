@@ -55,7 +55,7 @@ function dump(io::IO, model::Model, data::AbstractData;
     root["meta"] = meta
 
     root["data"] = OrderedDict()
-    root["data"]["x"] = pred.domain[1]
+    root["data"]["x"] = domain(pred)
     root["data"]["y"] = data.val
     root["data"]["err"] = data.unc
 
@@ -66,13 +66,13 @@ function dump(io::IO, model::Model, data::AbstractData;
     for i in 1:length(names)
         n = string(names[i])
         root["model"][n] = OrderedDict()
-        root["model"][n]["x"] = pred.domain[1]
+        root["model"][n]["x"] = domain(pred)
         root["model"][n]["y"] = pred.revals[names[i]]
     end
 
     root["residuals"] = OrderedDict()
-    root["residuals"]["x"] = pred.domain[1]
-    root["residuals"]["y"] = (data.val .- final(pred)) ./ data.unc
+    root["residuals"]["x"] = domain(pred)
+    root["residuals"]["y"] = (data.val .- pred()) ./ data.unc
 
     JSON.print(io, root)
 end
