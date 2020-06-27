@@ -5,6 +5,7 @@ using Statistics, Distributions
 using DataStructures
 using LsqFit
 using JSON
+using ExprTools
 
 import Base.push!
 import Base.show
@@ -21,12 +22,10 @@ import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
-    Prediction, Reducer, add!, domain,
-    Model, evaluate, parindex, thaw, freeze, fit!, dump
-
+    Prediction, Reducer, @reducer, add!, domain,
+    Model, evaluate, parindex, thaw, freeze, fit!
 
 include("domain.jl")
-
 
 # ====================================================================
 # Parameter
@@ -166,24 +165,48 @@ end
 
 # ====================================================================
 mutable struct Reducer
-    name::Symbol
     funct::Function
     allargs::Bool
     args::Vector{Symbol}
-    kw::Base.Iterators.Pairs
 end
 
-Reducer(f::Function; kw...) = Reducer(Symbol(""), f, true, Vector{Symbol}(), kw)
-Reducer(f::Function, args::Vector{Symbol}; kw...) =  Reducer(Symbol(""), f, false, args, kw)
-Reducer(name::Symbol, f::Function; kw...) = Reducer(name, f, true, Vector{Symbol}(), kw)
-Reducer(name::Symbol, f::Function, args::Vector{Symbol}; kw...) =  Reducer(name, f, false, args, kw)
+Reducer(f::Function) = Reducer(f, true, Vector{Symbol}())
+Reducer(f::Function, args::Vector{Symbol}) =  Reducer(f, false, args)
+
+macro reducer(ex)
+    @assert ex.head == Symbol("->") "Not an anonmymous function"
+    f = splitdef(ex; throw=false)
+    @assert !isnothing(f) "Not an function definition"
+
+    allargs = false
+    args = Vector{Symbol}()
+    if haskey(f, :args)
+        if (length(f[:args]) == 1)  &&
+            isa(f[:args][1], Expr)  &&  (f[:args][1].head == :...)
+            allargs= true
+        end
+        if !allargs
+            for arg in f[:args]
+                if isa(arg, Symbol)
+                    push!(args, arg)
+                elseif isa(arg, Expr)  &&  (arg.head = Symbol("::"))
+                    push!(args, arg.args[1])
+                else
+                    error("Unexpected input: $arg")
+                end
+            end
+        end
+    end
+    # Here `esc` is necessary to evaluate the function expression in
+    # the caller scope
+    return esc(:(Reducer($ex, $allargs, $args)))
+end
 
 
 # ====================================================================
 mutable struct ReducerEval
     args::Vector{Vector{Float64}}
     funct::Function
-    kw::Base.Iterators.Pairs
     eval::Vector{Float64}
 end
 
@@ -206,9 +229,12 @@ mutable struct Prediction
         return pred
     end
 
-    function Prediction(domain::AbstractDomain, reducer::Reducer, things...; kw...)
+    Prediction(domain::AbstractDomain, reducer::Reducer, things...; kw...) =
+        Prediction(domain, :_1 => reducer, things...; kw...)
+
+    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, things...; kw...)
         pred = Prediction(domain, things...; kw...)
-        add!(pred, reducer)
+        add!(pred, redpair)
         return pred
     end
 end
@@ -223,8 +249,12 @@ end
 
 sum_of_array(args...) = .+(args...)
 
-function add!(pred::Prediction, reducer::Reducer)
-    rname = reducer.name
+add!(pred::Prediction, reducer::Reducer) =
+    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer)
+
+function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
+    rname = redpair[1]
+    reducer = redpair[2]
     if rname == Symbol("")
         rname = Symbol(:_, length(pred.revals)+1)
     end
@@ -234,7 +264,7 @@ function add!(pred::Prediction, reducer::Reducer)
         append!(reducer.args, keys(pred.cevals))
         append!(reducer.args, keys(pred.revals))
     end
-        
+
     args = Vector{Vector{Float64}}()
     for arg in reducer.args
         if haskey(pred.cevals, arg)
@@ -245,16 +275,19 @@ function add!(pred::Prediction, reducer::Reducer)
     end
 
     (reducer.funct == sum)  &&  (reducer.funct = sum_of_array)
-    eval = reducer.funct(args...; reducer.kw...)
-    pred.revals[rname] = ReducerEval(args, reducer.funct, reducer.kw, eval)
+    eval = reducer.funct(args...)
+    pred.revals[rname] = ReducerEval(args, reducer.funct, eval)
     pred.rsel = rname
     evaluate(pred)
     return pred
 end
 
-function add!(pred::Prediction, reducer::Reducer, things...; kw...)
+add!(pred::Prediction, reducer::Reducer, things...; kw...) =
+    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer, things...; kw...)
+
+function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, things...; kw...)
     add!(pred, things...; kw...)
-    add!(pred, reducer)
+    add!(pred, redpair)
 end
 
 function evaluate(pred::Prediction)
@@ -267,7 +300,7 @@ end
 
 function reduce(pred::Prediction)
     for (rname, reval) in pred.revals
-        reval.eval .= reval.funct(reval.args...; reval.kw...)
+        reval.eval .= reval.funct(reval.args...)
     end
     pred.counter += 1
 end
@@ -297,19 +330,18 @@ mutable struct Model
     actual::Vector{Float64}
     buffer::Vector{Float64}
     partransform::Function
-end
 
-function Model(v::Vector{Prediction})
-    model = Model(v, OrderedDict{Symbol, AbstractComponent}(),
-                  OrderedDict{Symbol, Bool}(),
-                  OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
-                  Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), default_partransform)
-    evaluate(model)
-    return model
+    function Model(v::Vector{Prediction})
+        model = new(v, OrderedDict{Symbol, AbstractComponent}(),
+                    OrderedDict{Symbol, Bool}(),
+                    OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
+                    Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), default_partransform)
+        evaluate(model)
+        return model
+    end
+    Model(p::Prediction) = Model([p])
+    Model(args...; kw...) = Model([Prediction(args...; kw...)])
 end
-
-Model(p::Prediction) = Model([p])
-Model(args...; kw...) = Model(Prediction(args...; kw...))
 
 function evaluate(model::Model)
     @assert length(model.preds) >= 1
