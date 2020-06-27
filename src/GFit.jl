@@ -158,7 +158,7 @@ mutable struct Reducer
 end
 
 Reducer(f::Function) = Reducer(f, true, Vector{Symbol}())
-Reducer(f::Function, args::Vector{Symbol}) =  Reducer(f, false, args)
+Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(f, false, collect(args))
 
 macro reducer(ex)
     @assert ex.head == Symbol("->") "Not an anonmymous function"
