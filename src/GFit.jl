@@ -21,7 +21,7 @@ import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
-    Prediction, addcomp!, domain,
+    Prediction, Reducer, add!, domain,
     Model, evaluate, parindex, thaw, freeze, fit!, dump
 
 
@@ -166,12 +166,25 @@ end
 
 # ====================================================================
 mutable struct Reducer
-    names::Vector{Symbol}
+    name::Symbol
+    funct::Function
+    allargs::Bool
+    args::Vector{Symbol}
+    kw::Base.Iterators.Pairs
+end
+
+Reducer(f::Function; kw...) = Reducer(Symbol(""), f, true, Vector{Symbol}(), kw)
+Reducer(f::Function, args::Vector{Symbol}; kw...) =  Reducer(Symbol(""), f, false, args, kw)
+Reducer(name::Symbol, f::Function; kw...) = Reducer(name, f, true, Vector{Symbol}(), kw)
+Reducer(name::Symbol, f::Function, args::Vector{Symbol}; kw...) =  Reducer(name, f, false, args, kw)
+
+
+# ====================================================================
+mutable struct ReducerEval
     args::Vector{Vector{Float64}}
-    rfunct::Function
+    funct::Function
+    kw::Base.Iterators.Pairs
     eval::Vector{Float64}
-    Reducer(names::Vector{Symbol}, args::Vector{Vector{Float64}}, rfunct::Function) =
-        new(names, args, rfunct, Vector{Float64}())
 end
 
 
@@ -180,62 +193,69 @@ end
 mutable struct Prediction
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    revals::OrderedDict{Symbol, Vector{Float64}}
-    reducers::OrderedDict{Symbol, Reducer}
-    rname::Symbol
+    revals::OrderedDict{Symbol, ReducerEval}
+    rsel::Symbol
     counter::Int
 
-    Prediction(domain::AbstractDomain, rfunct::T, things...; kw...) where T <: Function =
-        Prediction(domain, :_1 => rfunct, things...; kw...)
-
-    function Prediction(domain::AbstractDomain, rfunct::Pair{Symbol, T},
-                        things...; kw...) where T <: Function
-        cevals = OrderedDict{Symbol, CompEval}()
-        revals = OrderedDict{Symbol, Vector{Float64}}()
-        reducers = OrderedDict{Symbol, Vector{Reducer}}
-        out = new(domain,
+    function Prediction(domain::AbstractDomain, things...; kw...)
+        pred = new(domain,
                   OrderedDict{Symbol, CompEval}(),
-                  OrderedDict{Symbol, Vector{Float64}}(),
-                  OrderedDict{Symbol, Reducer}(),
-                  rfunct[1], 0)
-        addcomp!(out, rfunct, things...; kw...)
-        return out
+                  OrderedDict{Symbol, ReducerEval}(),
+                  Symbol(""), 0)
+        add!(pred, things...; kw...)
+        return pred
+    end
+
+    function Prediction(domain::AbstractDomain, reducer::Reducer, things...; kw...)
+        pred = Prediction(domain, things...; kw...)
+        add!(pred, reducer)
+        return pred
     end
 end
 
-addcomp!(base::Prediction, rfunct::T, things...; kw...) where T <: Function =
-    addcomp!(base, Symbol(:_, length(base.reducers)+1) => rfunct, things...; kw...)
-
-function addcomp!(base::Prediction, rfunct::Pair{Symbol, T},
-                  things...; prefix="") where T <: Function
-    rname = rfunct[1]
-    @assert !haskey(base.revals, rname)  "Name $(rname) already exists"
-
-    # Collect new components
-    newnames = Vector{Symbol}()
+function add!(pred::Prediction, things...; prefix="")
     for (cname, comp) in extract_components(things...; prefix=prefix)
-        @assert !haskey(base.revals, cname)  "Name $cname already exists"
-        base.cevals[cname] = CompEval(base.domain, comp)
-        base.revals[cname] = base.cevals[cname].eval
-        push!(newnames, cname)
+        @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
+        @assert !haskey(pred.revals, cname)  "Name $cname already exists"
+        pred.cevals[cname] = CompEval(pred.domain, comp)
     end
-
-    # Reducer
-    if length(base.reducers) > 0
-        prepend!(newnames, [base.rname])
-    end
-    args = [base.revals[name] for name in newnames]
-    f = rfunct[2]
-    (f === sum)  &&  (f = rfunct_sum)
-    (f === identity)  &&  (f = rfunct_sum)
-    base.reducers[rname] = Reducer(newnames, args, f)
-    base.revals[rname] = base.reducers[rname].eval
-    base.rname = rname
-
-    evaluate(base)
-    return base
 end
 
+sum_of_array(args...) = .+(args...)
+
+function add!(pred::Prediction, reducer::Reducer)
+    rname = reducer.name
+    if rname == Symbol("")
+        rname = Symbol(:_, length(pred.revals)+1)
+    end
+    @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
+    @assert !haskey(pred.revals, rname)  "Name $rname already exists"
+    if reducer.allargs
+        append!(reducer.args, keys(pred.cevals))
+        append!(reducer.args, keys(pred.revals))
+    end
+        
+    args = Vector{Vector{Float64}}()
+    for arg in reducer.args
+        if haskey(pred.cevals, arg)
+            push!(args, pred.cevals[arg].eval)
+        else
+            push!(args, pred.revals[arg].eval)
+        end
+    end
+
+    (reducer.funct == sum)  &&  (reducer.funct = sum_of_array)
+    eval = reducer.funct(args...; reducer.kw...)
+    pred.revals[rname] = ReducerEval(args, reducer.funct, reducer.kw, eval)
+    pred.rsel = rname
+    evaluate(pred)
+    return pred
+end
+
+function add!(pred::Prediction, reducer::Reducer, things...; kw...)
+    add!(pred, things...; kw...)
+    add!(pred, reducer)
+end
 
 function evaluate(pred::Prediction)
     for (name, ceval) in pred.cevals
@@ -245,29 +265,26 @@ function evaluate(pred::Prediction)
     return pred
 end
 
-
-# Default rfunct: add all components
-rfunct_sum(domain::AbstractDomain,
-           dict::OrderedDict{Symbol, Vector{Float64}},
-           args...) = .+(args...)
-
 function reduce(pred::Prediction)
-    for (rname, reducer) in pred.reducers
-        if length(reducer.eval) == 0
-            append!(reducer.eval, reducer.rfunct(pred.domain, pred.revals, reducer.args...))
-        else
-            reducer.eval .= reducer.rfunct(pred.domain, pred.revals, reducer.args...)
-        end
+    for (rname, reval) in pred.revals
+        reval.eval .= reval.funct(reval.args...; reval.kw...)
     end
     pred.counter += 1
 end
 
-(pred::Prediction)() = pred(pred.rname)
-(pred::Prediction)(rname::Symbol) = pred.revals[rname]
+(pred::Prediction)() = pred(pred.rsel)
+function (pred::Prediction)(name::Symbol)
+    if haskey(pred.cevals, name)
+        return pred.cevals[name].eval
+    else
+        return pred.revals[name].eval
+    end
+end
 Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
 Base.getindex(pred::Prediction, prefix::String, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
 Base.getindex(pred::Prediction, prefix::Symbol, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
 domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
+
 
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
@@ -357,7 +374,7 @@ function quick_evaluate(model::Model)
 end
 
 
-function Base.push!(model::Model, p::Prediction)
+function add!(model::Model, p::Prediction)
     push!(model.preds, p)
     evaluate(model)
     return model
@@ -366,7 +383,7 @@ end
 
 (m::Model)() = m(1)
 (m::Model)(i::Int) = m.preds[i]()
-(m::Model)(i::Int, rname::Symbol) = m.preds[i](rname)
+(m::Model)(i::Int, name::Symbol) = m.preds[i](name)
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
 Base.getindex(m::Model, prefix::String, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
 Base.getindex(m::Model, prefix::Symbol, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
