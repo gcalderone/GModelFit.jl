@@ -125,40 +125,26 @@ include("components/Gaussian.jl")
 # ====================================================================
 # Parse a user defined structure or dictionary to extract all
 # components
-function extract_components(things...; prefix="")
-    subprefix() = prefix * (length(prefix) > 0  ?  "_"  : "")
+function extract_components(things::AbstractDict)
+    out = OrderedDict{Symbol, AbstractComponent}()
+    for (name, comp) in things
+        isa(comp, Number)  &&  (comp = SimplePar(comp))
+        @assert isa(name, Symbol)
+        @assert isa(comp, AbstractComponent)
+        out[name] = comp
+    end
+    return out
+end
+
+function extract_components(things::Vararg{Pair})
     out = OrderedDict{Symbol, AbstractComponent}()
     for thing in things
-        #println()
-        #println("Thing $(typeof(thing))  (prefix = $(prefix))")
-        if isa(thing, AbstractComponent)
-            #println("Adding $prefix ...")
-            out[Symbol(prefix)] = thing
-        else
-            if isa(thing, AbstractDict)
-                for (name, v) in thing
-                    #println("Dict: Walk through $name :: $(typeof(v))")
-                    isa(v, Number)  &&  (v = SimplePar(v))
-                    merge!(out, extract_components(v; prefix=subprefix() * string(name)))
-                end
-            elseif isa(thing, Pair)
-                #println("Pair: $(thing[1]), $(typeof(thing[2]))")
-                if isa(thing[1], Symbol)
-                    name = thing[1]
-                    v = thing[2]
-                    isa(v, Number)  &&  (v = SimplePar(v))
-                    if isa(v, AbstractComponent)
-                        merge!(out, extract_components(v; prefix=subprefix() * string(name)))
-                    end
-                end
-            elseif isstructtype(typeof(thing))
-                for name in fieldnames(typeof(thing))
-                    #println("Structure: Walk through $name :: $(typeof(v))")
-                    v = getfield(thing, name)
-                    merge!(out, extract_components(v; prefix=subprefix() * string(name)))
-                end
-            end
-        end
+        name = thing[1]
+        comp = thing[2]
+        isa(comp, Number)  &&  (comp = SimplePar(comp))
+        @assert isa(name, Symbol)
+        @assert isa(comp, AbstractComponent)
+        out[name] = comp
     end
     return out
 end
@@ -221,20 +207,20 @@ mutable struct Prediction
     rsel::Symbol
     counter::Int
 
-    function Prediction(domain::AbstractDomain, things...; kw...)
+    function Prediction(domain::AbstractDomain, things...)
         pred = new(domain,
                   OrderedDict{Symbol, CompEval}(),
                   OrderedDict{Symbol, ReducerEval}(),
                   Symbol(""), 0)
-        add!(pred, things...; kw...)
+        add!(pred, things...)
         return pred
     end
 
-    Prediction(domain::AbstractDomain, reducer::Reducer, things...; kw...) =
-        Prediction(domain, :_1 => reducer, things...; kw...)
+    Prediction(domain::AbstractDomain, reducer::Reducer, things...) =
+        Prediction(domain, :_1 => reducer, things...)
 
-    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, things...; kw...)
-        pred = Prediction(domain, things...; kw...)
+    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, things...)
+        pred = Prediction(domain, things...)
         add!(pred, redpair)
         return pred
     end
@@ -283,11 +269,11 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     return pred
 end
 
-add!(pred::Prediction, reducer::Reducer, things...; kw...) =
-    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer, things...; kw...)
+add!(pred::Prediction, reducer::Reducer, things...) =
+    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer, things...)
 
-function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, things...; kw...)
-    add!(pred, things...; kw...)
+function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, things...)
+    add!(pred, things...)
     add!(pred, redpair)
 end
 
@@ -339,7 +325,7 @@ mutable struct Model
         return model
     end
     Model(p::Prediction) = Model([p])
-    Model(args...; kw...) = Model([Prediction(args...; kw...)])
+    Model(args...) = Model([Prediction(args...)])
 end
 
 function evaluate(model::Model)
