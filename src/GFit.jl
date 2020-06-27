@@ -329,13 +329,13 @@ mutable struct Model
     pvalues::Vector{Float64}
     actual::Vector{Float64}
     buffer::Vector{Float64}
-    partransform::Function
+    constraints::Vector{Function}
 
     function Model(v::Vector{Prediction})
         model = new(v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
-                    Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), default_partransform)
+                    Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), Vector{Function}())
         evaluate(model)
         return model
     end
@@ -387,12 +387,12 @@ function evaluate(model::Model)
     return model
 end
 
-default_partransform(model::Model, pvalues::Vector{Float64}, actual::Vector{Float64}) = nothing
-
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.actual .= model.pvalues  # copy all values by default
-    model.partransform(model, model.pvalues, model.actual)
+    for func in model.constraints
+        func(model, model.pvalues, model.actual)
+    end
 
     for pred in model.preds
         for (cname, ceval) in pred.cevals
@@ -408,6 +408,13 @@ end
 
 function add!(model::Model, p::Prediction)
     push!(model.preds, p)
+    evaluate(model)
+    return model
+end
+
+
+function constrain!(model::Model, func::Function)
+    push!(model.constraints, func)
     evaluate(model)
     return model
 end
@@ -444,7 +451,7 @@ struct BestFitPar
     val::Float64
     unc::Float64
     free::Bool
-    calc::Float64  # value after transformation
+    actual::Float64  # value after transformation
 end
 
 struct BestFitComp
