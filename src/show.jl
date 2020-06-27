@@ -1,4 +1,5 @@
 mutable struct ShowSettings
+    plain::Bool
     tableformat::PrettyTableFormat
     floatformat::String
     border::Crayon
@@ -8,8 +9,8 @@ mutable struct ShowSettings
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    fixedpars::Bool
-    ShowSettings() = new(unicode_rounded, "%9.4g",
+    showfixed::Bool
+    ShowSettings() = new(false, unicode_rounded, "%9.4g",
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
                          crayon"light_red blink", crayon"negative", crayon"green bold",
@@ -18,14 +19,26 @@ end
 
 const showsettings = ShowSettings()
 
-function printtable(args...; kw...)
-    pretty_table(args...; tf=showsettings.tableformat, kw...,
-                 border_crayon=showsettings.border,
-                 header_crayon=showsettings.header,
-                 subheader_crayon=showsettings.subheader, crop=:horizontal)
+function printtable(args...; formatters=(), kw...)
+    if showsettings.plain
+        c = crayon"default"
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=simple, hlines=:none,
+                     border_crayon=c, header_crayon=c, subheader_crayon=c,
+                     highlighters=())
+    else
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat,
+                     border_crayon=showsettings.border, header_crayon=showsettings.header, subheader_crayon=showsettings.subheader,
+                     kw...)
+    end
 end
 
-section(io, args...) = println(io, showsettings.section, args...)
+function section(io, args...)
+    if showsettings.plain
+        println(io, args...,)
+    else
+        println(io, showsettings.section, args..., crayon"default")
+    end
+end
 
 function left(s::String, maxlen::Int)
     (length(s) <= maxlen)  &&  (return s)
@@ -127,14 +140,16 @@ function preparetable(comp::AbstractComponent, cname="")
             parname *= "[" * string(pname[2]) * "]"
         end
         parname *= (param.free  ?  ""  :  " (FIXED)")
-        (!showsettings.fixedpars)  &&  (!param.free)  &&  continue
+        (!showsettings.showfixed)  &&  (!param.free)  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
         table = vcat(table, [cname ctype parname param.val range])
         push!(fixed, !param.free)
         push!(error, !(param.low <= param.val <= param.high))
-        cname = ""
-        ctype = ""
+        if !showsettings.plain
+            cname = ""
+            ctype = ""
+        end
     end
     if length(table) == 0
         table = vcat(table, [cname ctype "" NaN ""])
@@ -163,7 +178,7 @@ function show(io::IO, dict::OrderedDict{Symbol, T}, cfree::OrderedDict{Symbol, B
         append!(error, e)
         push!(hrule, length(error)+1)
     end
-    printtable(io, table , ["Component" "Type" "Param." "Value" "Range"], alignment=:l,
+    printtable(io, table , ["Component" "Type" "Param." "Value" "Range"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
                              Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
@@ -220,7 +235,7 @@ function show(io::IO, pred::Prediction)
         i += 1
     end
 
-    printtable(io, table, ["Component", "Counter", "Min", "Max", "Mean", "NaN/Inf"], alignment=:l,
+    printtable(io, table, ["Component", "Counter", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 3:5),
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
@@ -242,7 +257,7 @@ function preparetable(comp::BestFitComp)
         if isa(param, Vector{BestFitPar})
             for ii in 1:length(param)
                 par = param[ii]
-                (!showsettings.fixedpars)  &&  (!par.free)  &&  continue
+                (!showsettings.showfixed)  &&  (!par.free)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
                 table = vcat(table, ["" spname par.val par.unc par.actual])
                 push!(fixed, !par.free)
@@ -251,7 +266,7 @@ function preparetable(comp::BestFitComp)
             end
         else
             par = param
-            (!showsettings.fixedpars)  &&  (!par.free)  &&  continue
+            (!showsettings.showfixed)  &&  (!par.free)  &&  continue
             spname = string(pname)
             table = vcat(table, ["" spname par.val par.unc par.actual])
             push!(fixed, !par.free)
@@ -266,7 +281,7 @@ end
 function show(io::IO, comp::BestFitComp)
     (table, fixed, error, watch) = preparetable(comp)
     (length(table) == 0)  &&  return
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"], alignment=:l,
+    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"],
                hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
@@ -287,7 +302,11 @@ function show(io::IO, res::BestFitResult)
         if length(comp) > 0
             (t, f, e, w) = preparetable(comp)
             (length(t) > 0)  ||  continue
-            t[1,1] = string(cname)
+            if showsettings.plain
+                t[:,1] .= string(cname)
+            else
+                t[1,1] = string(cname)
+            end
             table = vcat(table, t)
             append!(fixed, f)
             append!(error, e)
@@ -295,32 +314,51 @@ function show(io::IO, res::BestFitResult)
             push!(hrule, length(error)+1)
         end
     end
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"], alignment=:l,
+    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
 
     println(io)
-    println(io, @sprintf("    #Data  : %10d              Cost : %-10.5g", res.ndata, res.cost))
-    println(io, @sprintf("    #Param : %10d              Red. : %-10.4g", res.ndata-res.dof, res.cost / res.dof))
-    print(  io, @sprintf("    DOF    : %10d              ", res.dof))
+    println(io, @sprintf("    #Data  : %8d              Cost   : %-10.5g", res.ndata, res.cost))
+    println(io, @sprintf("    #Param : %8d              Red.   : %-10.4g", res.ndata-res.dof, res.cost / res.dof))
+    print(  io, @sprintf("    DOF    : %8d              ", res.dof))
     if res.log10testprob < -3
-        println(io, @sprintf("Prob.: 10^%-10.4g", res.log10testprob))
+        println(io, @sprintf("Prob.  : 10^%-10.4f", res.log10testprob))
     else
-        println(io, @sprintf("Prob.: %10.4g", 10^res.log10testprob))
+        println(io, @sprintf("Prob.  : %-10.4g", 10^res.log10testprob))
     end
-    printstyled(io, "    Status :  ")
-    if res.status == :Optimal
-        printstyled(color=:green, io, @sprintf("%-15s", "Optimal"))
-    elseif res.status == :NonOptimal
-        printstyled(color=printcolorerr(), io, @sprintf("%-15s", "Non Optimal"))
-    elseif res.status == :Warn
-         printstyled(color=printcolorerr(), io, @sprintf("%-15s", "Warning"))
-    elseif res.status == :Error
-        printstyled(color=printcolorerr(), io, @sprintf("%-15s", "Error"))
+    print(io, "    Status : ")
+    status = @sprintf("%8s", string(res.status))
+    if showsettings.plain
+        print(io, status)
     else
-        printstyled(color=printcolorerr(), io, @sprintf("%-15s", "Unknown (" * string(res.status) * "), see fitter output"))
+        if res.status == :OK
+            print(io, crayon"green", status, crayon"default")
+        elseif res.status == :Warn
+            print(io, crayon"bold yellow", status, crayon"default")
+        elseif res.status == :Error
+            print(io, crayon"bold red", status, crayon"default")
+        else
+            print(io, crayon"red", status, crayon"default")
+        end
     end
-    println(io, @sprintf("        Elapsed: %-10.4g s", res.elapsed))
+    println(io, @sprintf("              Elapsed: %-10.4g s", res.elapsed))
+end
+
+
+function savelog(filename::String, args...; plain=true)
+    orig = showsettings.plain
+    showsettings.plain = plain
+    try
+        f = open(filename, "w")
+        for arg in args
+            show(f, arg)
+            println(f)
+        end
+        close(f)
+    catch
+    end
+    showsettings.plain = orig
 end

@@ -23,7 +23,8 @@ import Base.dump
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, constraint!, evaluate, parindex, thaw, freeze, fit!
+    Model, constraint!, evaluate, parindex, thaw, freeze, fit!,
+    savelog
 
 include("domain.jl")
 
@@ -470,7 +471,7 @@ struct BestFitResult
     ndata::Int
     dof::Int
     cost::Float64
-    status::Symbol      #:Optimal, :NonOptimal, :Warn, :Error
+    status::Symbol      #:OK, :Warn, :Error
     log10testprob::Float64
     elapsed::Float64
 end
@@ -517,8 +518,8 @@ function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
                                getfield.(params, :val),
                                lower=getfield.(params, :low),
                                upper=getfield.(params, :high))
-    status = :NonOptimal
-    (bestfit.converged)  &&  (status = :Optimal)
+    status = :Error
+    (bestfit.converged)  &&  (status = :OK)
     error = LsqFit.margin_error(bestfit, 0.6827)
     return (status, getfield.(Ref(bestfit), :param), error)
 end
@@ -547,7 +548,7 @@ macro with_CMPFit()
         end;
         bestfit = CMPFit.cmpfit((pvalues) -> func(pvalues),
                                 guess, parinfo=parinfo, config=minimizer.config);
-        return (:Optimal, getfield.(Ref(bestfit), :param), getfield.(Ref(bestfit), :perror));
+        return (:OK, getfield.(Ref(bestfit), :param), getfield.(Ref(bestfit), :perror));
         end;
     ))
 end
