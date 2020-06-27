@@ -23,7 +23,7 @@ import Base.dump
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, evaluate, parindex, thaw, freeze, fit!
+    Model, constraint!, evaluate, parindex, thaw, freeze, fit!
 
 include("domain.jl")
 
@@ -239,8 +239,8 @@ mutable struct Prediction
     end
 end
 
-function add!(pred::Prediction, things...; prefix="")
-    for (cname, comp) in extract_components(things...; prefix=prefix)
+function add!(pred::Prediction, things...)
+    for (cname, comp) in extract_components(things...)
         @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
         pred.cevals[cname] = CompEval(pred.domain, comp)
@@ -259,7 +259,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
         rname = Symbol(:_, length(pred.revals)+1)
     end
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
-    @assert !haskey(pred.revals, rname)  "Name $rname already exists"
+    haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
     if reducer.allargs
         append!(reducer.args, keys(pred.cevals))
         append!(reducer.args, keys(pred.revals))
@@ -314,8 +314,6 @@ function (pred::Prediction)(name::Symbol)
     end
 end
 Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
-Base.getindex(pred::Prediction, prefix::String, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
-Base.getindex(pred::Prediction, prefix::Symbol, cname::Symbol) = pred.cevals[Symbol(prefix, :_, cname)].comp
 domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 
 
@@ -413,7 +411,7 @@ function add!(model::Model, p::Prediction)
 end
 
 
-function constrain!(model::Model, func::Function)
+function constraint!(model::Model, func::Function)
     push!(model.constraints, func)
     evaluate(model)
     return model
@@ -424,21 +422,21 @@ end
 (m::Model)(i::Int) = m.preds[i]()
 (m::Model)(i::Int, name::Symbol) = m.preds[i](name)
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
-Base.getindex(m::Model, prefix::String, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
-Base.getindex(m::Model, prefix::Symbol, cname::Symbol) = m.comps[Symbol(prefix, :_, cname)]
 domain(m::Model, i::Int=1, dim::Int=1) = domain(m.preds[i], dim)
 
 parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
     findfirst(keys(model.params) .== Ref((cname, pname, i)))
 
 function freeze(model::Model, cname::Symbol)
-    @assert cname in keys(model.cfree) "Component $c is not defined"
+    evaluate(model)
+    @assert cname in keys(model.cfree) "Component $cname is not defined"
     model.cfree[cname] = false
     model
 end
 
 function thaw(model::Model, cname::Symbol)
-    @assert cname in keys(model.cfree) "Component $c is not defined"
+    evaluate(model)
+    @assert cname in keys(model.cfree) "Component $cname is not defined"
     model.cfree[cname] = true
     model
 end
