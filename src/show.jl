@@ -324,11 +324,7 @@ function show(io::IO, res::BestFitResult)
     println(io, @sprintf("    #Data  : %8d              Cost   : %-10.5g", res.ndata, res.cost))
     println(io, @sprintf("    #Param : %8d              Red.   : %-10.4g", res.ndata-res.dof, res.cost / res.dof))
     print(  io, @sprintf("    DOF    : %8d              ", res.dof))
-    if res.log10testprob < -3
-        println(io, @sprintf("Prob.  : 10^%-10.4f", res.log10testprob))
-    else
-        println(io, @sprintf("Prob.  : %-10.4g", 10^res.log10testprob))
-    end
+    println(io, @sprintf("Prob.  : %-10.4g", 10^res.log10testprob))
     print(io, "    Status : ")
     status = @sprintf("%8s", string(res.status))
     if showsettings.plain
