@@ -161,7 +161,7 @@ end
 
 
 show(io::IO, comp::AbstractComponent) =
-    show(io, OrderedDict(Symbol("?") => comp), OrderedDict(Symbol("?") => true))
+    show(io, OrderedDict(Symbol("?") => comp), OrderedDict(Symbol("?") => false))
 
 
 function show(io::IO, dict::OrderedDict{Symbol, T}, cfixed::OrderedDict{Symbol, Bool}) where T <: AbstractComponent
