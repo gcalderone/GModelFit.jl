@@ -43,9 +43,9 @@ Gaussian(norm, center, sigma) = Gaussian_1D(norm, center, sigma)
 Gaussian(norm, centerX, centerY, sigmaX, sigmaY, angle) = Gaussian_2D(norm, centerX, centerY, sigmaX, sigmaY, angle)
 function Gaussian(norm, centerX, centerY, sigma)
     out = Gaussian_2D(norm, centerX, centerY, sigma, sigma, 0.)
-    out.sigmaX.free = false
+    out.sigmaX.fixed = true
     out.sigmaX.expr = "this_sigmaY"
-    out.angle.free = false
+    out.angle.fixed = true
     return out
 end
 

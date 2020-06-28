@@ -117,10 +117,10 @@ end
 
 
 function show(io::IO, par::Parameter)
-    if par.free
-        println(io, "Value : ", par.val, "  [", par.low , " : ", par.high, "]")
-    else
+    if par.fixed
         println(io, "Value : ", par.val, "   (FIXED)")
+    else
+        println(io, "Value : ", par.val, "  [", par.low , " : ", par.high, "]")
     end
 end
 
@@ -139,12 +139,12 @@ function preparetable(comp::AbstractComponent, cname="")
         if pname[2] >= 1
             parname *= "[" * string(pname[2]) * "]"
         end
-        parname *= (param.free  ?  ""  :  " (FIXED)")
-        (!showsettings.showfixed)  &&  (!param.free)  &&  continue
+        parname *= (param.fixed  ?  " (FIXED)"  :  "")
+        (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
         table = vcat(table, [cname ctype parname param.val range])
-        push!(fixed, !param.free)
+        push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
         if !showsettings.plain
             cname = ""
@@ -164,7 +164,7 @@ show(io::IO, comp::AbstractComponent) =
     show(io, OrderedDict(Symbol("?") => comp), OrderedDict(Symbol("?") => true))
 
 
-function show(io::IO, dict::OrderedDict{Symbol, T}, cfree::OrderedDict{Symbol, Bool}) where T <: AbstractComponent
+function show(io::IO, dict::OrderedDict{Symbol, T}, cfixed::OrderedDict{Symbol, Bool}) where T <: AbstractComponent
     (length(dict) > 0)  ||  (return nothing)
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
@@ -172,9 +172,9 @@ function show(io::IO, dict::OrderedDict{Symbol, T}, cfree::OrderedDict{Symbol, B
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for (cname, comp) in dict
-        (t, f, e) = preparetable(comp, string(cname) .* (cfree[cname]  ?  ""  :  " (FIXED)"))
+        (t, f, e) = preparetable(comp, string(cname) .* (cfixed[cname]  ?  " (FIXED)"  :  ""))
         table = vcat(table, t)
-        append!(fixed, f .| (.!cfree[cname]))
+        append!(fixed, f .| cfixed[cname])
         append!(error, e)
         push!(hrule, length(error)+1)
     end
@@ -189,7 +189,7 @@ show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
 function show(io::IO, model::Model)
     section(io, "Components:")
     length(model.comps) != 0  || (return nothing)
-    show(io, model.comps, model.cfree)
+    show(io, model.comps, model.cfixed)
 
     for i in 1:length(model.preds)
         println(io)
@@ -257,19 +257,19 @@ function preparetable(comp::BestFitComp)
         if isa(param, Vector{BestFitPar})
             for ii in 1:length(param)
                 par = param[ii]
-                (!showsettings.showfixed)  &&  (!par.free)  &&  continue
+                (!showsettings.showfixed)  &&  par.fixed  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
                 table = vcat(table, ["" spname par.val par.unc par.actual])
-                push!(fixed, !par.free)
+                push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.actual)
             end
         else
             par = param
-            (!showsettings.showfixed)  &&  (!par.free)  &&  continue
+            (!showsettings.showfixed)  &&  par.fixed  &&  continue
             spname = string(pname)
             table = vcat(table, ["" spname par.val par.unc par.actual])
-            push!(fixed, !par.free)
+            push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.actual)
         end

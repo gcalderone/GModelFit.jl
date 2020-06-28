@@ -7,7 +7,7 @@ mutable struct OffsetSlope_1D <: AbstractComponent
 
     function OffsetSlope_1D(offset::Number, x0::Number, slope::Number)
         out = new(Parameter(offset), Parameter(x0), Parameter(slope))
-        out.x0.free = false
+        out.x0.fixed = true
         return out
     end
 end
@@ -22,8 +22,8 @@ mutable struct OffsetSlope_2D <: AbstractComponent
 
     function OffsetSlope_2D(offset::Number, x0::Number, y0::Number, slopeX::Number, slopeY::Number)
         out = new(Parameter(offset), Parameter(x0), Parameter(y0), Parameter(slopeX), Parameter(slopeY))
-        out.x0.free = false
-        out.y0.free = false
+        out.x0.fixed = true
+        out.y0.fixed = true
         return out
     end
 end

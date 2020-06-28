@@ -36,8 +36,8 @@ mutable struct Parameter
     low::Float64              # lower limit value
     high::Float64             # upper limit value
     step::Float64
-    free::Bool
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, true)
+    fixed::Bool
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
 end
 
 # ====================================================================
@@ -309,7 +309,7 @@ domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 mutable struct Model
     preds::Vector{Prediction}
     comps::OrderedDict{Symbol, AbstractComponent}
-    cfree::OrderedDict{Symbol, Bool}
+    cfixed::OrderedDict{Symbol, Bool}
     params::OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}
     pvalues::Vector{Float64}
     actual::Vector{Float64}
@@ -331,17 +331,17 @@ end
 function evaluate(model::Model)
     @assert length(model.preds) >= 1
 
-    # Save list of previously free components
-    cfree = deepcopy(model.cfree)
+    # Save list of previously fixed components
+    cfixed = deepcopy(model.cfixed)
 
     # Collect components and parameters
     empty!(model.comps)
-    empty!(model.cfree)
+    empty!(model.cfixed)
     empty!(model.params)
     for pred in model.preds
         for (cname, ceval) in pred.cevals
             model.comps[cname] = ceval.comp
-            model.cfree[cname] = get(cfree, cname, true)
+            model.cfixed[cname] = get(cfixed, cname, false)
             for (pname, par) in ceval.params
                 cpname = (cname, pname[1], pname[2])
                 model.params[cpname] = par
@@ -416,15 +416,15 @@ parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
 
 function freeze(model::Model, cname::Symbol)
     evaluate(model)
-    @assert cname in keys(model.cfree) "Component $cname is not defined"
-    model.cfree[cname] = false
+    @assert cname in keys(model.cfixed) "Component $cname is not defined"
+    model.cfixed[cname] = true
     model
 end
 
 function thaw(model::Model, cname::Symbol)
     evaluate(model)
-    @assert cname in keys(model.cfree) "Component $cname is not defined"
-    model.cfree[cname] = true
+    @assert cname in keys(model.cfixed) "Component $cname is not defined"
+    model.cfixed[cname] = false
     model
 end
 
@@ -435,7 +435,7 @@ end
 struct BestFitPar
     val::Float64
     unc::Float64
-    free::Bool
+    fixed::Bool
     actual::Float64  # value after transformation
 end
 
@@ -550,7 +550,7 @@ function fit!(model::Model, data::Vector{T};
 
     free = Vector{Bool}()
     for (cpname, par) in model.params
-        push!(free, par.free  &&  model.cfree[cpname[1]])
+        push!(free, (!par.fixed)  &&  (!model.cfixed[cpname[1]]))
     end
     ifree = findall(free)
     @assert length(ifree) > 0 "No free parameter in the model"
@@ -585,7 +585,7 @@ function fit!(model::Model, data::Vector{T};
         pname = cpname[2]
         parid = cpname[3]
         bfpar = BestFitPar(model.pvalues[i], uncerts[i],
-                           (i in ifree), model.actual[i])
+                           !(i in ifree), model.actual[i])
         if parid == 0
             comps[cname][pname] = bfpar
         else
