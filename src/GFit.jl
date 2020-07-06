@@ -234,7 +234,8 @@ function add!(pred::Prediction, things...)
     end
 end
 
-sum_of_array(args...) = .+(args...)
+sum_of_array( args...) = .+(args...)
+prod_of_array(args...) = .*(args...)
 
 add!(pred::Prediction, reducer::Reducer) =
     add!(pred, Symbol(:_, length(pred.revals)+1) => reducer)
@@ -261,7 +262,8 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
         end
     end
 
-    (reducer.funct == sum)  &&  (reducer.funct = sum_of_array)
+    (reducer.funct == sum)   &&  (reducer.funct = sum_of_array)
+    (reducer.funct == prod)  &&  (reducer.funct = prod_of_array)
     eval = reducer.funct(args...)
     pred.revals[rname] = ReducerEval(args, reducer.funct, eval)
     pred.rsel = rname
