@@ -16,14 +16,13 @@ import Base.getindex
 import Base.reshape
 import Base.propertynames
 import Base.getproperty
-import Base.setindex!
 import Base.iterate
 import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, constraint!, evaluate, parindex, thaw, freeze, fit!,
+    Model, liveupdate!, evaluate, parindex, thaw, freeze, fit!,
     savelog
 
 include("domain.jl")
@@ -306,6 +305,21 @@ Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
 domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 
 
+
+# ====================================================================
+struct LiveComponent
+    pvalues::Vector{Float64}
+    ipar::OrderedDict{Symbol, Vector{Int}}
+end
+
+function Base.getproperty(comp::LiveComponent, pname::Symbol)
+    v = getfield(comp, :pvalues)
+    i = getfield(comp, :ipar)[pname]
+    view(v, i)
+end
+
+
+
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
 mutable struct Model
@@ -313,15 +327,17 @@ mutable struct Model
     comps::OrderedDict{Symbol, AbstractComponent}
     cfixed::OrderedDict{Symbol, Bool}
     params::OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}
+    livecomp::OrderedDict{Symbol, LiveComponent}
     pvalues::Vector{Float64}
     actual::Vector{Float64}
     buffer::Vector{Float64}
-    constraints::Vector{Function}
+    liveupdatefuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
         model = new(v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
+                    OrderedDict{Symbol, LiveComponent}(),
                     Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), Vector{Function}())
         evaluate(model)
         return model
@@ -351,24 +367,37 @@ function evaluate(model::Model)
         end
     end
 
+    # Prepare vectors of parameter values (pvalues) and calculated
+    # values (actual)
+    model.pvalues = [par.val for par in values(model.params)]
+    model.actual = deepcopy(model.pvalues)
+
     # Populate CompEval.ipar and evaluate all predictions
+    empty!(model.livecomp)
     ndata = 0
     cpnames = keys(model.params)
     for pred in model.preds
         for (cname, ceval) in pred.cevals
             empty!(ceval.ipar)
+            liveipar = OrderedDict{Symbol, Vector{Int}}()
+
             for (pname, par) in ceval.params
                 cpname = (cname, pname[1], pname[2])
-                push!(ceval.ipar, findfirst(cpnames .== Ref(cpname)))
+                i = findall(cpnames .== Ref(cpname))
+                @assert length(i) == 1
+                push!(ceval.ipar, i[1])
+
+                haskey(liveipar, pname[1])  ||  (liveipar[pname[1]] = Vector{Int}())
+                push!( liveipar[pname[1]], i[1])
             end
             update(ceval)
+
+            model.livecomp[cname] = LiveComponent(model.actual, liveipar)
         end
         reduce(pred)
         ndata += length(pred())
     end
 
-    model.pvalues = [par.val for par in values(model.params)]
-    model.actual = deepcopy(model.pvalues)
     model.buffer = Vector{Float64}(undef, ndata)
     quick_evaluate(model)
     return model
@@ -377,8 +406,8 @@ end
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.actual .= model.pvalues  # copy all values by default
-    for func in model.constraints
-        func(model, model.pvalues, model.actual)
+    for func in model.liveupdatefuncts
+        func(model.livecomp)
     end
 
     for pred in model.preds
@@ -400,8 +429,8 @@ function add!(model::Model, p::Prediction)
 end
 
 
-function constraint!(model::Model, func::Function)
-    push!(model.constraints, func)
+function liveupdate!(model::Model, func::Function)
+    push!(model.liveupdatefuncts, func)
     evaluate(model)
     return model
 end
@@ -448,10 +477,8 @@ end
 
 Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
 Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
-Base.getindex(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 Base.length(comp::BestFitComp) = length(getfield(comp, :params))
 Base.iterate(comp::BestFitComp, args...) = iterate(getfield(comp, :params), args...)
-Base.setindex!(comp::BestFitComp, x, p::Symbol) = getfield(comp, :params)[p] = x
 
 
 struct BestFitResult
@@ -542,6 +569,17 @@ macro with_CMPFit()
 end
 
 
+# Fit on the i-th prediction
+function fit!(model::Model, i::Int, data::GFit.AbstractMeasures; kw...)
+    m = Model(model.preds[i])
+    append!(m.liveupdatefuncts, model.liveupdatefuncts)
+    for cname in keys(m.cfixed)
+        m.cfixed[cname] = model.cfixed[cname]
+    end
+    return fit!(m, [data]; kw...)
+end
+
+
 fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
@@ -589,13 +627,14 @@ function fit!(model::Model, data::Vector{T};
         bfpar = BestFitPar(model.pvalues[i], uncerts[i],
                            !(i in ifree), model.actual[i])
         if parid == 0
-            comps[cname][pname] = bfpar
+            #Base.setindex!(comp::BestFitComp, x, p::Symbol) = getfield(comp, :params)[p] = x
+            getfield(comps[cname], :params)[pname] = bfpar
         else
-            if parid == 1
-                comps[cname][pname] = [bfpar]
-            else
-                push!(comps[cname][pname], bfpar)
-            end
+            # TODO if parid == 1
+            # TODO     comps[cname][pname] = [bfpar]
+            # TODO else
+            # TODO     push!(comps[cname][pname], bfpar)
+            # TODO end
         end
         i += 1
     end
