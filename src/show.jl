@@ -257,7 +257,7 @@ function preparetable(comp::BestFitComp)
         if isa(param, Vector{BestFitPar})
             for ii in 1:length(param)
                 par = param[ii]
-                (!showsettings.showfixed)  &&  par.fixed  &&  continue
+                (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.actual)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
                 table = vcat(table, ["" spname par.val par.unc par.actual])
                 push!(fixed, par.fixed)
@@ -266,7 +266,7 @@ function preparetable(comp::BestFitComp)
             end
         else
             par = param
-            (!showsettings.showfixed)  &&  par.fixed  &&  continue
+            (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.actual)  &&  continue
             spname = string(pname)
             table = vcat(table, ["" spname par.val par.unc par.actual])
             push!(fixed, par.fixed)
