@@ -571,12 +571,17 @@ end
 
 # Fit on the i-th prediction
 function fit!(model::Model, i::Int, data::GFit.AbstractMeasures; kw...)
-    m = Model(model.preds[i])
-    append!(m.liveupdatefuncts, model.liveupdatefuncts)
-    for cname in keys(m.cfixed)
-        m.cfixed[cname] = model.cfixed[cname]
+    cfixed = deepcopy(model.cfixed)
+    for (cname, comp) in model.comps
+        if !haskey(model.preds[i].cevals, cname)
+            model.cfixed[cname] = true
+        end
     end
-    return fit!(m, [data]; kw...)
+    out = fit(model, [data]; kw...)
+    for cname in keys(cfixed)
+        model.cfixed[cname] = cfixed[cname]
+    end
+    return out
 end
 
 
