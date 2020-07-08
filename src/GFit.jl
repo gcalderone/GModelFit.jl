@@ -577,7 +577,7 @@ function fit!(model::Model, i::Int, data::GFit.AbstractMeasures; kw...)
             model.cfixed[cname] = true
         end
     end
-    out = fit(model, [data]; kw...)
+    out = fit!(model, [data]; kw...)
     for cname in keys(cfixed)
         model.cfixed[cname] = cfixed[cname]
     end
