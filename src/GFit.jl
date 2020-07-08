@@ -569,29 +569,23 @@ macro with_CMPFit()
 end
 
 
-# Fit on the i-th prediction
-function fit!(model::Model, i::Int, data::GFit.AbstractMeasures; kw...)
-    cfixed = deepcopy(model.cfixed)
-    for (cname, comp) in model.comps
-        if !haskey(model.preds[i].cevals, cname)
-            model.cfixed[cname] = true
-        end
-    end
-    out = fit!(model, [data]; kw...)
-    for cname in keys(cfixed)
-        model.cfixed[cname] = cfixed[cname]
-    end
-    return out
-end
-
-
 fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
 function fit!(model::Model, data::Vector{T};
+              onlypred::Int=0,
               minimizer=lsqfit()) where T<:AbstractMeasures
     elapsedTime = Base.time_ns()
     evaluate(model)
+
+    if onlypred != 0
+        origcfixed = deepcopy(model.cfixed)
+        for (cname, comp) in model.comps
+            if !haskey(model.preds[onlypred].cevals, cname)
+                model.cfixed[cname] = true
+            end
+        end
+    end
 
     free = Vector{Bool}()
     for (cpname, par) in model.params
@@ -649,6 +643,13 @@ function fit!(model::Model, data::Vector{T};
     result = BestFitResult(comps, length(model.buffer), dof, cost, status,
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
                            float(Base.time_ns() - elapsedTime) / 1.e9)
+
+    if onlypred != 0
+        for cname in keys(origcfixed)
+            model.cfixed[cname] = origcfixed[cname]
+        end
+    end
+
     return result
 end
 
