@@ -29,7 +29,7 @@ function viewermeta(model::Model, data::AbstractData;
 
     pred = model.preds[index]
     if length(names) == 0
-        names = collect(keys(pred.reducers))
+        names = collect(keys(pred.revals))
     end
     meta["model"] = OrderedDict()
     for i in 1:length(names)
@@ -60,14 +60,14 @@ function dump(io::IO, model::Model, data::AbstractData;
     root["data"]["err"] = data.unc
 
     if length(names) == 0
-        names = collect(keys(pred.reducers))
+        names = collect(keys(pred.revals))
     end
     root["model"] = OrderedDict()
     for i in 1:length(names)
         n = string(names[i])
         root["model"][n] = OrderedDict()
         root["model"][n]["x"] = domain(pred)
-        root["model"][n]["y"] = pred.revals[names[i]]
+        root["model"][n]["y"] = pred.revals[names[i]].eval
     end
 
     root["residuals"] = OrderedDict()

@@ -243,8 +243,8 @@ end
 
 
 show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
-                                        (par.val == par.actual  ?  ""  :
-                                         " (constrained value: " * string(par.actual) * ")"))
+                                        (par.val == par.patched  ?  ""  :
+                                         " (patched value: " * string(par.patched) * ")"))
 
 
 function preparetable(comp::BestFitComp)
@@ -257,21 +257,21 @@ function preparetable(comp::BestFitComp)
         if isa(param, Vector{BestFitPar})
             for ii in 1:length(param)
                 par = param[ii]
-                (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.actual)  &&  continue
+                (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, ["" spname par.val par.unc par.actual])
+                table = vcat(table, ["" spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
-                push!(watch, par.val != par.actual)
+                push!(watch, par.val != par.patched)
             end
         else
             par = param
-            (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.actual)  &&  continue
+            (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
             spname = string(pname)
-            table = vcat(table, ["" spname par.val par.unc par.actual])
+            table = vcat(table, ["" spname par.val par.unc par.patched])
             push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
-            push!(watch, par.val != par.actual)
+            push!(watch, par.val != par.patched)
         end
     end
     return (table, fixed, error, watch)
@@ -281,7 +281,7 @@ end
 function show(io::IO, comp::BestFitComp)
     (table, fixed, error, watch) = preparetable(comp)
     (length(table) == 0)  &&  return
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"],
+    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Patched"],
                hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
@@ -314,7 +314,7 @@ function show(io::IO, res::BestFitResult)
             push!(hrule, length(error)+1)
         end
     end
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Constrained"],
+    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Patched"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),

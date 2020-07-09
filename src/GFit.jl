@@ -22,7 +22,7 @@ import Base.dump
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, liveupdate!, evaluate, parindex, thaw, freeze, fit!,
+    Model, patch!, evaluate, parindex, thaw, freeze, fit!,
     savelog
 
 include("domain.jl")
@@ -307,12 +307,12 @@ domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 
 
 # ====================================================================
-struct LiveComponent
+struct PatchComp
     pvalues::Vector{Float64}
     ipar::OrderedDict{Symbol, Vector{Int}}
 end
 
-function Base.getproperty(comp::LiveComponent, pname::Symbol)
+function Base.getproperty(comp::PatchComp, pname::Symbol)
     v = getfield(comp, :pvalues)
     i = getfield(comp, :ipar)[pname]
     view(v, i)
@@ -327,17 +327,17 @@ mutable struct Model
     comps::OrderedDict{Symbol, AbstractComponent}
     cfixed::OrderedDict{Symbol, Bool}
     params::OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}
-    livecomp::OrderedDict{Symbol, LiveComponent}
+    patchbay::OrderedDict{Symbol, PatchComp}
     pvalues::Vector{Float64}
-    actual::Vector{Float64}
+    patched::Vector{Float64}
     buffer::Vector{Float64}
-    liveupdatefuncts::Vector{Function}
+    patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
         model = new(v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
-                    OrderedDict{Symbol, LiveComponent}(),
+                    OrderedDict{Symbol, PatchComp}(),
                     Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), Vector{Function}())
         evaluate(model)
         return model
@@ -367,13 +367,13 @@ function evaluate(model::Model)
         end
     end
 
-    # Prepare vectors of parameter values (pvalues) and calculated
-    # values (actual)
+    # Prepare vectors of parameter values (pvalues) and "patched"
+    # values (patched)
     model.pvalues = [par.val for par in values(model.params)]
-    model.actual = deepcopy(model.pvalues)
+    model.patched = deepcopy(model.pvalues)
 
     # Populate CompEval.ipar and evaluate all predictions
-    empty!(model.livecomp)
+    empty!(model.patchbay)
     ndata = 0
     cpnames = keys(model.params)
     for pred in model.preds
@@ -392,7 +392,7 @@ function evaluate(model::Model)
             end
             update(ceval)
 
-            model.livecomp[cname] = LiveComponent(model.actual, liveipar)
+            model.patchbay[cname] = PatchComp(model.patched, liveipar)
         end
         reduce(pred)
         ndata += length(pred())
@@ -405,14 +405,14 @@ end
 
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
-    model.actual .= model.pvalues  # copy all values by default
-    for func in model.liveupdatefuncts
-        func(model.livecomp)
+    model.patched .= model.pvalues  # copy all values by default
+    for func in model.patchfuncts
+        func(model.patchbay)
     end
 
     for pred in model.preds
         for (cname, ceval) in pred.cevals
-            update(ceval, model.actual[ceval.ipar])
+            update(ceval, model.patched[ceval.ipar])
         end
     end
     for pred in model.preds
@@ -429,8 +429,8 @@ function add!(model::Model, p::Prediction)
 end
 
 
-function liveupdate!(model::Model, func::Function)
-    push!(model.liveupdatefuncts, func)
+function patch!(model::Model, func::Function)
+    push!(model.patchfuncts, func)
     evaluate(model)
     return model
 end
@@ -467,7 +467,7 @@ struct BestFitPar
     val::Float64
     unc::Float64
     fixed::Bool
-    actual::Float64  # value after transformation
+    patched::Float64  # value after transformation
 end
 
 struct BestFitComp
@@ -624,7 +624,7 @@ function fit!(model::Model, data::Vector{T};
         pname = cpname[2]
         parid = cpname[3]
         bfpar = BestFitPar(model.pvalues[i], uncerts[i],
-                           !(i in ifree), model.actual[i])
+                           !(i in ifree), model.patched[i])
         if parid == 0
             #Base.setindex!(comp::BestFitComp, x, p::Symbol) = getfield(comp, :params)[p] = x
             getfield(comps[cname], :params)[pname] = bfpar
