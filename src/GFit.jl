@@ -4,7 +4,6 @@ using Printf, PrettyTables
 using Statistics, Distributions
 using DataStructures
 using LsqFit
-using JSON
 using ExprTools
 
 import Base.push!
@@ -663,7 +662,7 @@ function fit!(model::Model, data::Vector{T};
     return result
 end
 
+include("todict.jl")
 include("show.jl")
-include("viewer.jl")
 
 end
