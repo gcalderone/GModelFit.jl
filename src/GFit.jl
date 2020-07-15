@@ -678,6 +678,7 @@ function domain(m::Model, dim::Int=1)
 end
 
 ##
+meta(d::AbstractData) = d.meta
 meta(param::Parameter) = param.meta
 meta(pred::Prediction) = pred.meta
 function meta(m::Model)

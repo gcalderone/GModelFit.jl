@@ -35,7 +35,6 @@ function todict(ceval::CompEval)
     i = findall(isfinite.(y))
 
     out = MDict()
-    out[:__meta] = ceval.meta
     out[:__counter] = ceval.counter
     out[:__min] = minimum(y[i])
     out[:__max] = maximum(y[i])
@@ -51,7 +50,6 @@ function todict(reval::ReducerEval)
     i = findall(isfinite.(y))
 
     out = MDict()
-    out[:__meta] = reval.meta
     out[:__counter] = reval.counter
     out[:__min] = minimum(y[i])
     out[:__max] = maximum(y[i])
@@ -130,17 +128,25 @@ todict(model::Model, data::T, bestfit::BestFitResult) where T <: AbstractMeasure
 function todict(model::Model,
     data::Union{Nothing, Vector{T}}=nothing,
     bestfit::Union{Nothing, BestFitResult}=nothing) where T <: AbstractMeasures
+
     out = MDict()
 
     out[:__components] = MDict()
     for (cname, comp) in model.comps
         out[:__components][cname] = todict(comp)
         out[:__components][cname][:__fixed] = model.cfixed[cname]
+        out[:__components][cname][:__meta] = meta(model, cname)
     end
 
     out[:__predictions] = Vector{MDict}()
     for pred in model.preds
         push!(out[:__predictions], todict(pred))
+        for (name, ceval) in pred.cevals
+            out[:__predictions][end][:__components][name][:__meta] = meta(model, name)
+        end
+        for (name, ceval) in pred.revals
+            out[:__predictions][end][:__reducers][name][:__meta] = meta(model, name)
+        end
     end
 
     if !isnothing(data)
