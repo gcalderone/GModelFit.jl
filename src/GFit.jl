@@ -69,7 +69,6 @@ end
 # CompEval: a wrapper for a component evaluated on a specific domain
 #
 mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
-    meta::MDict
     domain::TDomain
     comp::TComp
     params::OrderedDict{Tuple{Symbol,Int}, Parameter}
@@ -83,7 +82,7 @@ mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
         params = getparams(comp)
         (cdata, len) = ceval_data(domain, comp)
         return new{typeof(domain), typeof(comp)}(
-            MDict(), domain, comp, params, cdata, 0,
+            domain, comp, params, cdata, 0,
             fill(NaN, length(params)),
             fill(NaN, len), Vector{Int}())
     end
@@ -195,7 +194,6 @@ end
 
 # ====================================================================
 mutable struct ReducerEval
-    meta::MDict
     args::Vector{Vector{Float64}}
     funct::Function
     counter::Int
@@ -271,7 +269,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     (reducer.funct == sum)   &&  (reducer.funct = sum_of_array)
     (reducer.funct == prod)  &&  (reducer.funct = prod_of_array)
     eval = reducer.funct(args...)
-    pred.revals[rname] = ReducerEval(MDict(), args, reducer.funct, 1, eval)
+    pred.revals[rname] = ReducerEval(args, reducer.funct, 1, eval)
     pred.rsel = rname
     evaluate(pred)
     return pred
@@ -314,6 +312,7 @@ end
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
 mutable struct Model
+    meta::MDict
     preds::Vector{Prediction}
     comps::OrderedDict{Symbol, AbstractComponent}
     cfixed::OrderedDict{Symbol, Bool}
@@ -325,7 +324,7 @@ mutable struct Model
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(v, OrderedDict{Symbol, AbstractComponent}(),
+        model = new(MDict(), v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
                     OrderedDict{Symbol, PatchComp}(),
@@ -638,54 +637,77 @@ end
 
 # ====================================================================
 # User interface
+#
+
+Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
+Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
+
 function Base.getproperty(comp::PatchComp, pname::Symbol)
     v = getfield(comp, :pvalues)
     i = getfield(comp, :ipar)[pname]
     view(v, i)
 end
 
-##
-(pred::Prediction)() = pred(pred.rsel)
-function (pred::Prediction)(name::Symbol)
-    if haskey(pred.cevals, name)
-        return pred.cevals[name].eval
-    else
-        return pred.revals[name].eval
-    end
-end
-Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
-domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
-
-function meta(pred::Prediction, cname::Symbol)
-    if haskey(pred.cevals, name)
-        return pred.cevals[name].meta
-    else
-        return pred.revals[name].meta
-    end
-end
 
 ##
-(m::Model)() = m(1)
-(m::Model)(i::Int) = m.preds[i]()
-(m::Model)(i::Int, name::Symbol) = m.preds[i](name)
+function Base.getindex(pred::Prediction, name::Symbol)
+    if haskey(pred.cevals, name)
+        return pred.cevals[name]
+    else
+        return pred.revals[name]
+    end
+end
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
-domain(m::Model, i::Int=1, dim::Int=1) = domain(m.preds[i], dim)
-
-meta(m::Model, i::Int=1) = m.preds[i].meta
-meta(m::Model, name::Symbol) = meta(m.preds[1], name)
-meta(m::Model, i::Int, name::Symbol) = meta(m.preds[i], name)
-
-
-
-##
-Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
-Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
-
-##
+Base.getindex(m::Model, i::Int) = m.preds[i]
 Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
+##
+(e::CompEval)() = e.eval
+(e::ReducerEval)() = e.eval
+(pred::Prediction)() = pred[pred.rsel]()
+function (m::Model)()
+    @assert length(m.preds) == 1
+    m[1]()
+end
 
-#meta(p::Parameter) = p.meta
+##
+domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
+function domain(m::Model, dim::Int=1)
+    @assert length(m.preds) == 1
+    domain(m[1], dim)
+end
+
+##
+meta(param::Parameter) = param.meta
+meta(pred::Prediction) = pred.meta
+function meta(m::Model)
+    @assert length(m.preds) == 1
+    meta(m[1])
+end
+
+meta(m::Model, i::Int) = meta(m[i])
+function meta(m::Model, name::Symbol)
+    if haskey(m.comps, name)
+        haskey(m.meta, name)  ||  (m.meta[name] = MDict())
+        comp = m.comps[name]
+        if name in fieldnames(typeof(comp))
+            field = getfield(comp, name)
+            if isa(field, MDict)
+                m.meta[name] = field
+            end
+        end
+
+        return m.meta[name]
+    else
+        for pred in m.preds
+            if haskey(pred.revals, name)
+                haskey(m.meta, name)  ||  (m.meta[name] = MDict())
+                return m.meta[name]
+            end
+        end
+    end
+    error("Name $name is not defined")
+end
 
 include("todict.jl")
 include("show.jl")
