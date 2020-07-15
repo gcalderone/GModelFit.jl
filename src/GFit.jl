@@ -6,7 +6,6 @@ using DataStructures
 using LsqFit
 using ExprTools
 
-import Base.push!
 import Base.show
 import Base.ndims
 import Base.size
@@ -20,8 +19,8 @@ import Base.iterate
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, parindex, thaw, freeze, fit!,
-    savelog
+    Model, patch!, evaluate, thaw, freeze, fit!,
+    meta, savelog
 
 const MDict = OrderedDict{Symbol, Any}
 
@@ -70,6 +69,7 @@ end
 # CompEval: a wrapper for a component evaluated on a specific domain
 #
 mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
+    meta::MDict
     domain::TDomain
     comp::TComp
     params::OrderedDict{Tuple{Symbol,Int}, Parameter}
@@ -83,7 +83,7 @@ mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
         params = getparams(comp)
         (cdata, len) = ceval_data(domain, comp)
         return new{typeof(domain), typeof(comp)}(
-            domain, comp, params, cdata, 0,
+            MDict(), domain, comp, params, cdata, 0,
             fill(NaN, length(params)),
             fill(NaN, len), Vector{Int}())
     end
@@ -155,14 +155,13 @@ end
 
 # ====================================================================
 mutable struct Reducer
-    meta::MDict
     funct::Function
     allargs::Bool
     args::Vector{Symbol}
 end
 
-Reducer(f::Function) = Reducer(MDict(), f, true, Vector{Symbol}())
-Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(MDict(), f, false, collect(args))
+Reducer(f::Function) = Reducer(f, true, Vector{Symbol}())
+Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(f, false, collect(args))
 
 macro reducer(ex)
     @assert ex.head == Symbol("->") "Not an anonmymous function"
@@ -190,12 +189,13 @@ macro reducer(ex)
     end
     # Here `esc` is necessary to evaluate the function expression in
     # the caller scope
-    return esc(:(Reducer(GFit.MDict(), $ex, $allargs, $args)))
+    return esc(:(Reducer($ex, $allargs, $args)))
 end
 
 
 # ====================================================================
 mutable struct ReducerEval
+    meta::MDict
     args::Vector{Vector{Float64}}
     funct::Function
     counter::Int
@@ -271,7 +271,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     (reducer.funct == sum)   &&  (reducer.funct = sum_of_array)
     (reducer.funct == prod)  &&  (reducer.funct = prod_of_array)
     eval = reducer.funct(args...)
-    pred.revals[rname] = ReducerEval(args, reducer.funct, 1, eval)
+    pred.revals[rname] = ReducerEval(MDict(), args, reducer.funct, 1, eval)
     pred.rsel = rname
     evaluate(pred)
     return pred
@@ -301,17 +301,6 @@ function reduce(pred::Prediction)
     pred.counter += 1
 end
 
-(pred::Prediction)() = pred(pred.rsel)
-function (pred::Prediction)(name::Symbol)
-    if haskey(pred.cevals, name)
-        return pred.cevals[name].eval
-    else
-        return pred.revals[name].eval
-    end
-end
-Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
-domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
-
 
 
 # ====================================================================
@@ -320,18 +309,11 @@ struct PatchComp
     ipar::OrderedDict{Symbol, Vector{Int}}
 end
 
-function Base.getproperty(comp::PatchComp, pname::Symbol)
-    v = getfield(comp, :pvalues)
-    i = getfield(comp, :ipar)[pname]
-    view(v, i)
-end
-
 
 
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
 mutable struct Model
-    meta::MDict
     preds::Vector{Prediction}
     comps::OrderedDict{Symbol, AbstractComponent}
     cfixed::OrderedDict{Symbol, Bool}
@@ -343,7 +325,7 @@ mutable struct Model
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(MDict(), v, OrderedDict{Symbol, AbstractComponent}(),
+        model = new(v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
                     OrderedDict{Symbol, PatchComp}(),
@@ -445,14 +427,8 @@ function patch!(model::Model, func::Function)
 end
 
 
-(m::Model)() = m(1)
-(m::Model)(i::Int) = m.preds[i]()
-(m::Model)(i::Int, name::Symbol) = m.preds[i](name)
-Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
-domain(m::Model, i::Int=1, dim::Int=1) = domain(m.preds[i], dim)
-
-parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
-    findfirst(keys(model.params) .== Ref((cname, pname, i)))
+#parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
+#    findfirst(keys(model.params) .== Ref((cname, pname, i)))
 
 function freeze(model::Model, cname::Symbol)
     evaluate(model)
@@ -484,8 +460,6 @@ struct BestFitComp
     BestFitComp() = new(OrderedDict{Symbol, Union{BestFitPar, Vector{BestFitPar}}}())
 end
 
-Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
-Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 Base.length(comp::BestFitComp) = length(getfield(comp, :params))
 Base.iterate(comp::BestFitComp, args...) = iterate(getfield(comp, :params), args...)
 
@@ -500,7 +474,6 @@ struct BestFitResult
     elapsed::Float64
 end
 
-Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
 # ====================================================================
 function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
@@ -661,6 +634,58 @@ function fit!(model::Model, data::Vector{T};
 
     return result
 end
+
+
+# ====================================================================
+# User interface
+function Base.getproperty(comp::PatchComp, pname::Symbol)
+    v = getfield(comp, :pvalues)
+    i = getfield(comp, :ipar)[pname]
+    view(v, i)
+end
+
+##
+(pred::Prediction)() = pred(pred.rsel)
+function (pred::Prediction)(name::Symbol)
+    if haskey(pred.cevals, name)
+        return pred.cevals[name].eval
+    else
+        return pred.revals[name].eval
+    end
+end
+Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
+domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
+
+function meta(pred::Prediction, cname::Symbol)
+    if haskey(pred.cevals, name)
+        return pred.cevals[name].meta
+    else
+        return pred.revals[name].meta
+    end
+end
+
+##
+(m::Model)() = m(1)
+(m::Model)(i::Int) = m.preds[i]()
+(m::Model)(i::Int, name::Symbol) = m.preds[i](name)
+Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
+domain(m::Model, i::Int=1, dim::Int=1) = domain(m.preds[i], dim)
+
+meta(m::Model, i::Int=1) = m.preds[i].meta
+meta(m::Model, name::Symbol) = meta(m.preds[1], name)
+meta(m::Model, i::Int, name::Symbol) = meta(m.preds[i], name)
+
+
+
+##
+Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
+Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
+
+##
+Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
+
+
+#meta(p::Parameter) = p.meta
 
 include("todict.jl")
 include("show.jl")
