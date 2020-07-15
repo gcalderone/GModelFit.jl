@@ -104,6 +104,7 @@ function show(io::IO, data::AbstractData)
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
     for name in names
+        (name == :meta)  &&  continue
         a = getfield(data, name)
         nan = length(findall(isnan.(a))) + length(findall(isinf.(a)))
         a = a[findall(isfinite.(a))]

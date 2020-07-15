@@ -17,7 +17,6 @@ import Base.reshape
 import Base.propertynames
 import Base.getproperty
 import Base.iterate
-import Base.dump
 
 
 export Domain, CartesianDomain, Measures,
@@ -25,18 +24,23 @@ export Domain, CartesianDomain, Measures,
     Model, patch!, evaluate, parindex, thaw, freeze, fit!,
     savelog
 
+const MDict = OrderedDict{Symbol, Any}
+
+
 include("domain.jl")
+
 
 # ====================================================================
 # Parameter
 #
 mutable struct Parameter
+    meta::MDict
     val::Float64
     low::Float64              # lower limit value
     high::Float64             # upper limit value
     step::Float64
     fixed::Bool
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
+    Parameter(value::Number) = new(MDict(), float(value), -Inf, +Inf, NaN, false)
 end
 
 # ====================================================================
@@ -149,15 +153,17 @@ function extract_components(things::Vararg{Pair})
 end
 
 
+
 # ====================================================================
 mutable struct Reducer
+    meta::MDict
     funct::Function
     allargs::Bool
     args::Vector{Symbol}
 end
 
-Reducer(f::Function) = Reducer(f, true, Vector{Symbol}())
-Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(f, false, collect(args))
+Reducer(f::Function) = Reducer(MDict(), f, true, Vector{Symbol}())
+Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(MDict(), f, false, collect(args))
 
 macro reducer(ex)
     @assert ex.head == Symbol("->") "Not an anonmymous function"
@@ -185,7 +191,7 @@ macro reducer(ex)
     end
     # Here `esc` is necessary to evaluate the function expression in
     # the caller scope
-    return esc(:(Reducer($ex, $allargs, $args)))
+    return esc(:(Reducer(GFit.MDict(), $ex, $allargs, $args)))
 end
 
 
@@ -193,6 +199,7 @@ end
 mutable struct ReducerEval
     args::Vector{Vector{Float64}}
     funct::Function
+    counter::Int
     eval::Vector{Float64}
 end
 
@@ -200,6 +207,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
+    meta::MDict
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
@@ -207,10 +215,10 @@ mutable struct Prediction
     counter::Int
 
     function Prediction(domain::AbstractDomain, things...)
-        pred = new(domain,
-                  OrderedDict{Symbol, CompEval}(),
-                  OrderedDict{Symbol, ReducerEval}(),
-                  Symbol(""), 0)
+        pred = new(MDict(), domain,
+                   OrderedDict{Symbol, CompEval}(),
+                   OrderedDict{Symbol, ReducerEval}(),
+                   Symbol(""), 0)
         add!(pred, things...)
         return pred
     end
@@ -264,7 +272,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     (reducer.funct == sum)   &&  (reducer.funct = sum_of_array)
     (reducer.funct == prod)  &&  (reducer.funct = prod_of_array)
     eval = reducer.funct(args...)
-    pred.revals[rname] = ReducerEval(args, reducer.funct, eval)
+    pred.revals[rname] = ReducerEval(args, reducer.funct, 1, eval)
     pred.rsel = rname
     evaluate(pred)
     return pred
@@ -288,6 +296,7 @@ end
 
 function reduce(pred::Prediction)
     for (rname, reval) in pred.revals
+        reval.counter += 1
         reval.eval .= reval.funct(reval.args...)
     end
     pred.counter += 1
@@ -323,6 +332,7 @@ end
 # ====================================================================
 # Global model, actually a collection of `Prediction`s.
 mutable struct Model
+    meta::MDict
     preds::Vector{Prediction}
     comps::OrderedDict{Symbol, AbstractComponent}
     cfixed::OrderedDict{Symbol, Bool}
@@ -334,7 +344,7 @@ mutable struct Model
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(v, OrderedDict{Symbol, AbstractComponent}(),
+        model = new(MDict(), v, OrderedDict{Symbol, AbstractComponent}(),
                     OrderedDict{Symbol, Bool}(),
                     OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
                     OrderedDict{Symbol, PatchComp}(),
