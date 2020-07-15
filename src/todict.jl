@@ -72,7 +72,7 @@ function todict(pred::Prediction)
     for (rname, reval) in pred.revals
         out[:__reducers][rname] = todict(reval)
     end
-    out[:__model] = todict(pred.revals[pred.rsel])
+    out[:__main_reducer] = pred.rsel
     return out
 end
 
