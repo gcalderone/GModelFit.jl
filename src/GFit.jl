@@ -20,7 +20,7 @@ import Base.iterate
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate, thaw, freeze, fit!,
-    meta, savelog
+    metadict, savelog
 
 const MDict = OrderedDict{Symbol, Any}
 
@@ -678,16 +678,16 @@ function domain(m::Model, dim::Int=1)
 end
 
 ##
-meta(d::AbstractData) = d.meta
-meta(param::Parameter) = param.meta
-meta(pred::Prediction) = pred.meta
-function meta(m::Model)
+metadict(d::AbstractData) = d.meta
+metadict(param::Parameter) = param.meta
+metadict(pred::Prediction) = pred.meta
+function metadict(m::Model)
     @assert length(m.preds) == 1
-    meta(m[1])
+    metadict(m[1])
 end
 
-meta(m::Model, i::Int) = meta(m[i])
-function meta(m::Model, name::Symbol)
+metadict(m::Model, i::Int) = metadict(m[i])
+function metadict(m::Model, name::Symbol)
     if haskey(m.comps, name)
         haskey(m.meta, name)  ||  (m.meta[name] = MDict())
         comp = m.comps[name]

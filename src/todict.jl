@@ -135,17 +135,17 @@ function todict(model::Model,
     for (cname, comp) in model.comps
         out[:__components][cname] = todict(comp)
         out[:__components][cname][:__fixed] = model.cfixed[cname]
-        out[:__components][cname][:__meta] = meta(model, cname)
+        out[:__components][cname][:__meta] = metadict(model, cname)
     end
 
     out[:__predictions] = Vector{MDict}()
     for pred in model.preds
         push!(out[:__predictions], todict(pred))
         for (name, ceval) in pred.cevals
-            out[:__predictions][end][:__components][name][:__meta] = meta(model, name)
+            out[:__predictions][end][:__components][name][:__meta] = metadict(model, name)
         end
         for (name, ceval) in pred.revals
-            out[:__predictions][end][:__reducers][name][:__meta] = meta(model, name)
+            out[:__predictions][end][:__reducers][name][:__meta] = metadict(model, name)
         end
     end
 
