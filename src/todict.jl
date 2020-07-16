@@ -80,7 +80,6 @@ end
 function todict(pred::Prediction, data::Measures_1D)
     out = MDict()
     out[:__meta] = data.meta
-    out[:__x] = domain(pred)
     out[:__y] = data.val
     out[:__err] = data.unc
     out[:__residuals] = (data.val .- pred()) ./ data.unc
