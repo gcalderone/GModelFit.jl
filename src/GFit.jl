@@ -677,7 +677,7 @@ Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
 function domain(m::Model, dim::Int=1)
     @assert length(m.preds) == 1
-    domain(m[1], dim)
+    domain(m.preds[1], dim)
 end
 
 ##
