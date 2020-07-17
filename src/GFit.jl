@@ -300,6 +300,15 @@ function reduce(pred::Prediction)
 end
 
 
+geteval(pred::Prediction) = geteval(pred, pred.rsel)
+function geteval(pred::Prediction, name::Symbol)
+    if haskey(pred.cevals, name)
+        return pred.cevals[name].eval
+    else
+        return pred.revals[name].eval
+    end
+end
+
 
 # ====================================================================
 struct PatchComp
@@ -385,7 +394,7 @@ function evaluate(model::Model)
             model.patchbay[cname] = PatchComp(model.patched, liveipar)
         end
         reduce(pred)
-        ndata += length(pred())
+        ndata += length(geteval(pred))
     end
 
     model.buffer = Vector{Float64}(undef, ndata)
@@ -479,7 +488,7 @@ function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
     out = Vector{Measures_1D}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        @assert(length(data[i]) == length(pred()),
+        @assert(length(data[i]) == length(geteval(pred)),
                 "Length of dataset $i do not match corresponding model prediction.")
         push!(out, flatten(data[i], pred.domain))
     end
@@ -491,7 +500,7 @@ function residuals1d(model::Model, data1d::Vector{Measures_1D})
     c1 = 1
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        eval = pred()
+        eval = geteval(pred)
         c2 = c1 + length(eval) - 1
         model.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
         c1 = c2 + 1
@@ -638,7 +647,6 @@ end
 # ====================================================================
 # User interface
 #
-
 Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
 Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 
@@ -650,25 +658,20 @@ end
 
 
 ##
-function Base.getindex(pred::Prediction, name::Symbol)
-    if haskey(pred.cevals, name)
-        return pred.cevals[name]
-    else
-        return pred.revals[name]
-    end
-end
-Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
-Base.getindex(m::Model, i::Int) = m.preds[i]
-Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
-
-##
-(e::CompEval)() = e.eval
-(e::ReducerEval)() = e.eval
-(pred::Prediction)() = pred[pred.rsel]()
 function (m::Model)()
     @assert length(m.preds) == 1
-    m[1]()
+    m(1)
 end
+function (m::Model)(name::Symbol)
+    @assert length(m.preds) == 1
+    m(1, name)
+end
+(m::Model)(i::Int) = geteval(m.preds[i])
+(m::Model)(i::Int, name::Symbol) = geteval(m.preds[i], name)
+
+##
+Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
+Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
 ##
 domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
@@ -680,13 +683,12 @@ end
 ##
 metadict(d::AbstractData) = d.meta
 metadict(param::Parameter) = param.meta
-metadict(pred::Prediction) = pred.meta
 function metadict(m::Model)
     @assert length(m.preds) == 1
-    metadict(m[1])
+    return m.preds[1].meta
 end
+metadict(m::Model, i::Int) = m.preds[i].meta
 
-metadict(m::Model, i::Int) = metadict(m[i])
 function metadict(m::Model, name::Symbol)
     if haskey(m.comps, name)
         haskey(m.meta, name)  ||  (m.meta[name] = MDict())
