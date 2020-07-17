@@ -113,6 +113,16 @@ ceval_data(domain::AbstractDomain, comp::AbstractComponent) =
 evaluate(c::CompEval{TDomain, TComp}, args...) where {TDomain, TComp} =
     error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
+function evaluate(c::CompEval{TDomain, TComp}) where {TDomain, TComp}
+    if length(c.params) == 0
+        error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
+    else
+        # Facility to evaluate a component using stored values
+        pvalues = getfield.(values(c.params), :val)
+        evaluate(c, pvalues...)
+    end
+end
+
 
 # ====================================================================
 # Built-in components
