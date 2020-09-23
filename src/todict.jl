@@ -82,7 +82,7 @@ function todict(pred::Prediction, data::Measures_1D)
     out[:__meta] = data.meta
     out[:__y] = data.val
     out[:__err] = data.unc
-    out[:__residuals] = (data.val .- pred()) ./ data.unc
+    out[:__residuals] = (data.val .- geteval(pred)) ./ data.unc
     return out
 end
 
