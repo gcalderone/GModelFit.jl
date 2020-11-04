@@ -1,3 +1,8 @@
+const todict_opt = Dict(
+    :rebin => 1,
+    :addcomps => true
+)
+
 rebin_data(rebin, v) = rebin_data(rebin, v, ones(eltype(v), length(v)))[1]
 function rebin_data(rebin::Int, v, e)
     @assert length(v) == length(e)
@@ -52,7 +57,7 @@ function todict(comp::AbstractComponent)
 end
 
 
-function todict(ceval::CompEval; rebin::Int=1)
+function todict(ceval::CompEval)
     y = ceval.eval
     i = findall(isfinite.(y))
 
@@ -62,12 +67,16 @@ function todict(ceval::CompEval; rebin::Int=1)
     out[:max] = maximum(y[i])
     out[:mean] = mean(y[i])
     out[:error] = (length(i) == length(y))
-    out[:y] = rebin_data(rebin, y)
+    if todict_opt[:addcomps]
+        out[:y] = rebin_data(todict_opt[:rebin], y)
+    else
+        out[:y] = Vector{Float64}()
+    end
     return out
 end
 
 
-function todict(reval::ReducerEval; rebin::Int=1)
+function todict(reval::ReducerEval)
     y = reval.eval
     i = findall(isfinite.(y))
 
@@ -77,33 +86,33 @@ function todict(reval::ReducerEval; rebin::Int=1)
     out[:max] = maximum(y[i])
     out[:mean] = mean(y[i])
     out[:error] = (length(i) == length(y))
-    out[:y] = rebin_data(rebin, y)
+    out[:y] = rebin_data(todict_opt[:rebin], y)
     return out
 end
 
 
-function todict(pred::Prediction; rebin::Int=1)
+function todict(pred::Prediction)
     out = MDict()
     out[:meta] = pred.meta
-    out[:x] = rebin_data(rebin, domain(pred))
+    out[:x] = rebin_data(todict_opt[:rebin], domain(pred))
     out[:components] = MDict()
     for (cname, ceval) in pred.cevals
-        out[:components][cname] = todict(ceval, rebin=rebin)
+        out[:components][cname] = todict(ceval)
     end
     out[:reducers] = MDict()
     for (rname, reval) in pred.revals
-        out[:reducers][rname] = todict(reval, rebin=rebin)
+        out[:reducers][rname] = todict(reval)
     end
     out[:main_reducer] = pred.rsel
     return out
 end
 
 
-function todict(pred::Prediction, data::Measures_1D; rebin::Int=1)
+function todict(pred::Prediction, data::Measures_1D)
     out = MDict()
     out[:meta] = data.meta
-    p = rebin_data(rebin, geteval(pred))
-    y, err = rebin_data(rebin, data.val, data.unc)
+    p = rebin_data(todict_opt[:rebin], geteval(pred))
+    y, err = rebin_data(todict_opt[:rebin], data.val, data.unc)
     out[:y] = y
     out[:err] = err
     out[:residuals] = (y .- p) ./ err
@@ -145,13 +154,12 @@ function todict(res::BestFitResult)
 end
 
 
-todict(model::Model, data::T; rebin::Int=1) where T <: AbstractMeasures = todict(model, [data], rebin=rebin)
-todict(model::Model, data::T, bestfit::BestFitResult; rebin::Int=1) where T <: AbstractMeasures = todict(model, [data], bestfit, rebin=rebin)
+todict(model::Model, data::T) where T <: AbstractMeasures = todict(model, [data])
+todict(model::Model, data::T, bestfit::BestFitResult) where T <: AbstractMeasures = todict(model, [data], bestfit)
 
 function todict(model::Model,
                 data::Union{Nothing, Vector{T}}=nothing,
-                bestfit::Union{Nothing, BestFitResult}=nothing;
-                rebin::Int=1) where T <: AbstractMeasures
+                bestfit::Union{Nothing, BestFitResult}=nothing) where T <: AbstractMeasures
 
     out = MDict()
 
@@ -164,7 +172,7 @@ function todict(model::Model,
 
     out[:predictions] = Vector{MDict}()
     for pred in model.preds
-        push!(out[:predictions], todict(pred, rebin=rebin))
+        push!(out[:predictions], todict(pred))
         for (name, ceval) in pred.cevals
             out[:predictions][end][:components][name][:meta] = metadict(model, name)
         end
@@ -177,7 +185,7 @@ function todict(model::Model,
         out[:data] = Vector{MDict}()
         @assert length(model.preds) == length(data)
         for i in 1:length(data)
-            push!(out[:data], todict(model.preds[i], data[i], rebin=rebin))
+            push!(out[:data], todict(model.preds[i], data[i]))
         end
     end
 
