@@ -1,6 +1,6 @@
 mutable struct ShowSettings
     plain::Bool
-    tableformat::PrettyTableFormat
+    tableformat::TextFormat
     floatformat::String
     border::Crayon
     header::Crayon
@@ -10,7 +10,7 @@ mutable struct ShowSettings
     highlighted::Crayon
     section::Crayon
     showfixed::Bool
-    ShowSettings() = new(false, unicode_rounded, "%9.4g",
+    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g",
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
                          crayon"light_red blink", crayon"negative", crayon"green bold",
