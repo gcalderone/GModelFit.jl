@@ -89,7 +89,7 @@ mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
 end
 
 
-# This is called to `update` to distinguish it from component's `evaluate`.
+# This is called `update` to distinguish it from component's `evaluate`.
 update(c::CompEval) = update(c, [par.val for par in values(c.params)])
 function update(c::CompEval, pvalues::Vector{Float64})
     @assert length(c.params) == length(pvalues)
@@ -611,6 +611,9 @@ function fit!(model::Model, data::Vector{T};
                                             collect(values(model.params))[ifree])
 
     model.pvalues[ifree] .= best_val
+    # Copy best fit values back into components.  This is needed since
+    # the evaluated components are stored in the Model, not in
+    # BestFitResult, hence I do this to maintain a coherent status.
     setfield!.(values(model.params), :val, model.pvalues)
     uncerts = fill(NaN, length(model.pvalues))
     uncerts[ifree] .= best_unc
