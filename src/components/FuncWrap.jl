@@ -11,7 +11,7 @@ struct FuncWrap <: AbstractComponent
     end
 end
 
-ceval_data(domain::AbstractDomain, comp::FuncWrap) = (nothing, 0)
+ceval_data(domain::AbstractDomain, comp::FuncWrap) = (nothing, length(domain))
 
 function evaluate(c::CompEval{T, FuncWrap}, params...) where T <: AbstractDomain
     out = c.comp.func(c.domain[1], params...)
