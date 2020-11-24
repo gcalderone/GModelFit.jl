@@ -227,6 +227,7 @@ mutable struct Prediction
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
         add!(pred, things...)
+        add!(pred, :_1 => Reducer(sum_of_array))
         return pred
     end
 
@@ -248,7 +249,9 @@ function add!(pred::Prediction, things...)
     end
 end
 
+sum_of_array( arg::Array) = arg
 sum_of_array( args...) = .+(args...)
+prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
 add!(pred::Prediction, reducer::Reducer) =
@@ -618,6 +621,7 @@ function fit!(model::Model, data::Vector{T};
     for cname in keys(model.comps)
         comps[cname] = BestFitComp()
     end
+
     i = 1
     for (cpname, par) in model.params
         cname = cpname[1]
@@ -629,11 +633,11 @@ function fit!(model::Model, data::Vector{T};
             #Base.setindex!(comp::BestFitComp, x, p::Symbol) = getfield(comp, :params)[p] = x
             getfield(comps[cname], :params)[pname] = bfpar
         else
-            # TODO if parid == 1
-            # TODO     comps[cname][pname] = [bfpar]
-            # TODO else
-            # TODO     push!(comps[cname][pname], bfpar)
-            # TODO end
+            if parid == 1
+                getfield(comps[cname], :params)[pname] = [bfpar]
+            else
+                push!(getfield(comps[cname], :params)[pname], bfpar)
+            end
         end
         i += 1
     end
