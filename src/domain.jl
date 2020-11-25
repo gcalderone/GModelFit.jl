@@ -14,7 +14,7 @@ abstract type AbstractCounts   <: AbstractData end
 # Macro to define domain, data and associated methods for any
 # dimensionality
 #
-macro define_ndim(ndim::Int)
+function define_ndim(ndim::Int)
     @assert ndim >= 1 "Number of dimensions must be >= 1"
     out = Expr(:block)
 
@@ -147,12 +147,12 @@ macro define_ndim(ndim::Int)
         end
     ))
 
-    return esc(out)
+    eval(out)
+    return nothing
 end
 
-@define_ndim 1
-@define_ndim 2
-@define_ndim 3
+define_ndim(1)
+define_ndim(2)
 
 getaxismin(dom::AbstractLinearDomain, dim::Int) = dom.vmin[dim]
 getaxismax(dom::AbstractLinearDomain, dim::Int) = dom.vmax[dim]
