@@ -227,12 +227,12 @@ mutable struct Prediction
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
         add!(pred, things...)
-        add!(pred, :_1 => Reducer(sum_of_array))
+        add!(pred, :autored_1 => Reducer(sum_of_array))
         return pred
     end
 
     Prediction(domain::AbstractDomain, reducer::Reducer, things...) =
-        Prediction(domain, :_1 => reducer, things...)
+        Prediction(domain, :autored_1 => reducer, things...)
 
     function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, things...)
         pred = Prediction(domain, things...)
@@ -255,7 +255,7 @@ prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
 add!(pred::Prediction, reducer::Reducer) =
-    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer)
+    add!(pred, Symbol(:autored_, length(pred.revals)+1) => reducer)
 
 function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
@@ -576,15 +576,15 @@ fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
 function fit!(model::Model, data::Vector{T};
-              onlypred::Int=0,
+              id::Int=0,
               minimizer=lsqfit()) where T<:AbstractMeasures
     elapsedTime = Base.time_ns()
     evaluate(model)
 
-    if onlypred != 0
+    if id != 0
         origcfixed = deepcopy(model.cfixed)
         for (cname, comp) in model.comps
-            if !haskey(model.preds[onlypred].cevals, cname)
+            if !haskey(model.preds[id].cevals, cname)
                 model.cfixed[cname] = true
             end
         end
@@ -651,7 +651,7 @@ function fit!(model::Model, data::Vector{T};
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
                            float(Base.time_ns() - elapsedTime) / 1.e9)
 
-    if onlypred != 0
+    if id != 0
         for cname in keys(origcfixed)
             model.cfixed[cname] = origcfixed[cname]
         end
@@ -675,36 +675,22 @@ end
 
 
 ##
-function (m::Model)()
-    @assert length(m.preds) == 1
-    m(1)
-end
-function (m::Model)(name::Symbol)
-    @assert length(m.preds) == 1
-    m(1, name)
-end
-(m::Model)(i::Int) = geteval(m.preds[i])
-(m::Model)(i::Int, name::Symbol) = geteval(m.preds[i], name)
+(m::Model)(; id::Int=1) = geteval(m.preds[id])
+(m::Model)(name::Symbol; id::Int=1) = geteval(m.preds[id], name)
 
 ##
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
 Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
 ##
-domain(pred::Prediction, dim::Int=1) = pred.domain[dim]
-function domain(m::Model, dim::Int=1)
-    @assert length(m.preds) == 1
-    domain(m.preds[1], dim)
-end
+domain(pred::Prediction; dim::Int=1) = pred.domain[dim]
+domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].domain[dim]
+
 
 ##
 metadict(d::AbstractData) = d.meta
 metadict(param::Parameter) = param.meta
-function metadict(m::Model)
-    @assert length(m.preds) == 1
-    return m.preds[1].meta
-end
-metadict(m::Model, i::Int) = m.preds[i].meta
+metadict(m::Model; id::Int=1) = m.preds[id].meta
 
 function metadict(m::Model, name::Symbol)
     if haskey(m.comps, name)

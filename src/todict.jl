@@ -49,7 +49,7 @@ function todict(comp::AbstractComponent)
     for (pname, param) in getparams(comp)
         parname = pname[1]
         if pname[2] >= 1
-            parname = Symbol(parname, "[: * string(pname[2]) * ]")
+            parname = Symbol(parname, "_", pname[2])
         end
         out[:params][parname] = todict(param)
     end
@@ -133,7 +133,13 @@ function todict(comp::BestFitComp)
     out = MDict()
     params = getfield(comp, :params)
     for (pname, param) in params
-        out[pname] = todict(param)
+        if isa(param, Vector)
+            for i in 1:length(param)
+                out[Symbol(pname, "_$i")] = todict(param[i])
+            end
+        else
+            out[pname] = todict(param)
+        end
     end
     return out
 end
