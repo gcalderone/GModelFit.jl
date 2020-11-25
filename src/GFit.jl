@@ -136,9 +136,9 @@ include("components/Gaussian.jl")
 # ====================================================================
 # Parse a user defined structure or dictionary to extract all
 # components
-function extract_components(things::AbstractDict)
+function extract_components(comp_iterable::AbstractDict)
     out = OrderedDict{Symbol, AbstractComponent}()
-    for (name, comp) in things
+    for (name, comp) in comp_iterable
         isa(comp, Number)  &&  (comp = SimplePar(comp))
         @assert isa(name, Symbol)
         @assert isa(comp, AbstractComponent)
@@ -147,9 +147,9 @@ function extract_components(things::AbstractDict)
     return out
 end
 
-function extract_components(things::Vararg{Pair})
+function extract_components(comp_iterable::Vararg{Pair})
     out = OrderedDict{Symbol, AbstractComponent}()
-    for thing in things
+    for thing in comp_iterable
         name = thing[1]
         comp = thing[2]
         isa(comp, Number)  &&  (comp = SimplePar(comp))
@@ -221,28 +221,28 @@ mutable struct Prediction
     rsel::Symbol
     counter::Int
 
-    function Prediction(domain::AbstractDomain, things...)
+    function Prediction(domain::AbstractDomain, comp_iterable...)
         pred = new(MDict(), domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
-        add!(pred, things...)
+        add!(pred, comp_iterable...)
         add!(pred, :autored_1 => Reducer(sum_of_array))
         return pred
     end
 
-    Prediction(domain::AbstractDomain, reducer::Reducer, things...) =
-        Prediction(domain, :autored_1 => reducer, things...)
+    Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
+        Prediction(domain, :autored_1 => reducer, comp_iterable...)
 
-    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, things...)
-        pred = Prediction(domain, things...)
+    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, comp_iterable...)
+        pred = Prediction(domain, comp_iterable...)
         add!(pred, redpair)
         return pred
     end
 end
 
-function add!(pred::Prediction, things...)
-    for (cname, comp) in extract_components(things...)
+function add!(pred::Prediction, comp_iterable...)
+    for (cname, comp) in extract_components(comp_iterable...)
         @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
         pred.cevals[cname] = CompEval(pred.domain, comp)
@@ -261,7 +261,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
     reducer = redpair[2]
     if rname == Symbol("")
-        rname = Symbol(:_, length(pred.revals)+1)
+        rname = Symbol(:autored_, length(pred.revals)+1)
     end
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
     haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
@@ -288,11 +288,11 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     return pred
 end
 
-add!(pred::Prediction, reducer::Reducer, things...) =
-    add!(pred, Symbol(:_, length(pred.revals)+1) => reducer, things...)
+add!(pred::Prediction, reducer::Reducer, comp_iterable...) =
+    add!(pred, Symbol(:autored_, length(pred.revals)+1) => reducer, comp_iterable...)
 
-function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, things...)
-    add!(pred, things...)
+function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, comp_iterable...)
+    add!(pred, comp_iterable...)
     add!(pred, redpair)
 end
 
