@@ -72,7 +72,7 @@ function evaluate(c::CompEval{Domain_1D, Gaussian_1D},
 end
 
 
-function evaluate(c::CompEval{Domain_2D, Gaussian_2D},
+function evaluate(ceval::CompEval{Domain_2D, Gaussian_2D},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -80,10 +80,10 @@ function evaluate(c::CompEval{Domain_2D, Gaussian_2D},
     c =  (sin(angle) / sigmaX)^2 / 2  +  (cos(angle) / sigmaY)^2 / 2
 
     # TODO: optimize using cdata
-    x = c.domain[1]
-    y = c.domain[2]
+    x = ceval.domain[1]
+    y = ceval.domain[2]
     
-    @. (c.eval = norm *
+    @. (ceval.eval = norm *
         exp(
             -(
                 a * (x - centerX)^2. +
