@@ -215,14 +215,15 @@ end
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
     meta::MDict
-    domain::AbstractDomain
+    orig_domain::AbstractDomain
+    domain::AbstractLinearDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
     counter::Int
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
-        pred = new(MDict(), domain,
+        pred = new(MDict(), domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -683,8 +684,8 @@ Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
 Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
 ##
-domain(pred::Prediction; dim::Int=1) = pred.domain[dim]
-domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].domain[dim]
+domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
+domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].orig_domain[dim]
 
 
 ##

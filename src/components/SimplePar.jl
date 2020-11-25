@@ -5,6 +5,6 @@ end
 
 ceval_data(domain::AbstractDomain, comp::SimplePar) = nothing, 1
 
-function evaluate(c::CompEval{T, SimplePar}, par) where T <: AbstractDomain
+function evaluate(c::CompEval{T, SimplePar}, par) where T <: AbstractLinearDomain
     c.eval[1] = par
 end

@@ -167,10 +167,10 @@ size(data::AbstractData, dim::Int) = size(data.val)[dim]
 flatten(dom::AbstractLinearDomain) = dom
 flatten(data::Measures_1D, dom::AbstractLinearDomain)::Measures_1D = data
 flatten(data::Counts_1D, dom::AbstractLinearDomain)::Counts_1D = data
-flatten(data::AbstractMeasures, dom::AbstractLinearDomain)::Measures_1D    = Measures_1D(data.val[:], data.unc[:])
-flatten(data::AbstractMeasures, dom::AbstractCartesianDomain)::Measures_1D = Measures_1D(data.val[dom.index], data.unc[dom.index])
-flatten(data::AbstractCounts  , dom::AbstractLinearDomain)::Counts_1D      = Counts_1D(data.val)
-flatten(data::AbstractCounts  , dom::AbstractCartesianDomain)::Counts_1D   = Counts_1D(data.val[dom.index])
+flatten(data::AbstractMeasures, dom::AbstractLinearDomain)::Measures_1D    = Measures_1D(MDict(), data.val[:], data.unc[:])
+flatten(data::AbstractMeasures, dom::AbstractCartesianDomain)::Measures_1D = Measures_1D(MDict(), data.val[dom.index], data.unc[dom.index])
+flatten(data::AbstractCounts  , dom::AbstractLinearDomain)::Counts_1D      = Counts_1D(MDict(), data.val)
+flatten(data::AbstractCounts  , dom::AbstractCartesianDomain)::Counts_1D   = Counts_1D(MDict(), data.val[dom.index])
 
 """
 # reshape

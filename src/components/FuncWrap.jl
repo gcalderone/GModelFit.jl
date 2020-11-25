@@ -13,8 +13,13 @@ end
 
 ceval_data(domain::AbstractDomain, comp::FuncWrap) = (nothing, length(domain))
 
-function evaluate(c::CompEval{T, FuncWrap}, params...) where T <: AbstractDomain
-    out = c.comp.func(c.domain[1], params...)
+function evaluate(c::CompEval{T, FuncWrap}, params...) where T <: AbstractLinearDomain
+    if ndims(c.domain) == 1
+        out = c.comp.func(c.domain[1], params...)
+    else
+        dom = [c.domain[i] for i in 1:ndims(c.domain)]
+        out = c.comp.func(dom..., params...)
+    end
     if length(c.eval) == 0
         append!(c.eval, out)
     else
