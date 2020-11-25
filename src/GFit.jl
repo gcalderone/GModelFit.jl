@@ -19,7 +19,7 @@ import Base.iterate
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, thaw, freeze, fit!,
+    Model, patch!, @patch!, evaluate, thaw, freeze, fit!,
     metadict, savelog
 
 const MDict = OrderedDict{Symbol, Any}
@@ -448,6 +448,11 @@ function patch!(model::Model, func::Function)
     return model
 end
 
+
+macro patch!(model, ex)
+    out = "patch!($model, ($model) -> ($ex; return nothing))"
+    return esc(Meta.parse(out))
+end
 
 #parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
 #    findfirst(keys(model.params) .== Ref((cname, pname, i)))
