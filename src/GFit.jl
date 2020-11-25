@@ -228,12 +228,12 @@ mutable struct Prediction
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
         add!(pred, comp_iterable...)
-        add!(pred, :autored_1 => Reducer(sum_of_array))
+        add!(pred, :autogen1 => Reducer(sum_of_array))
         return pred
     end
 
     Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
-        Prediction(domain, :autored_1 => reducer, comp_iterable...)
+        Prediction(domain, :autogen1 => reducer, comp_iterable...)
 
     function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, comp_iterable...)
         pred = Prediction(domain, comp_iterable...)
@@ -256,13 +256,13 @@ prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
 add!(pred::Prediction, reducer::Reducer) =
-    add!(pred, Symbol(:autored_, length(pred.revals)+1) => reducer)
+    add!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer)
 
 function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
     reducer = redpair[2]
     if rname == Symbol("")
-        rname = Symbol(:autored_, length(pred.revals)+1)
+        rname = Symbol(:autogen, length(pred.revals)+1)
     end
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
     haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
@@ -290,7 +290,7 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
 end
 
 add!(pred::Prediction, reducer::Reducer, comp_iterable...) =
-    add!(pred, Symbol(:autored_, length(pred.revals)+1) => reducer, comp_iterable...)
+    add!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer, comp_iterable...)
 
 function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, comp_iterable...)
     add!(pred, comp_iterable...)
