@@ -14,6 +14,7 @@ import Base.getindex
 import Base.reshape
 import Base.propertynames
 import Base.getproperty
+import Base.setproperty!
 import Base.iterate
 
 
@@ -328,8 +329,17 @@ end
 function Base.getproperty(comp::PatchComp, pname::Symbol)
     v = getfield(comp, :pvalues)
     i = getfield(comp, :ipar)[pname]
-    return view(v, i)
+    (length(i) == 1)  &&  (i = i[1])
+    return v[i]
 end
+
+function Base.setproperty!(comp::PatchComp, pname::Symbol, value::Real)
+    v = getfield(comp, :pvalues)
+    i = getfield(comp, :ipar)[pname]
+    @assert length(i) == 1
+    v[i[1]] = value
+end
+
 
 
 # ====================================================================
