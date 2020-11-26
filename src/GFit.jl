@@ -127,6 +127,7 @@ end
 # ====================================================================
 # Built-in components
 #
+include("components/CDomain.jl")
 include("components/SimplePar.jl")
 include("components/FuncWrap.jl")
 include("components/OffsetSlope.jl")
@@ -223,6 +224,7 @@ mutable struct Prediction
     counter::Int
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
+        @assert length(comp_iterable) > 0
         pred = new(MDict(), domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
@@ -232,11 +234,22 @@ mutable struct Prediction
         return pred
     end
 
-    Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
-        Prediction(domain, :autogen1 => reducer, comp_iterable...)
+    function Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...)
+        pred = new(MDict(), domain, flatten(domain),
+                   OrderedDict{Symbol, CompEval}(),
+                   OrderedDict{Symbol, ReducerEval}(),
+                   Symbol(""), 0)
+        add!(pred, comp_iterable...)
+        add!(pred, :autogen1 => reducer)
+        return pred
+    end
 
     function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, comp_iterable...)
-        pred = Prediction(domain, comp_iterable...)
+        pred = new(MDict(), domain, flatten(domain),
+                   OrderedDict{Symbol, CompEval}(),
+                   OrderedDict{Symbol, ReducerEval}(),
+                   Symbol(""), 0)
+        add!(pred, comp_iterable...)
         add!(pred, redpair)
         return pred
     end
