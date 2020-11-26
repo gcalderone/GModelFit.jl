@@ -261,7 +261,7 @@ prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
 add_reducer!(pred::Prediction, reducer::Reducer) =
-    add!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer)
+    add_reducer!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer)
 
 function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
@@ -448,10 +448,26 @@ end
 function add!(model::Model, p::Prediction)
     push!(model.preds, p)
     evaluate(model)
-    return model
 end
 
 
+function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
+    @assert length(comp_iterable) > 0
+    add_comps!(  model.preds[id], comp_iterable...)
+    add_reducer!(model.preds[id], reducer)
+    evaluate(model)
+end
+
+
+function add!(model::Model, redpair::Pair{Symbol, Reducer}, comp_iterable...; id::Int=1)
+    @assert length(comp_iterable) > 0
+    add_comps!(  model.preds[id], comp_iterable...)
+    add_reducer!(model.preds[id], redpair)
+    evaluate(model)
+end
+
+
+# ====================================================================
 function patch!(model::Model, func::Function)
     push!(model.patchfuncts, func)
     evaluate(model)
@@ -464,12 +480,14 @@ macro patch!(model, ex)
     return esc(Meta.parse(out))
 end
 
+
 function freeze(model::Model, cname::Symbol)
     evaluate(model)
     @assert cname in keys(model.cfixed) "Component $cname is not defined"
     model.cfixed[cname] = true
     model
 end
+
 
 function thaw(model::Model, cname::Symbol)
     evaluate(model)
