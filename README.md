@@ -323,7 +323,7 @@ model[:comp1].p[1].high = +Inf
 ## Parameter patching
 A parameter may be "*patched*", i.e. its value being re-calculated before actually evaluating the model, through a common  Julia expression and set using the `@patch` macro.  A common case is to patch a parameter to link its value to another one:
 ```julia
-@patch!(model, model[:comp1].p[2] .= model[:comp1].p[1]
+@patch!(model, model[:comp1].p[2] .= model[:comp1].p[1])
 model[:comp1].p[2].fixed = true
 ```
 Note that in the above example we had to fix the `p[2]` parameter otherwise the minizer will try to find a best fit for a parameter which has no influence on the final model, since its value will always be overwritten by the expression. 

@@ -11,18 +11,15 @@ struct FuncWrap <: AbstractComponent
     end
 end
 
-ceval_data(domain::AbstractDomain, comp::FuncWrap) = (nothing, length(domain))
+compeval_cdata(comp::FuncWrap, domain::AbstractDomain) = nothing
+compeval_array(comp::FuncWrap, domain::AbstractDomain) = fill(NaN, length(domain))
 
-function evaluate(c::CompEval{T, FuncWrap}, params...) where T <: AbstractLinearDomain
+function evaluate(c::CompEval{FuncWrap, T}, params...) where T <: AbstractLinearDomain
     if ndims(c.domain) == 1
-        out = c.comp.func(c.domain[1], params...)
+        c.buffer .= c.comp.func(c.domain[1], params...)
     else
         dom = [c.domain[i] for i in 1:ndims(c.domain)]
-        out = c.comp.func(dom..., params...)
+        c.buffer .= c.comp.func(dom..., params...)
     end
-    if length(c.eval) == 0
-        append!(c.eval, out)
-    else
-        c.eval .= out
-    end
+    nothing
 end

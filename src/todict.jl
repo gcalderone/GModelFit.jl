@@ -58,7 +58,7 @@ end
 
 
 function todict(ceval::CompEval)
-    y = ceval.eval
+    y = ceval.buffer
     i = findall(isfinite.(y))
 
     out = MDict()
@@ -77,7 +77,7 @@ end
 
 
 function todict(reval::ReducerEval)
-    y = reval.eval
+    y = reval.buffer
     i = findall(isfinite.(y))
 
     out = MDict()

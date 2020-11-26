@@ -7,13 +7,13 @@ mutable struct Polynomial <: AbstractComponent
     end
 end
 
-ceval_data(domain::AbstractDomain, comp::Polynomial) = (nothing, length(domain))
+compeval_cdata(comp::Polynomial, domain::AbstractDomain, ) = nothing
+compeval_array(comp::Polynomial, domain::AbstractDomain) = fill(NaN, length(domain))
 
-function evaluate(c::CompEval{Domain_1D, Polynomial}, coeffs...)
-    output .= coeffs[1]
+function evaluate(c::CompEval{Polynomial, Domain_1D}, coeffs...)
+    c.eval .= coeffs[1]
     x = domain[1]
     for deg in 1:length(coeffs)-1
-        output .+= x.^deg .* coeffs[deg+1]
+        c.eval .+= x.^deg .* coeffs[deg+1]
     end
-    return output
 end

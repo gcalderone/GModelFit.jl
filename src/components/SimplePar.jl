@@ -3,8 +3,9 @@ struct SimplePar <: AbstractComponent
     SimplePar(val::Number) = new(Parameter(val))
 end
 
-ceval_data(domain::AbstractDomain, comp::SimplePar) = nothing, 1
+compeval_cdata(comp::SimplePar, domain::AbstractDomain) = nothing
+compeval_array(comp::SimplePar, domain::AbstractDomain) = [NaN]
 
-function evaluate(c::CompEval{T, SimplePar}, par) where T <: AbstractLinearDomain
-    c.eval[1] = par
+function evaluate(c::CompEval{SimplePar, T}, par) where T <: AbstractLinearDomain
+    c.buffer[1] = par
 end

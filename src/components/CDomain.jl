@@ -3,12 +3,7 @@ struct CDomain <: AbstractComponent
     CDomain(dim::Int=1) = new(dim)
 end
 
-ceval_data(domain::AbstractDomain, comp::CDomain) = true, length(domain)
+compeval_cdata(comp::CDomain, domain::AbstractDomain) = nothing
+compeval_array(comp::CDomain, domain::AbstractDomain) = deepcopy(flatten(domain)[comp.dim])
 
-function evaluate(c::CompEval{T, CDomain}) where T <: AbstractLinearDomain
-    if c.cdata
-        c.eval .= c.domain[c.comp.dim]
-        c.cdata = false
-    end
-    nothing
-end
+evaluate(c::CompEval{CDomain, T}) where T <: AbstractLinearDomain = nothing

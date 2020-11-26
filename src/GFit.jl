@@ -68,30 +68,30 @@ end
 # ====================================================================
 # CompEval: a wrapper for a component evaluated on a specific domain
 #
-mutable struct CompEval{TDomain <: AbstractDomain, TComp <: AbstractComponent}
-    domain::TDomain
+mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
+    domain::TDomain
     params::OrderedDict{Tuple{Symbol,Int}, Parameter}
     cdata
     counter::Int
     lastvalues::Vector{Float64}
-    eval::Vector{Float64}
+    buffer::Vector{Float64}
     ipar::Vector{Int}  # handled by Model
 
-    function CompEval(domain::AbstractDomain, comp::AbstractComponent)
+    function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         params = getparams(comp)
-        (cdata, len) = ceval_data(domain, comp)
-        return new{typeof(domain), typeof(comp)}(
-            domain, comp, params, cdata, 0,
-            fill(NaN, length(params)),
-            fill(NaN, len), Vector{Int}())
+        cdata  = compeval_cdata(comp, domain)
+        buffer = compeval_array(comp, domain)
+        return new{typeof(comp), typeof(domain)}(
+            comp, domain, params, cdata, 0,
+            fill(NaN, length(params)), 
+            buffer, Vector{Int}())
     end
 end
 
 
-# This is called `update` to distinguish it from component's `evaluate`.
-update(c::CompEval) = update(c, [par.val for par in values(c.params)])
-function update(c::CompEval, pvalues::Vector{Float64})
+evaluate_cached(c::CompEval) = evaluate_cached(c, [par.val for par in values(c.params)])
+function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
     @assert length(c.params) == length(pvalues)
 
     # Do we actually need a new evaluation?
@@ -101,27 +101,23 @@ function update(c::CompEval, pvalues::Vector{Float64})
         @assert all(.!isnan.(pvalues))
         evaluate(c, pvalues...)
     end
-    return c.eval
+    return c.buffer
 end
 
 
 # ====================================================================
 # Component fall back methods
-ceval_data(domain::AbstractDomain, comp::AbstractComponent) =
-    error("Component " * string(typeof(comp)) * " must implement its own method for `ceval_data`.")
+compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) =
+    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_cdata`.")
 
-evaluate(c::CompEval{TDomain, TComp}, args...) where {TDomain, TComp} =
+compeval_array(comp::AbstractComponent, domain::AbstractDomain) =
+    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_array`.")
+
+evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} =
     error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
-function evaluate(c::CompEval{TDomain, TComp}) where {TDomain, TComp}
-    if length(c.params) == 0
-        error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
-    else
-        # Facility to evaluate a component using stored values
-        pvalues = getfield.(values(c.params), :val)
-        evaluate(c, pvalues...)
-    end
-end
+evaluate(c::CompEval{TComp, TDomain}) where {TComp, TDomain} = 
+    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
 
 # ====================================================================
@@ -135,7 +131,7 @@ include("components/Gaussian.jl")
 
 
 # ====================================================================
-# Parse a user defined structure or dictionary to extract all
+# Parse a dictionary or a collection of `Pair`s to extract all
 # components
 function extract_components(comp_iterable::AbstractDict)
     out = OrderedDict{Symbol, AbstractComponent}()
@@ -208,7 +204,7 @@ mutable struct ReducerEval
     args::Vector{Vector{Float64}}
     funct::Function
     counter::Int
-    eval::Vector{Float64}
+    buffer::Vector{Float64}
 end
 
 
@@ -229,37 +225,32 @@ mutable struct Prediction
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
-        add!(pred, comp_iterable...)
-        add!(pred, :autogen1 => Reducer(sum_of_array))
+        add_comps!(  pred, comp_iterable...)
+        add_reducer!(pred, :autogen1 => Reducer(sum_of_array))
         return pred
     end
 
-    function Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...)
+    function Prediction(domain::AbstractDomain,
+                        redpair::Pair{Symbol, Reducer}, comp_iterable...)
+        @assert length(comp_iterable) > 0
         pred = new(MDict(), domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
-        add!(pred, comp_iterable...)
-        add!(pred, :autogen1 => reducer)
+        add_comps!(  pred, comp_iterable...)
+        add_reducer!(pred, redpair)
         return pred
     end
 
-    function Prediction(domain::AbstractDomain, redpair::Pair{Symbol, Reducer}, comp_iterable...)
-        pred = new(MDict(), domain, flatten(domain),
-                   OrderedDict{Symbol, CompEval}(),
-                   OrderedDict{Symbol, ReducerEval}(),
-                   Symbol(""), 0)
-        add!(pred, comp_iterable...)
-        add!(pred, redpair)
-        return pred
-    end
+    Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
+        Prediction(domain, :autogen1 => reducer, comp_iterable...)
 end
 
-function add!(pred::Prediction, comp_iterable...)
+function add_comps!(pred::Prediction, comp_iterable...)
     for (cname, comp) in extract_components(comp_iterable...)
         @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
-        pred.cevals[cname] = CompEval(pred.domain, comp)
+        pred.cevals[cname] = CompEval(comp, pred.domain)
     end
 end
 
@@ -268,15 +259,12 @@ sum_of_array( args...) = .+(args...)
 prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
-add!(pred::Prediction, reducer::Reducer) =
+add_reducer!(pred::Prediction, reducer::Reducer) =
     add!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer)
 
-function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
+function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
     reducer = redpair[2]
-    if rname == Symbol("")
-        rname = Symbol(:autogen, length(pred.revals)+1)
-    end
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
     haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
     if reducer.allargs
@@ -287,9 +275,9 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     args = Vector{Vector{Float64}}()
     for arg in reducer.args
         if haskey(pred.cevals, arg)
-            push!(args, pred.cevals[arg].eval)
+            push!(args, pred.cevals[arg].buffer)
         else
-            push!(args, pred.revals[arg].eval)
+            push!(args, pred.revals[arg].buffer)
         end
     end
 
@@ -302,26 +290,20 @@ function add!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     return pred
 end
 
-add!(pred::Prediction, reducer::Reducer, comp_iterable...) =
-    add!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer, comp_iterable...)
-
-function add!(pred::Prediction, redpair::Pair{Symbol, Reducer}, comp_iterable...)
-    add!(pred, comp_iterable...)
-    add!(pred, redpair)
-end
 
 function evaluate(pred::Prediction)
     for (name, ceval) in pred.cevals
-        update(ceval)
+        evaluate_cached(ceval)
     end
     reduce(pred)
     return pred
 end
 
+
 function reduce(pred::Prediction)
     for (rname, reval) in pred.revals
         reval.counter += 1
-        reval.eval .= reval.funct(reval.args...)
+        reval.buffer .= reval.funct(reval.args...)
     end
     pred.counter += 1
 end
@@ -330,9 +312,9 @@ end
 geteval(pred::Prediction) = geteval(pred, pred.rsel)
 function geteval(pred::Prediction, name::Symbol)
     if haskey(pred.cevals, name)
-        return pred.cevals[name].eval
+        return pred.cevals[name].buffer
     else
-        return pred.revals[name].eval
+        return pred.revals[name].buffer
     end
 end
 
@@ -343,6 +325,11 @@ struct PatchComp
     ipar::OrderedDict{Symbol, Vector{Int}}
 end
 
+function Base.getproperty(comp::PatchComp, pname::Symbol)
+    v = getfield(comp, :pvalues)
+    i = getfield(comp, :ipar)[pname]
+    return view(v, i)
+end
 
 
 # ====================================================================
@@ -416,7 +403,7 @@ function evaluate(model::Model)
                 haskey(liveipar, pname[1])  ||  (liveipar[pname[1]] = Vector{Int}())
                 push!( liveipar[pname[1]], i[1])
             end
-            update(ceval)
+            evaluate_cached(ceval)
 
             model.patchbay[cname] = PatchComp(model.patched, liveipar)
         end
@@ -438,7 +425,7 @@ function quick_evaluate(model::Model)
 
     for pred in model.preds
         for (cname, ceval) in pred.cevals
-            update(ceval, model.patched[ceval.ipar])
+            evaluate_cached(ceval, model.patched[ceval.ipar])
         end
     end
     for pred in model.preds
@@ -466,9 +453,6 @@ macro patch!(model, ex)
     out = "patch!($model, ($model) -> ($ex; return nothing))"
     return esc(Meta.parse(out))
 end
-
-#parindex(model::Model, cname::Symbol, pname::Symbol, i::Int=0) =
-#    findfirst(keys(model.params) .== Ref((cname, pname, i)))
 
 function freeze(model::Model, cname::Symbol)
     evaluate(model)
@@ -685,13 +669,6 @@ end
 #
 Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
 Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
-
-function Base.getproperty(comp::PatchComp, pname::Symbol)
-    v = getfield(comp, :pvalues)
-    i = getfield(comp, :ipar)[pname]
-    view(v, i)
-end
-
 
 ##
 (m::Model)(; id::Int=1) = geteval(m.preds[id])

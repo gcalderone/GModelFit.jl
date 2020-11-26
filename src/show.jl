@@ -209,7 +209,7 @@ function show(io::IO, pred::Prediction)
 
     i = 1
     for (cname, ceval) in pred.cevals
-        result = ceval.eval
+        result = ceval.buffer
         v = view(result, findall(isfinite.(result)))
         (length(v) == 0)  &&  (v = [NaN])
         nan = length(findall(isnan.(result)))
@@ -223,7 +223,7 @@ function show(io::IO, pred::Prediction)
     end
 
     for (rname, reval) in pred.revals
-        result = reval.eval
+        result = reval.buffer
         v = view(result, findall(isfinite.(result)))
         (length(v) == 0)  &&  (v = [NaN])
         nan = length(findall(isnan.(result)))

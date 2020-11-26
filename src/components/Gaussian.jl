@@ -51,28 +51,35 @@ end
 
 # ====================================================================
 # Prepare component `cdata`
-mutable struct Gaussian_cdata
+mutable struct Gaussian_1D_cdata
     ix::Vector{Int}
-    iy::Vector{Int}
-    Gaussian_cdata() = new(Vector{Int}(), Vector{Int}())
+    Gaussian_1D_cdata() = new(Vector{Int}())
 end
 
-ceval_data(domain::Domain_1D, comp::Gaussian_1D) = (Gaussian_cdata(), length(domain))
-ceval_data(domain::Domain_2D, comp::Gaussian_2D) = (Gaussian_cdata(), length(domain))
+mutable struct Gaussian_2D_cdata
+    ix::Vector{Int}
+    iy::Vector{Int}
+    Gaussian_2D_cdata() = new(Vector{Int}(), Vector{Int}())
+end
+
+compeval_cdata(comp::Gaussian_1D, domain::Domain_1D) = Gaussian_1D_cdata()
+compeval_cdata(comp::Gaussian_2D, domain::Domain_2D) = Gaussian_2D_cdata()
+compeval_array(comp::Gaussian_1D, domain::Domain_1D) = fill(NaN, length(domain))
+compeval_array(comp::Gaussian_2D, domain::Domain_2D) = fill(NaN, length(domain))
 
 
 # ====================================================================
 # Evaluate component 
-function evaluate(c::CompEval{Domain_1D, Gaussian_1D},
+function evaluate(c::CompEval{Gaussian_1D, Domain_1D},
                   norm, center, sigma)
     # TODO: optimize using cdata
     x = c.domain[1]
-    @. (c.eval = exp( ((x - center) / sigma)^2. / (-2.)) / 
+    @. (c.buffer = exp( ((x - center) / sigma)^2. / (-2.)) / 
         2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
 end
 
 
-function evaluate(ceval::CompEval{Domain_2D, Gaussian_2D},
+function evaluate(ce::CompEval{Gaussian_2D, Domain_2D},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -80,10 +87,10 @@ function evaluate(ceval::CompEval{Domain_2D, Gaussian_2D},
     c =  (sin(angle) / sigmaX)^2 / 2  +  (cos(angle) / sigmaY)^2 / 2
 
     # TODO: optimize using cdata
-    x = ceval.domain[1]
-    y = ceval.domain[2]
+    x = ce.domain[1]
+    y = ce.domain[2]
     
-    @. (ceval.eval = norm *
+    @. (ce.buffer = norm *
         exp(
             -(
                 a * (x - centerX)^2. +
