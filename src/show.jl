@@ -229,7 +229,7 @@ function show(io::IO, pred::Prediction)
         nan = length(findall(isnan.(result)))
         inf = length(findall(isinf.(result)))
         table[i, 1] = string(rname)
-        table[i, 2] = pred.counter
+        table[i, 2] = reval.counter
         table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
         table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
         push!(error, (nan+inf > 0))
