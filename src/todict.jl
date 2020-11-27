@@ -191,8 +191,8 @@ function todict(model::Model,
     if !isnothing(data)
         out[:data] = Vector{MDict}()
         @assert length(model.preds) == length(data)
-        for i in 1:length(data)
-            push!(out[:data], todict(model.preds[i], data[i]))
+        for id in 1:length(data)
+            push!(out[:data], todict(model.preds[id], data[id]))
         end
     end
 
