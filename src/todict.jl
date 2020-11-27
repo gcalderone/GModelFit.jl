@@ -1,6 +1,7 @@
 const todict_opt = Dict(
     :rebin => 1,
-    :addcomps => true
+    :addcomps => true,
+    :selcomps => Vector{Symbol}()
 )
 
 rebin_data(rebin, v) = rebin_data(rebin, v, ones(eltype(v), length(v)))[1]
@@ -57,7 +58,7 @@ function todict(comp::AbstractComponent)
 end
 
 
-function todict(ceval::CompEval)
+function todict(ceval::CompEval; forceadd=false)
     y = ceval.buffer
     i = findall(isfinite.(y))
 
@@ -67,7 +68,7 @@ function todict(ceval::CompEval)
     out[:max] = maximum(y[i])
     out[:mean] = mean(y[i])
     out[:error] = (length(i) == length(y))
-    if todict_opt[:addcomps]
+    if todict_opt[:addcomps] || forceadd
         out[:y] = rebin_data(todict_opt[:rebin], y)
     else
         out[:y] = Vector{Float64}()
@@ -97,7 +98,7 @@ function todict(pred::Prediction)
     out[:x] = rebin_data(todict_opt[:rebin], domain(pred))
     out[:components] = MDict()
     for (cname, ceval) in pred.cevals
-        out[:components][cname] = todict(ceval)
+        out[:components][cname] = todict(ceval, forceadd = (cname in todict_opt[:selcomps]))
     end
     out[:reducers] = MDict()
     for (rname, reval) in pred.revals
