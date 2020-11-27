@@ -460,8 +460,9 @@ end
 
 
 function add!(model::Model, redpair::Pair{Symbol, Reducer}, comp_iterable...; id::Int=1)
-    @assert length(comp_iterable) > 0
-    add_comps!(  model.preds[id], comp_iterable...)
+    if length(comp_iterable) > 0
+        add_comps!(model.preds[id], comp_iterable...)
+    end
     add_reducer!(model.preds[id], redpair)
     evaluate(model)
 end
