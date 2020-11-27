@@ -20,7 +20,7 @@ import Base.iterate
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, @patch!, evaluate, thaw, freeze, fit!,
+    Model, patch!, evaluate, thaw, freeze, fit!,
     metadict, savelog
 
 const MDict = OrderedDict{Symbol, Any}
@@ -468,16 +468,10 @@ end
 
 
 # ====================================================================
-function patch!(model::Model, func::Function)
+function patch!(func::Function, model::Model)
     push!(model.patchfuncts, func)
     evaluate(model)
     return model
-end
-
-
-macro patch!(model, ex)
-    out = "patch!($model, ($model) -> ($ex; return nothing))"
-    return esc(Meta.parse(out))
 end
 
 
