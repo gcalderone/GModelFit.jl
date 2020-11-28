@@ -335,7 +335,13 @@ end
 
 function Base.setproperty!(comp::PatchComp, pname::Symbol, value::Real)
     v = getfield(comp, :pvalues)
-    i = getfield(comp, :ipar)[pname]
+    d = getfield(comp, :ipar)
+    i = get(d, pname, nothing)
+    if isnothing(i)
+        # Avoid issuing an error here to simplify patch functions
+        @warn "Attempt to patch a non-existing parameter named $pname"
+        return value
+    end
     @assert length(i) == 1
     v[i[1]] = value
 end
