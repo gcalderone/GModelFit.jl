@@ -457,9 +457,17 @@ function add!(model::Model, p::Prediction)
 end
 
 
-function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
+function add!(model::Model, comp_iterable...; id::Int=1)
     @assert length(comp_iterable) > 0
     add_comps!(  model.preds[id], comp_iterable...)
+    evaluate(model)
+end
+
+
+function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
+    if length(comp_iterable) > 0
+        add_comps!(  model.preds[id], comp_iterable...)
+    end
     add_reducer!(model.preds[id], reducer)
     evaluate(model)
 end
