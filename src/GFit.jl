@@ -712,6 +712,7 @@ Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 (m::Model)(name::Symbol; id::Int=1) = geteval(m.preds[id], name)
 
 ##
+Base.getindex(p::Prediction, cname::Symbol) = p.cevals[cname].comp
 Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
 Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
 
