@@ -22,7 +22,7 @@ const showsettings = ShowSettings()
 function printtable(args...; formatters=(), kw...)
     if showsettings.plain
         c = crayon"default"
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=simple, hlines=:none,
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_markdown, hlines=:none,
                      border_crayon=c, header_crayon=c, subheader_crayon=c,
                      highlighters=())
     else
