@@ -227,7 +227,7 @@ mutable struct Prediction
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
         add_comps!(  pred, comp_iterable...)
-        add_reducer!(pred, :autogen1 => Reducer(sum_of_array))
+        add_reducer!(pred, :sum1 => Reducer(sum_of_array))
         return pred
     end
 
@@ -244,7 +244,7 @@ mutable struct Prediction
     end
 
     Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
-        Prediction(domain, :autogen1 => reducer, comp_iterable...)
+        Prediction(domain, :reducer1 => reducer, comp_iterable...)
 end
 
 function add_comps!(pred::Prediction, comp_iterable...)
@@ -261,7 +261,7 @@ prod_of_array( arg::Array) = arg
 prod_of_array(args...) = .*(args...)
 
 add_reducer!(pred::Prediction, reducer::Reducer) =
-    add_reducer!(pred, Symbol(:autogen, length(pred.revals)+1) => reducer)
+    add_reducer!(pred, Symbol(:reducer, length(pred.revals)+1) => reducer)
 
 function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     rname = redpair[1]
@@ -583,35 +583,31 @@ function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
 end
 
 
-macro with_CMPFit()
-    return esc(:(
-        using CMPFit;
-        import GFit.minimize;
+using CMPFit;
 
-        mutable struct cmpfit <: GFit.AbstractMinimizer;
-        config::CMPFit.Config;
-        cmpfit() = new(CMPFit.Config());
-        end;
+mutable struct cmpfit <: AbstractMinimizer;
+    config::CMPFit.Config;
+    cmpfit() = new(CMPFit.Config());
+end;
 
-        function minimize(minimizer::cmpfit, func::Function, params::Vector{GFit.Parameter});
-        guess = getfield.(params, :val);
-        low   = getfield.(params, :low);
-        high  = getfield.(params, :high);
-        parinfo = CMPFit.Parinfo(length(guess));
-        for i in 1:length(guess);
+function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter});
+    guess = getfield.(params, :val);
+    low   = getfield.(params, :low);
+    high  = getfield.(params, :high);
+    parinfo = CMPFit.Parinfo(length(guess));
+    for i in 1:length(guess);
         llow  = isfinite(low[i])   ?  1  :  0;
         lhigh = isfinite(high[i])  ?  1  :  0;
         parinfo[i].limited = (llow, lhigh);
         parinfo[i].limits  = (low[i], high[i]);
-        end;
-        bestfit = CMPFit.cmpfit((pvalues) -> func(pvalues),
-                                guess, parinfo=parinfo, config=minimizer.config);
-        return (:OK, getfield.(Ref(bestfit), :param), getfield.(Ref(bestfit), :perror));
-        end;
-    ))
-end
+    end;
+    bestfit = CMPFit.cmpfit((pvalues) -> func(pvalues),
+                            guess, parinfo=parinfo, config=minimizer.config);
+    return (:OK, getfield.(Ref(bestfit), :param), getfield.(Ref(bestfit), :perror));
+end;
 
 
+# ====================================================================
 fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
