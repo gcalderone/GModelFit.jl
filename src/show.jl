@@ -236,7 +236,7 @@ function show(io::IO, pred::Prediction)
         i += 1
     end
 
-    printtable(io, table, ["Component", "Counter", "Min", "Max", "Mean", "NaN/Inf"],
+    printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 3:5),
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
