@@ -286,11 +286,11 @@ end
 function show(io::IO, comp::BestFitComp)
     (table, fixed, error, watch) = preparetable(comp)
     (length(table) == 0)  &&  return
-    printtable(io, table , ["Component", "Param.", "Value", "Uncert.", "Patched"],
-               hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [3,4,5]),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
-                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
+    printtable(io, table , ["id", "Component", "Param.", "Value", "Uncert.", "Patched"],
+               hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [4,5,6]),
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed),
+                             Highlighter((data,i,j) -> (watch[i]  &&  (j==6)), showsettings.highlighted),
+                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==5)), showsettings.error)))
 end
 
 
