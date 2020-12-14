@@ -232,6 +232,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
+    id::Int
     meta::MDict
     orig_domain::AbstractDomain
     domain::AbstractLinearDomain
@@ -242,7 +243,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(MDict(), domain, flatten(domain),
+        pred = new(0, MDict(), domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -254,7 +255,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(MDict(), domain, flatten(domain),
+        pred = new(0, MDict(), domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -271,7 +272,7 @@ function add_comps!(pred::Prediction, comp_iterable...)
     for (cname, comp) in extract_components(comp_iterable...)
         @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
-        pred.cevals[cname] = CompEval(comp, pred.domain)
+        pred.cevals[cname] = CompEval(deepcopy(comp), pred.domain)
     end
 end
 
@@ -408,6 +409,7 @@ function ModelInternals(model::Model)
     i = 1
     for id in 1:length(model.preds)
         pred = model.preds[id]
+        pred.id = id
         for (cname, ceval) in pred.cevals
             empty!(ceval.ipar)
             for (qpname, par) in ceval.params
@@ -678,7 +680,7 @@ function fit!(model::Model, data::Vector{T};
                            !(i in ifree), model.priv.patched[i])
         i += 1
         bfcomp = getfield(preds[qcpname.id][qcpname.name], :params)
-        
+
         if qcpname.par.index == 0
             bfcomp[qcpname.par.name] = bfpar
         else
@@ -719,8 +721,10 @@ Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 
 ##
 Base.getindex(p::Prediction, cname::Symbol) = p.cevals[cname].comp
-Base.getindex(m::Model, cname::Symbol; id=1) = m.preds[id].cevals[cname].comp
-Base.getindex(res::BestFitResult, cname::Symbol; id=1) = res.preds[id][cname]
+Base.getindex(m::Model, id::Int, cname::Symbol) = m.preds[id].cevals[cname].comp
+Base.getindex(m::Model, cname::Symbol) = m[1, cname]
+Base.getindex(res::BestFitResult, id::Int, cname::Symbol) = res.preds[id][cname]
+Base.getindex(res::BestFitResult, cname::Symbol) = res[1, cname]
 
 ##
 domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
