@@ -135,10 +135,10 @@ function preparetable(comp::AbstractComponent, cname="")
     (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
     ctype = join(ctype, ".")
 
-    for (pname, param) in getparams(comp)
-        parname = string(pname[1])
-        if pname[2] >= 1
-            parname *= "[" * string(pname[2]) * "]"
+    for (qpname, param) in getparams(comp)
+        parname = string(qpname.name)
+        if qpname.index >= 1
+            parname *= "[" * string(qpname.index) * "]"
         end
         parname *= (param.fixed  ?  " (FIXED)"  :  "")
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
@@ -165,17 +165,29 @@ show(io::IO, comp::AbstractComponent) =
     show(io, OrderedDict(Symbol("?") => comp), OrderedDict(Symbol("?") => false))
 
 
-function show(io::IO, dict::OrderedDict{Symbol, T}, cfixed::OrderedDict{Symbol, Bool}) where T <: AbstractComponent
-    (length(dict) > 0)  ||  (return nothing)
+show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
+function show(io::IO, model::Model)
+    for id in 1:length(model.preds)
+        println(io)
+        section(io, "Prediction #$id:")
+        show(io, model.preds[id])
+    end
+end
+
+
+function show(io::IO, pred::Prediction)
+    (length(pred.cevals) == 0)  &&  (return nothing)
+
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, comp) in dict
-        (t, f, e) = preparetable(comp, string(cname) .* (cfixed[cname]  ?  " (FIXED)"  :  ""))
+    for (cname, ceval) in pred.cevals
+        comp = ceval.comp
+        (t, f, e) = preparetable(comp, string(cname) .* (ceval.cfixed  ?  " (FIXED)"  :  ""))
         table = vcat(table, t)
-        append!(fixed, f .| cfixed[cname])
+        append!(fixed, f .| ceval.cfixed)
         append!(error, e)
         push!(hrule, length(error)+1)
     end
@@ -183,31 +195,11 @@ function show(io::IO, dict::OrderedDict{Symbol, T}, cfixed::OrderedDict{Symbol, 
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
                              Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
-end
-
-
-show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
-function show(io::IO, model::Model)
-    section(io, "Components:")
-    length(model.comps) != 0  || (return nothing)
-    show(io, model.comps, model.cfixed)
-
-    for i in 1:length(model.preds)
-        println(io)
-        section(io, "Prediction #$i:")
-        show(io, model.preds[i])
-    end
-end
-
-
-
-function show(io::IO, pred::Prediction)
-    (length(pred.cevals) == 0)  &&  (return nothing)
-    table = Matrix{Union{String,Int,Float64}}(undef,
-                                              length(pred.cevals) + length(pred.revals), 6)
-    error = Vector{Bool}()
 
     i = 1
+    error = Vector{Bool}()
+    table = Matrix{Union{String,Int,Float64}}(undef,
+                                              length(pred.cevals) + length(pred.revals), 6)
     for (cname, ceval) in pred.cevals
         result = ceval.buffer
         v = view(result, findall(isfinite.(result)))
@@ -299,8 +291,8 @@ function show(io::IO, res::BestFitResult)
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, comp) in res.comps
-        if length(comp) > 0
+    for id in 1:length(res.preds)
+        for (cname, comp) in res.preds[id]
             (t, f, e, w) = preparetable(comp)
             (length(t) > 0)  ||  continue
             if showsettings.plain
