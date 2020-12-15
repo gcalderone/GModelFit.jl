@@ -59,6 +59,13 @@ struct QualifiedParamName
     QualifiedParamName(pname::Symbol, index::Int) = new(pname, index)  # vector of params
 end
 
+struct QualifiedCompName
+    id::Int
+    name::Symbol
+    QualifiedCompName(cname::Symbol) = new(1, cname)  # default on first prediction
+    QualifiedCompName(id::Int, cname::Symbol) = new(id, cname)
+end
+
 struct QualifiedCompParamName
     id::Int
     name::Symbol
@@ -350,8 +357,22 @@ end
 function Base.getproperty(comp::PatchComp, pname::Symbol)
     v = getfield(comp, :pvalues)
     i = getfield(comp, :ipar)[pname]
-    (length(i) == 1)  &&  (i = i[1])
-    return v[i]
+    if length(i) == 1
+        return v[i[1]]
+    end
+    return view(v, i)
+end
+
+function Base.setproperty!(comp::PatchComp, pname::Symbol, values::AbstractArray{T}) where T <: Real
+    v = getfield(comp, :pvalues)
+    d = getfield(comp, :ipar)
+    i = get(d, pname, nothing)
+    if isnothing(i)
+        @warn "Attempt to patch non-existing parameter $pname"
+        return nothing
+    end
+    @assert length(i) > 1 "Can't assign a vector to a single `Parameter`."
+    error("Can't copy a vector to a Vector{Parameter}: try with dot (broadcast) notation.")
 end
 
 function Base.setproperty!(comp::PatchComp, pname::Symbol, value::Real)
@@ -360,29 +381,29 @@ function Base.setproperty!(comp::PatchComp, pname::Symbol, value::Real)
     i = get(d, pname, nothing)
     if isnothing(i)
         # Avoid issuing an error here to simplify patch functions
-        @warn "Attempt to patch a non-existing parameter named $pname"
+        @warn "Attempt to patch non-existing parameter $pname"
         return value
     end
-    @assert length(i) == 1
+    @assert length(i) == 1 "Can't set a single value to a Vector{Parameter}: try with dot (broadcast) notation."
     v[i[1]] = value
 end
 
 
 # ====================================================================
-# Global model, actually a collection of `Prediction`s.
+# Model and ModelInternals structures
+#
 struct ModelInternals
     params::OrderedDict{QualifiedCompParamName, Parameter}
-    #patchbay::Vector{OrderedDict{Symbol, PatchComp}}
     pvalues::Vector{Float64}
     patched::Vector{Float64}
+    patchcomps::OrderedDict{QualifiedCompName, PatchComp}
+    patchfuncts::Vector{Function}
     buffer::Vector{Float64}
-    #patchfuncts::Vector{Function}
 end
 ModelInternals() = ModelInternals(OrderedDict{QualifiedCompParamName, Parameter}(),
-                                  Vector{Float64}(),
-                                  Vector{Float64}(),
-                                  Vector{Float64}())
-
+                                  Vector{Float64}(), Vector{Float64}(),
+                                  OrderedDict{QualifiedCompName, PatchComp}(),
+                                  Vector{Function}(), Vector{Float64}())
 
 mutable struct Model
     meta::MDict
@@ -401,10 +422,9 @@ end
 
 function ModelInternals(model::Model)
     params = OrderedDict{QualifiedCompParamName, Parameter}()
-    #patchbay::Vector{OrderedDict{Symbol, PatchComp}}
-    #patchfuncts::Vector{Function}
+    patched = Vector{Float64}()
+    patchcomps = OrderedDict{QualifiedCompName, PatchComp}()
 
-    # Collect components and parameters
     ndata = 0
     i = 1
     for id in 1:length(model.preds)
@@ -412,11 +432,15 @@ function ModelInternals(model::Model)
         pred.id = id
         for (cname, ceval) in pred.cevals
             empty!(ceval.ipar)
+            dd = OrderedDict{Symbol, Vector{Int}}()
             for (qpname, par) in ceval.params
                 params[QualifiedCompParamName(id, cname, qpname)] = par
-                push!(ceval.ipar, i)
+                push!(ceval.ipar, i)  # save indices of params associated to the component
+                haskey(dd, qpname.name)  ||  (dd[qpname.name] = Vector{Int}())
+                push!(dd[qpname.name], i)
                 i += 1
             end
+            patchcomps[QualifiedCompName(id, cname)] = PatchComp(patched, dd)
             evaluate_cached(ceval)
         end
         reduce(pred)
@@ -426,11 +450,10 @@ function ModelInternals(model::Model)
     # Prepare vectors of parameter values (pvalues) and "patched"
     # values (patched)
     pvalues = [par.val for par in values(params)]
-    patched = deepcopy(pvalues)
-    buffer = fill(NaN, ndata)
-    return ModelInternals(params, pvalues, patched, buffer)
-    #Vector{OrderedDict{Symbol, PatchComp}}(),
-    #Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), Vector{Function}())
+    append!(patched, pvalues)
+
+    return ModelInternals(params, pvalues, patched, patchcomps,
+                          Vector{Function}(), fill(NaN, ndata))
 end
 
 function evaluate(model::Model)
@@ -444,9 +467,9 @@ end
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.priv.patched .= model.priv.pvalues  # copy all values by default
-    # TODO for func in model.priv.patchfuncts
-    # TODO     func(model.priv.patchbay)
-    # TODO end
+    for func in model.priv.patchfuncts
+        func(model.priv.patchcomps)
+    end
 
     for pred in model.preds
         for (cname, ceval) in pred.cevals
@@ -493,7 +516,7 @@ end
 
 # ====================================================================
 function patch!(func::Function, model::Model)
-    push!(model.patchfuncts, func)
+    push!(model.priv.patchfuncts, func)
     evaluate(model)
     return model
 end
