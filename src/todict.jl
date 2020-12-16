@@ -173,7 +173,7 @@ function todict(model::Model,
     out[:components] = MDict()
     for (cname, comp) in model.comps
         out[:components][cname] = todict(comp)
-        out[:components][cname][:fixed] = model.cfixed[cname]
+        out[:components][cname][:fixed] = (model.cfixed[cname] >= 1)
         out[:components][cname][:meta] = metadict(model, cname)
     end
 

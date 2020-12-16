@@ -103,7 +103,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     counter::Int
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
-    cfixed::Bool
+    cfixed::Int8
     ipar::Vector{Int}  # handled by Model
 
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
@@ -524,7 +524,7 @@ end
 
 function freeze(model::Model, cname::Symbol; id=1)
     @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
-    model.preds[id].cevals[cname].cfixed = true
+    model.preds[id].cevals[cname].cfixed = 1
     evaluate(model)
     model
 end
@@ -532,7 +532,7 @@ end
 
 function thaw(model::Model, cname::Symbol; id=1)
     @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
-    model.preds[id].cevals[cname].cfixed = false
+    model.preds[id].cevals[cname].cfixed = 0
     evaluate(model)
     model
 end
@@ -644,23 +644,24 @@ fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
 function fit!(model::Model, data::Vector{T};
-              id::Int=0,
+              only_id::Int=0,
               minimizer=lsqfit()) where T<:AbstractMeasures
     elapsedTime = Base.time_ns()
     evaluate(model)
 
-    # TODO if id != 0
-    # TODO     origcfixed = deepcopy(model.cfixed)
-    # TODO     for (cname, comp) in model.comps
-    # TODO         if !haskey(model.preds[id].cevals, cname)
-    # TODO             model.cfixed[cname] = true
-    # TODO         end
-    # TODO     end
-    # TODO end
+    if only_id != 0
+        for id in 1:length(model.preds)
+            (id == only_id)  &&  continue
+            pred = model.preds[id]
+            for (cname, ceval) in pred.cevals
+                ceval.cfixed += 1
+            end
+        end
+    end
 
     free = Vector{Bool}()
     for (qcp, par) in model.priv.params
-        push!(free, (!par.fixed)  &&  (!model.preds[qcp.id].cevals[qcp.name].cfixed))
+        push!(free, (!par.fixed)  &&  (model.preds[qcp.id].cevals[qcp.name].cfixed == 0))
     end
     ifree = findall(free)
     @assert length(ifree) > 0 "No free parameter in the model"
@@ -722,11 +723,15 @@ function fit!(model::Model, data::Vector{T};
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
                            float(Base.time_ns() - elapsedTime) / 1.e9)
 
-    # TODO if id != 0
-    # TODO     for cname in keys(origcfixed)
-    # TODO         model.cfixed[cname] = origcfixed[cname]
-    # TODO     end
-    # TODO end
+    if only_id != 0
+        for id in 1:length(model.preds)
+            (id == only_id)  &&  continue
+            pred = model.preds[id]
+            for (cname, ceval) in pred.cevals
+                (ceval.cfixed > 1)  &&  (ceval.cfixed = 1)
+            end
+        end
+    end
 
     return result
 end

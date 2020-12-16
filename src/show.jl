@@ -192,9 +192,9 @@ function show(io::IO, pred::Prediction)
     push!(hrule, 0, 1)
     for (cname, ceval) in pred.cevals
         comp = ceval.comp
-        (t, f, e) = preparetable(comp, cname=string(cname), id=string(pred.id), cfixed=ceval.cfixed)
+        (t, f, e) = preparetable(comp, cname=string(cname), id=string(pred.id), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
-        append!(fixed, f .| ceval.cfixed)
+        append!(fixed, f .| (ceval.cfixed >= 1))
         append!(error, e)
         push!(hrule, length(error)+1)
     end
