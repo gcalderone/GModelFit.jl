@@ -10,6 +10,8 @@ import Base.show
 import Base.ndims
 import Base.size
 import Base.length
+import Base.haskey
+import Base.keys
 import Base.getindex
 import Base.reshape
 import Base.propertynames
@@ -20,7 +22,7 @@ import Base.iterate
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, thaw, freeze, fit!,
+    Model, patch!, evaluate, isfixed, thaw, freeze, fit!,
     savelog
 
 const MDict = OrderedDict{Symbol, Any}
@@ -488,15 +490,16 @@ function add!(model::Model, p::Prediction)
     evaluate(model)
 end
 
+add!(model::Model, args...) = add!(model, 1, args...)
 
-function add!(model::Model, comp_iterable...; id::Int=1)
+function add!(model::Model, id::Int, comp_iterable...)
     @assert length(comp_iterable) > 0
     add_comps!(  model.preds[id], comp_iterable...)
     evaluate(model)
 end
 
 
-function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
+function add!(model::Model, id::Int, reducer::Reducer, comp_iterable...)
     if length(comp_iterable) > 0
         add_comps!(  model.preds[id], comp_iterable...)
     end
@@ -505,7 +508,7 @@ function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
 end
 
 
-function add!(model::Model, redpair::Pair{Symbol, Reducer}, comp_iterable...; id::Int=1)
+function add!(model::Model, id::Int, redpair::Pair{Symbol, Reducer}, comp_iterable...)
     if length(comp_iterable) > 0
         add_comps!(model.preds[id], comp_iterable...)
     end
@@ -522,7 +525,12 @@ function patch!(func::Function, model::Model)
 end
 
 
-function freeze(model::Model, cname::Symbol; id=1)
+isfixed(model::Model, cname::Symbol) = isfixed(model, 1, cname)
+isfixed(model::Model, id::Int, cname::Symbol) = (model.preds[id].cevals[cname].cfixed >= 1)
+
+
+freeze(model::Model, cname::Symbol) = freeze(model, 1, cname)
+function freeze(model::Model, id::Int, cname::Symbol)
     @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
     model.preds[id].cevals[cname].cfixed = 1
     evaluate(model)
@@ -530,7 +538,8 @@ function freeze(model::Model, cname::Symbol; id=1)
 end
 
 
-function thaw(model::Model, cname::Symbol; id=1)
+thaw(model::Model, cname::Symbol) = thaw(model, 1, cname)
+function thaw(model::Model, id::Int, cname::Symbol)
     @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
     model.preds[id].cevals[cname].cfixed = 0
     evaluate(model)
@@ -711,8 +720,8 @@ function fit!(model::Model, data::Vector{T};
                 (ceval.cfixed > 1)  &&  (ceval.cfixed = 1)
             end
         end
+        evaluate(model)
     end
-
     return result
 end
 
@@ -721,8 +730,14 @@ end
 # User interface
 
 ##
-(m::Model)(; id::Int=1) = geteval(m.preds[id])
-(m::Model)(name::Symbol; id::Int=1) = geteval(m.preds[id], name)
+(m::Model)(id::Int=1) = geteval(m.preds[id])
+(m::Model)(name::Symbol) = m(1, name)
+(m::Model)(id::Int, name::Symbol) = geteval(m.preds[id], name)
+
+##
+Base.haskey(m::Model, id::Int, name::Symbol) = haskey(m.preds[id].cevals, name)
+Base.haskey(m::Model, name::Symbol) = haskey(m, 1, name)
+Base.keys(m::Model, id::Int=1) = keys(m.preds[id].cevals)
 
 ##
 Base.getindex(p::Prediction, cname::Symbol) = p.cevals[cname].comp
@@ -733,12 +748,12 @@ Base.getindex(res::BestFitResult, cname::Symbol) = res[1, cname]
 Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
 Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
 
-
 ##
 domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
-domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].orig_domain[dim]
+domain(m::Model, id::Int=1; dim::Int=1) = m.preds[id].orig_domain[dim]
 
 
+# ====================================================================
 include("todict.jl")
 include("show.jl")
 

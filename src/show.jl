@@ -254,13 +254,15 @@ function preparetable(cid::CompID, comp::BestFitComp)
     error = Vector{Bool}()
     watch = Vector{Bool}()
 
+    id = cid.id
+    cname = cid.name
     for (pname, params) in comp
         if isa(params, AbstractArray)
             for ii in 1:length(params)
                 par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, [cid.id cid.name spname par.val par.unc par.patched])
+                table = vcat(table, [id name spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
@@ -271,7 +273,7 @@ function preparetable(cid::CompID, comp::BestFitComp)
             par = params
             (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
             spname = string(pname)
-            table = vcat(table, [cid.id cid.name spname par.val par.unc par.patched])
+            table = vcat(table, [id cname spname par.val par.unc par.patched])
             push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.patched)
