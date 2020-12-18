@@ -248,19 +248,19 @@ show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
                                          " (patched value: " * string(par.patched) * ")"))
 
 
-function preparetable(comp::BestFitComp; cname::String="?", id::String="?")
+function preparetable(cid::CompID, comp::BestFitComp)
     table = Matrix{Union{String,Float64}}(undef, 0, 6)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
 
-    for (pname, param) in comp
-        if isa(param, Vector{BestFitPar})
-            for ii in 1:length(param)
-                par = param[ii]
+    for (pname, params) in comp
+        if length(params) > 1
+            for ii in 1:length(params)
+                par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, [id cname spname par.val par.unc par.patched])
+                table = vcat(table, [cid.id cid.name spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
@@ -268,10 +268,10 @@ function preparetable(comp::BestFitComp; cname::String="?", id::String="?")
                 cname = ""
             end
         else
-            par = param
+            par = params
             (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
             spname = string(pname)
-            table = vcat(table, [id cname spname par.val par.unc par.patched])
+            table = vcat(table, [cid.id cid.name spname par.val par.unc par.patched])
             push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.patched)
@@ -284,7 +284,7 @@ end
 
 
 function show(io::IO, comp::BestFitComp)
-    (table, fixed, error, watch) = preparetable(comp)
+    (table, fixed, error, watch) = preparetable(CompID(0, Symbol("?")), comp)
     (length(table) == 0)  &&  return
     printtable(io, table , ["id", "Component", "Param.", "Value", "Uncert.", "Patched"],
                hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [4,5,6]),
@@ -303,16 +303,14 @@ function show(io::IO, res::BestFitResult)
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for id in 1:length(res.preds)
-        for (cname, comp) in res.preds[id]
-            (t, f, e, w) = preparetable(comp, cname=string(cname), id=string(id))
-            (length(t) > 0)  ||  continue
-            table = vcat(table, t)
-            append!(fixed, f)
-            append!(error, e)
-            append!(watch, w)
-            push!(hrule, length(error)+1)
-        end
+    for (cid, comp) in res.comps
+        (t, f, e, w) = preparetable(cid, comp)
+        (length(t) > 0)  ||  continue
+        table = vcat(table, t)
+        append!(fixed, f)
+        append!(error, e)
+        append!(watch, w)
+        push!(hrule, length(error)+1)
     end
     printtable(io, table, ["id", "Component", "Param.", "Value", "Uncert.", "Patched"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4,5,6]),
