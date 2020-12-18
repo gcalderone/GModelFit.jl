@@ -255,7 +255,7 @@ function preparetable(cid::CompID, comp::BestFitComp)
     watch = Vector{Bool}()
 
     for (pname, params) in comp
-        if length(params) > 1
+        if isa(params, AbstractArray)
             for ii in 1:length(params)
                 par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
