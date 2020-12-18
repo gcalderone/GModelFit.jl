@@ -346,15 +346,10 @@ end
 # ====================================================================
 include("HashVector.jl")
 
-# Must declare the following for each key type to avoid method ambiguities
-getproperty( hv::HashVector{K,V}, key::K)       where {K <: Symbol,V} = _getproperty( hv, key)
-setproperty!(hv::HashVector{K,V}, key::K, v::V) where {K <: Symbol,V} = _setproperty!(hv, key, v)
-
-
 # ====================================================================
 # Model and ModelInternals structures
 #
-const PatchComp = HashVector{Symbol, Float64}
+const PatchComp = HashVector{Float64}
 
 struct ModelInternals
     cevals::OrderedDict{CompID, CompEval}
@@ -528,7 +523,7 @@ struct BestFitPar
     patched::Float64  # value after transformation
 end
 
-const BestFitComp = HashVector{Symbol, BestFitPar}
+const BestFitComp = HashVector{BestFitPar}
 
 struct BestFitResult
     comps::OrderedDict{CompID, BestFitComp}
