@@ -21,10 +21,9 @@ import Base.iterate
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate, thaw, freeze, fit!,
-    metadict, savelog
+    savelog
 
 const MDict = OrderedDict{Symbol, Any}
-
 
 include("domain.jl")
 
@@ -32,13 +31,12 @@ include("domain.jl")
 # Parameter
 #
 mutable struct Parameter
-    meta::MDict
     val::Float64
     low::Float64              # lower limit value
     high::Float64             # upper limit value
     step::Float64
     fixed::Bool
-    Parameter(value::Number) = new(MDict(), float(value), -Inf, +Inf, NaN, false)
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
 end
 
 # ====================================================================
@@ -235,7 +233,6 @@ end
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
     id::Int
-    meta::MDict
     orig_domain::AbstractDomain
     domain::AbstractLinearDomain
     cevals::OrderedDict{Symbol, CompEval}
@@ -245,7 +242,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(0, MDict(), domain, flatten(domain),
+        pred = new(0, domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -257,7 +254,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(0, MDict(), domain, flatten(domain),
+        pred = new(0, domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -368,13 +365,13 @@ ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   Vector{Float64}())
 
 mutable struct Model
-    meta::MDict
+    meta::Vector{MDict}
     preds::Vector{Prediction}
     priv::ModelInternals
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(MDict(), v, ModelInternals(), Vector{Function}())
+        model = new(Vector{MDict}(), v, ModelInternals(), Vector{Function}())
         evaluate(model)
         return model
     end
@@ -437,6 +434,34 @@ function evaluate(model::Model)
     @assert length(model.preds) >= 1
     model.priv = ModelInternals(model)
     quick_evaluate(model)
+
+    # Prepare meta data
+    while length(model.meta) < length(model.preds)
+        push!(model.meta, MDict())
+    end
+    for id in 1:length(model.preds)
+        pred = model.preds[id]
+        meta = model.meta[id]
+
+        haskey(meta, :components)  ||  (meta[:components] = MDict())
+        for (cname, ceval) in pred.cevals
+            haskey(meta[:components], cname)  ||  (meta[:components][cname] = MDict(:params => MDict()))
+            for (pid, param) in ceval.params
+                if pid.index >= 1
+                    pname = Symbol(pid.name, "[", pid.index, "]")
+                else
+                    pname = pid.name
+                end
+                haskey(meta[:components][cname][:params], pname)  ||  (meta[:components][cname][:params][pname] = MDict())
+            end
+        end
+
+        haskey(meta, :reducers)  ||  (meta[:reducers] = MDict())
+        for (rname, reval) in pred.revals
+            haskey(meta[:reducers], rname)  ||  (meta[:reducers][rname] = MDict())
+        end
+    end
+
     return model
 end
 
@@ -713,35 +738,6 @@ Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, c
 domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
 domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].orig_domain[dim]
 
-
-##
-metadict(d::AbstractData) = d.meta
-metadict(param::Parameter) = param.meta
-metadict(m::Model; id::Int=1) = m.preds[id].meta
-
-function metadict(m::Model, name::Symbol; id=1)
-    if haskey(m.preds[id].cevals, name)
-        # TODO qcname = CompID(id, name)
-        # TODO haskey(m.meta, qcname)  ||  (m.meta[qcname] = MDict())
-        # TODO comp = m.preds[i].cevals[name].comp
-        # TODO if name in fieldnames(typeof(comp))
-        # TODO     field = getfield(comp, name)
-        # TODO     if isa(field, MDict)
-        # TODO         m.meta[name] = field
-        # TODO     end
-        # TODO end
-
-        return m.meta[name]
-    else
-        for pred in m.preds
-            if haskey(pred.revals, name)
-                haskey(m.meta, name)  ||  (m.meta[name] = MDict())
-                return m.meta[name]
-            end
-        end
-    end
-    error("Name $name is not defined")
-end
 
 include("todict.jl")
 include("show.jl")
