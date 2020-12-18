@@ -358,7 +358,6 @@ struct ModelInternals
     pvalues::Vector{Float64}
     patched::Vector{Float64}
     patchcomps::OrderedDict{CompID, PatchComp}
-    patchfuncts::Vector{Function}
     buffer::Vector{Float64}
 end
 ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
@@ -366,15 +365,16 @@ ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   OrderedDict{CompID, Vector{Int}}(),
                                   Vector{Float64}(), Vector{Float64}(),
                                   OrderedDict{CompID, PatchComp}(),
-                                  Vector{Function}(), Vector{Float64}())
+                                  Vector{Float64}())
 
 mutable struct Model
     meta::MDict
     preds::Vector{Prediction}
     priv::ModelInternals
+    patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(MDict(), v, ModelInternals())
+        model = new(MDict(), v, ModelInternals(), Vector{Function}())
         evaluate(model)
         return model
     end
@@ -429,7 +429,7 @@ function ModelInternals(model::Model)
     end
 
     return ModelInternals(cevals, params, par_indices, pvalues, patched, patchcomps,
-                          Vector{Function}(), fill(NaN, ndata))
+                          fill(NaN, ndata))
 end
 
 
@@ -444,7 +444,7 @@ end
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.priv.patched .= model.priv.pvalues  # copy all values by default
-    for func in model.priv.patchfuncts
+    for func in model.patchfuncts
         func(model.priv.patchcomps)
     end
 
@@ -491,7 +491,7 @@ end
 
 # ====================================================================
 function patch!(func::Function, model::Model)
-    push!(model.priv.patchfuncts, func)
+    push!(model.patchfuncts, func)
     evaluate(model)
     return model
 end
@@ -705,6 +705,9 @@ Base.getindex(m::Model, id::Int, cname::Symbol) = m.preds[id].cevals[cname].comp
 Base.getindex(m::Model, cname::Symbol) = m[1, cname]
 Base.getindex(res::BestFitResult, id::Int, cname::Symbol) = res.comps[CompID(id, cname)]
 Base.getindex(res::BestFitResult, cname::Symbol) = res[1, cname]
+Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
+Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
+
 
 ##
 domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
