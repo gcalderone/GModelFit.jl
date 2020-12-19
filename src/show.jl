@@ -182,7 +182,7 @@ end
 
 function show(io::IO, pred::PredRef)
     println(io)
-    section(io, "Prediction: $(pred ⋄ :id)):")
+    section(io, "Prediction: $(pred ⋄ :id):")
     (length(pred.cevals) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 6)
@@ -248,37 +248,34 @@ show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
                                          " (patched value: " * string(par.patched) * ")"))
 
 
-function preparetable(cid::CompID, comp::BestFitComp)
-    table = Matrix{Union{String,Float64}}(undef, 0, 6)
+function preparetable(cname::Symbol, comp::BestFitComp)
+    table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
 
-    id = cid.id
-    cname = cid.name
+    cname = string(cname)
     for (pname, params) in comp
         if isa(params, AbstractArray)
             for ii in 1:length(params)
                 par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, [id cname spname par.val par.unc par.patched])
+                table = vcat(table, [cname spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
-                id = ""
                 cname = ""
             end
         else
             par = params
             (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
             spname = string(pname)
-            table = vcat(table, [id cname spname par.val par.unc par.patched])
+            table = vcat(table, [cname spname par.val par.unc par.patched])
             push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.patched)
         end
-        id = ""
         cname = ""
     end
     return (table, fixed, error, watch)
@@ -286,15 +283,38 @@ end
 
 
 function show(io::IO, comp::BestFitComp)
-    (table, fixed, error, watch) = preparetable(CompID(0, Symbol("?")), comp)
+    (table, fixed, error, watch) = preparetable(Symbol("?"), comp)
     (length(table) == 0)  &&  return
-    printtable(io, table , ["id", "Component", "Param.", "Value", "Uncert.", "Patched"],
-               hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [4,5,6]),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (watch[i]  &&  (j==6)), showsettings.highlighted),
-                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==5)), showsettings.error)))
+    printtable(io, table , ["Component", "Param.", "Value", "Uncert.", "Patched"],
+               hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [3,4,5]),
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
+                             Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
+                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
 end
 
+
+function show(io::IO, comps::OrderedDict{Symbol, BestFitComp})
+    table = Matrix{Union{String,Float64}}(undef, 0, 5)
+    fixed = Vector{Bool}()
+    error = Vector{Bool}()
+    watch = Vector{Bool}()
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1)
+    for (cname, comp) in comps
+        (t, f, e, w) = preparetable(cname, comp)
+        (length(t) > 0)  ||  continue
+        table = vcat(table, t)
+        append!(fixed, f)
+        append!(error, e)
+        append!(watch, w)
+        push!(hrule, length(error)+1)
+    end
+    printtable(io, table, ["Component", "Param.", "Value", "Uncert.", "Patched"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [3,4,5]),
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
+                             Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
+                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
+end
 
 function show(io::IO, res::BestFitResult)
     section(io, "Best Fit results:")
@@ -305,20 +325,11 @@ function show(io::IO, res::BestFitResult)
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cid, comp) in res.comps
-        (t, f, e, w) = preparetable(cid, comp)
-        (length(t) > 0)  ||  continue
-        table = vcat(table, t)
-        append!(fixed, f)
-        append!(error, e)
-        append!(watch, w)
-        push!(hrule, length(error)+1)
+    for id in 1:length(res.preds)
+        println(io)
+        section(io, "Prediction: $id:")
+        show(io, res.preds[id])
     end
-    printtable(io, table, ["id", "Component", "Param.", "Value", "Uncert.", "Patched"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4,5,6]),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (watch[i]  &&  (j==6)), showsettings.highlighted),
-                             Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==5)), showsettings.error)))
 
     println(io)
     println(io, @sprintf("    #Data  : %8d              Cost   : %-10.5g", res.ndata, res.cost))

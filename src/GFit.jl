@@ -565,7 +565,7 @@ end
 const BestFitComp = HashVector{BestFitPar}
 
 struct BestFitResult
-    comps::OrderedDict{CompID, BestFitComp}
+    preds::Vector{OrderedDict{Symbol, BestFitComp}}
     ndata::Int
     dof::Int
     cost::Float64
@@ -705,15 +705,15 @@ function fit!(model::Model, data::Vector{T};
         i += 1
     end
 
-    bfcomps = OrderedDict{CompID, BestFitComp}()
+    preds = fill(OrderedDict{Symbol, BestFitComp}(), length(model.preds))
     for (cid, ceval) in model.priv.cevals
-        bfcomps[cid] = BestFitComp(getfield(model.priv.patchcomps[cid], :dict), bfpars)
+        preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid], :dict), bfpars)
     end
 
     cost = sum(abs2, model.priv.buffer)
     dof = length(model.priv.buffer) - length(ifree)
 
-    result = BestFitResult(bfcomps, length(model.priv.buffer), dof, cost, status,
+    result = BestFitResult(preds, length(model.priv.buffer), dof, cost, status,
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
                            float(Base.time_ns() - elapsedTime) / 1.e9)
 
@@ -737,8 +737,14 @@ end
 ##
 (p::PredRef)() = geteval(deref(p))
 (p::PredRef)(name::Symbol) = geteval(deref(p), name)
-(m::Model)() = m[1]()
-(m::Model)(name::Symbol) = m[1](name)
+function (m::Model)()
+    evaluate(m)
+    m[1]()
+end
+function (m::Model)(name::Symbol)
+    evaluate(m)
+    m[1](name)
+end
 
 ##
 Base.keys(m::Model) = keys(m[1])
@@ -750,8 +756,8 @@ Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
 Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
 Base.getindex(m::Model, id::Int) = PredRef(m, id)
 Base.getindex(m::Model, cname::Symbol) = m[1][cname]
-Base.getindex(res::BestFitResult, id::Int, cname::Symbol) = res.comps[CompID(id, cname)]
-Base.getindex(res::BestFitResult, cname::Symbol) = res[1, cname]
+Base.getindex(res::BestFitResult, id::Int) = res.preds[id]
+Base.getindex(res::BestFitResult, cname::Symbol) = res.preds[1][cname]
 #Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
 #Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
 
