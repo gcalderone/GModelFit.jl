@@ -19,6 +19,8 @@ import Base.getproperty
 import Base.setproperty!
 import Base.iterate
 
+⋄ = getfield
+
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
@@ -234,7 +236,6 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    id::Int
     orig_domain::AbstractDomain
     domain::AbstractLinearDomain
     cevals::OrderedDict{Symbol, CompEval}
@@ -244,7 +245,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(0, domain, flatten(domain),
+        pred = new(domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -256,7 +257,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(0, domain, flatten(domain),
+        pred = new(domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -381,6 +382,14 @@ mutable struct Model
     Model(args...) = Model([Prediction(args...)])
 end
 
+struct PredRef
+    model::Model
+    id::Int
+end
+deref(p::PredRef) = (p ⋄ :model).preds[p ⋄ :id]
+Base.getproperty(p::PredRef, name::Symbol) = getproperty(deref(p), name)
+
+
 
 function ModelInternals(model::Model)
     cevals = OrderedDict{CompID, CompEval}()
@@ -391,7 +400,6 @@ function ModelInternals(model::Model)
     i = 1
     for id in 1:length(model.preds)
         pred = model.preds[id]
-        pred.id = id
         for (cname, ceval) in pred.cevals
             cid = CompID(id, cname)
             cevals[cid] = ceval
@@ -490,30 +498,28 @@ function add!(model::Model, p::Prediction)
     evaluate(model)
 end
 
-add!(model::Model, args...) = add!(model, 1, args...)
+add!(model::Model, args...) = add!(model[1], args...)
 
-function add!(model::Model, id::Int, comp_iterable...)
+function add!(p::PredRef, comp_iterable...)
     @assert length(comp_iterable) > 0
-    add_comps!(  model.preds[id], comp_iterable...)
-    evaluate(model)
+    add_comps!(deref(p), comp_iterable...)
+    evaluate(p ⋄ :model)
 end
 
-
-function add!(model::Model, id::Int, reducer::Reducer, comp_iterable...)
+function add!(p::PredRef, reducer::Reducer, comp_iterable...)
     if length(comp_iterable) > 0
-        add_comps!(  model.preds[id], comp_iterable...)
+        add_comps!(deref(p), comp_iterable...)
     end
-    add_reducer!(model.preds[id], reducer)
-    evaluate(model)
+    add_reducer!(deref(p), reducer)
+    evaluate(p ⋄ :model)
 end
 
-
-function add!(model::Model, id::Int, redpair::Pair{Symbol, Reducer}, comp_iterable...)
+function add!(p::PredRef, redpair::Pair{Symbol, Reducer}, comp_iterable...)
     if length(comp_iterable) > 0
-        add_comps!(model.preds[id], comp_iterable...)
+        add_comps!(deref(p), comp_iterable...)
     end
-    add_reducer!(model.preds[id], redpair)
-    evaluate(model)
+    add_reducer!(deref(p), redpair)
+    evaluate(p ⋄ :model)
 end
 
 
@@ -525,25 +531,24 @@ function patch!(func::Function, model::Model)
 end
 
 
-isfixed(model::Model, cname::Symbol) = isfixed(model, 1, cname)
-isfixed(model::Model, id::Int, cname::Symbol) = (model.preds[id].cevals[cname].cfixed >= 1)
+isfixed(pref::PredRef, cname::Symbol) = (pref.cevals[cname].cfixed >= 1)
+isfixed(model::Model, cname::Symbol) = isfixed(model[1], cname)
 
-
-freeze(model::Model, cname::Symbol) = freeze(model, 1, cname)
-function freeze(model::Model, id::Int, cname::Symbol)
-    @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
-    model.preds[id].cevals[cname].cfixed = 1
-    evaluate(model)
-    model
+freeze(model::Model, cname::Symbol) = freeze(model[1], cname)
+function freeze(pref::PredRef, cname::Symbol)
+    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
+    pref.cevals[cname].cfixed = 1
+    evaluate(pref ⋄ :model)
+    nothing
 end
 
 
-thaw(model::Model, cname::Symbol) = thaw(model, 1, cname)
-function thaw(model::Model, id::Int, cname::Symbol)
-    @assert cname in keys(model.preds[id].cevals) "Component $cname is not defined on prediction $id"
-    model.preds[id].cevals[cname].cfixed = 0
-    evaluate(model)
-    model
+thaw(model::Model, cname::Symbol) = thaw(model[1], cname)
+function thaw(pref::PredRef, cname::Symbol)
+    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
+    pref.cevals[cname].cfixed = 0
+    evaluate(pref ⋄ :model)
+    nothing
 end
 
 
@@ -730,27 +735,29 @@ end
 # User interface
 
 ##
-(m::Model)(id::Int=1) = geteval(m.preds[id])
-(m::Model)(name::Symbol) = m(1, name)
-(m::Model)(id::Int, name::Symbol) = geteval(m.preds[id], name)
+(p::PredRef)() = geteval(deref(p))
+(p::PredRef)(name::Symbol) = geteval(deref(p), name)
+(m::Model)() = m[1]()
+(m::Model)(name::Symbol) = m[1](name)
 
 ##
-Base.haskey(m::Model, id::Int, name::Symbol) = haskey(m.preds[id].cevals, name)
-Base.haskey(m::Model, name::Symbol) = haskey(m, 1, name)
-Base.keys(m::Model, id::Int=1) = keys(m.preds[id].cevals)
+Base.keys(m::Model) = keys(m[1])
+Base.keys(p::PredRef) = keys(p.cevals)
+Base.haskey(p::PredRef, name::Symbol) = haskey(p.cevals, name)
+Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
 
 ##
-Base.getindex(p::Prediction, cname::Symbol) = p.cevals[cname].comp
-Base.getindex(m::Model, id::Int, cname::Symbol) = m.preds[id].cevals[cname].comp
-Base.getindex(m::Model, cname::Symbol) = m[1, cname]
+Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
+Base.getindex(m::Model, id::Int) = PredRef(m, id)
+Base.getindex(m::Model, cname::Symbol) = m[1][cname]
 Base.getindex(res::BestFitResult, id::Int, cname::Symbol) = res.comps[CompID(id, cname)]
 Base.getindex(res::BestFitResult, cname::Symbol) = res[1, cname]
-Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
-Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
+#Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
+#Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
 
 ##
-domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
-domain(m::Model, id::Int=1; dim::Int=1) = m.preds[id].orig_domain[dim]
+domain(pref::PredRef; dim::Int=1) = pref.orig_domain[dim]
+domain(m::Model; dim::Int=1) = domain(m[1], dim=dim)
 
 
 # ====================================================================

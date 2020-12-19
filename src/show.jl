@@ -166,7 +166,7 @@ end
 show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
 function show(io::IO, model::Model)
     for id in 1:length(model.preds)
-        show(io, model.preds[id])
+        show(io, model[id])
     end
 end
 
@@ -180,9 +180,9 @@ function show(io::IO, comp::AbstractComponent)
 end
 
 
-function show(io::IO, pred::Prediction)
+function show(io::IO, pred::PredRef)
     println(io)
-    section(io, "Prediction: $(pred.id):")
+    section(io, "Prediction: $(pred ⋄ :id)):")
     (length(pred.cevals) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 6)
@@ -192,7 +192,7 @@ function show(io::IO, pred::Prediction)
     push!(hrule, 0, 1)
     for (cname, ceval) in pred.cevals
         comp = ceval.comp
-        (t, f, e) = preparetable(comp, cname=string(cname), id=string(pred.id), cfixed=(ceval.cfixed >= 1))
+        (t, f, e) = preparetable(comp, cname=string(cname), id=string(pred ⋄ :id), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
         append!(fixed, f .| (ceval.cfixed >= 1))
         append!(error, e)
@@ -235,7 +235,7 @@ function show(io::IO, pred::Prediction)
         i += 1
     end
 
-    table = hcat(fill(pred.id, size(table)[1]), table)
+    table = hcat(fill(pred ⋄ :id, size(table)[1]), table)
     printtable(io, table, ["id", "Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 4:6),
@@ -262,7 +262,7 @@ function preparetable(cid::CompID, comp::BestFitComp)
                 par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, [id name spname par.val par.unc par.patched])
+                table = vcat(table, [id cname spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
