@@ -765,6 +765,7 @@ Base.haskey(p::PredRef, name::Symbol) = haskey(p.cevals, name)
 Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
 
 ##
+Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
 Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
 Base.getindex(m::Model, id::Int) = PredRef(m, id)
 Base.getindex(m::Model, cname::Symbol) = m[1][cname]
