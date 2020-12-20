@@ -126,8 +126,8 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::AbstractComponent; cname::String="?", id::String="?", cfixed=false)
-    table = Matrix{Union{String,Float64}}(undef, 0, 6)
+function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
+    table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
 
@@ -145,17 +145,16 @@ function preparetable(comp::AbstractComponent; cname::String="?", id::String="?"
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
         table = vcat(table,
-                     [id cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname param.val range])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname param.val range])
         push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
         if !showsettings.plain
-            id = ""
             cname = ""
             ctype = ""
         end
     end
     if length(table) == 0
-        table = vcat(table, [id cname ctype "" NaN ""])
+        table = vcat(table, [cname ctype "" NaN ""])
         push!(fixed, false)
         push!(error, false)
     end
@@ -165,10 +164,10 @@ end
 
 function show(io::IO, comp::AbstractComponent)
     (table, fixed, error) = preparetable(comp)
-    printtable(io, table, ["id", "Component", "Type", "Param.", "Value", "Range"],
-               formatters=ft_printf(showsettings.floatformat, [5]),
+    printtable(io, table, ["Component", "Type", "Param.", "Value", "Range"],
+               formatters=ft_printf(showsettings.floatformat, [4]),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
-                             Highlighter((data,i,j) -> (error[i] &&  (j in (4,5))), showsettings.error)))
+                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
 end
 
 
@@ -177,23 +176,23 @@ function show(io::IO, pred::PredRef)
     section(io, "Prediction: $(pred ⋄ :id):")
     (length(pred.cevals) == 0)  &&  (return nothing)
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 6)
+    table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for (cname, ceval) in pred.cevals
         comp = ceval.comp
-        (t, f, e) = preparetable(comp, cname=string(cname), id=string(pred ⋄ :id), cfixed=(ceval.cfixed >= 1))
+        (t, f, e) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
         append!(fixed, f .| (ceval.cfixed >= 1))
         append!(error, e)
         push!(hrule, length(error)+1)
     end
-    printtable(io, table, ["id", "Component", "Type", "Param.", "Value", "Range"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [5]),
+    printtable(io, table, ["Component", "Type", "Param.", "Value", "Range"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
-                             Highlighter((data,i,j) -> (error[i] &&  (j in (4,5))), showsettings.error)))
+                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
 
     i = 1
     error = Vector{Bool}()
@@ -227,11 +226,10 @@ function show(io::IO, pred::PredRef)
         i += 1
     end
 
-    table = hcat(fill(pred ⋄ :id, size(table)[1]), table)
-    printtable(io, table, ["id", "Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+    printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
-               formatters=ft_printf(showsettings.floatformat, 4:6),
-               highlighters=(Highlighter((data,i,j) -> (error[i] && j==6), showsettings.error)))
+               formatters=ft_printf(showsettings.floatformat, 3:5),
+               highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
 end
 
 
