@@ -357,14 +357,14 @@ struct ModelInternals
     par_indices::OrderedDict{CompID, Vector{Int}}
     pvalues::Vector{Float64}
     patched::Vector{Float64}
-    patchcomps::OrderedDict{CompID, PatchComp}
+    patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
     buffer::Vector{Float64}
 end
 ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   OrderedDict{CompParamID, Parameter}(),
                                   OrderedDict{CompID, Vector{Int}}(),
                                   Vector{Float64}(), Vector{Float64}(),
-                                  OrderedDict{CompID, PatchComp}(),
+                                  Vector{OrderedDict{Symbol, PatchComp}}(),
                                   Vector{Float64}())
 
 mutable struct Model
@@ -419,10 +419,10 @@ function ModelInternals(model::Model)
     pvalues = getfield.(values(params), :val)
     patched = deepcopy(pvalues)
 
-    patchcomps = OrderedDict{CompID, PatchComp}()
+    patchcomps = [OrderedDict{Symbol, PatchComp}() for id in 1:length(model.preds)]
     i = 1
     for (cid, ceval) in cevals
-        ipar  = OrderedDict{Symbol, Union{Int, Vector{Int}}}()
+        ipar = OrderedDict{Symbol, Union{Int, Vector{Int}}}()
         for (pid, par) in ceval.params
             if pid.index == 0
                 ipar[pid.name] = i
@@ -433,7 +433,7 @@ function ModelInternals(model::Model)
             end
             i += 1
         end
-        patchcomps[cid] = HashVector(ipar, patched)
+        patchcomps[cid.id][cid.name] = HashVector(ipar, patched)
     end
 
     return ModelInternals(cevals, params, par_indices, pvalues, patched, patchcomps,
@@ -480,8 +480,9 @@ end
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.priv.patched .= model.priv.pvalues  # copy all values by default
+    tmp = (length(model.preds) == 1  ?  model.priv.patchcomps[1]  :  model.priv.patchcomps)
     for func in model.patchfuncts
-        func(model.priv.patchcomps)
+        func(tmp)
     end
 
     for (cid, ceval) in model.priv.cevals
@@ -716,12 +717,9 @@ function fit!(model::Model, data::Vector{T};
         i += 1
     end
 
-    preds = Vector{OrderedDict{Symbol, BestFitComp}}()
-    for id in 1:length(model.preds)
-        push!(preds, OrderedDict{Symbol, BestFitComp}())
-    end
+    preds = [OrderedDict{Symbol, BestFitComp}() for id in 1:length(model.preds)]
     for (cid, ceval) in model.priv.cevals
-        preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid], :dict), bfpars)
+        preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid.id][cid.name], :dict), bfpars)
     end
 
     cost = sum(abs2, model.priv.buffer)
