@@ -382,6 +382,7 @@ mutable struct Model
     Model(args...) = Model([Prediction(args...)])
 end
 
+
 struct PredRef
     model::Model
     id::Int
@@ -564,6 +565,7 @@ end
 
 const BestFitComp = HashVector{BestFitPar}
 
+
 struct BestFitResult
     preds::Vector{OrderedDict{Symbol, BestFitComp}}
     ndata::Int
@@ -573,6 +575,15 @@ struct BestFitResult
     log10testprob::Float64
     elapsed::Float64
 end
+
+
+struct BestFitPredRef
+    result::BestFitResult
+    id::Int
+end
+deref(p::BestFitPredRef) = (p ⋄ :result).preds[p ⋄ :id]
+Base.getindex(p::BestFitPredRef, name::Symbol) = getindex(deref(p), name)
+Base.iterate(p::BestFitPredRef, args...) = iterate(deref(p), args...)
 
 
 # ====================================================================
@@ -756,10 +767,8 @@ Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
 Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
 Base.getindex(m::Model, id::Int) = PredRef(m, id)
 Base.getindex(m::Model, cname::Symbol) = m[1][cname]
-Base.getindex(res::BestFitResult, id::Int) = res.preds[id]
-Base.getindex(res::BestFitResult, cname::Symbol) = res.preds[1][cname]
-#Base.getindex(comps::OrderedDict{CompID, PatchComp}, id::Int, cname::Symbol) = comps[CompID(id, cname)]
-#Base.getindex(comps::OrderedDict{CompID, PatchComp}, cname::Symbol) = comps[1, cname]
+Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
+Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
 
 ##
 domain(pref::PredRef; dim::Int=1) = pref.orig_domain[dim]

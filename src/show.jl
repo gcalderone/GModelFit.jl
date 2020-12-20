@@ -163,14 +163,6 @@ function preparetable(comp::AbstractComponent; cname::String="?", id::String="?"
 end
 
 
-show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
-function show(io::IO, model::Model)
-    for id in 1:length(model.preds)
-        show(io, model[id])
-    end
-end
-
-
 function show(io::IO, comp::AbstractComponent)
     (table, fixed, error) = preparetable(comp)
     printtable(io, table, ["id", "Component", "Type", "Param.", "Value", "Range"],
@@ -243,6 +235,15 @@ function show(io::IO, pred::PredRef)
 end
 
 
+#Is this needed? show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
+
+function show(io::IO, model::Model)
+    for id in 1:length(model.preds)
+        show(io, model[id])
+    end
+end
+
+
 show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
                                         (par.val == par.patched  ?  ""  :
                                          " (patched value: " * string(par.patched) * ")"))
@@ -293,14 +294,17 @@ function show(io::IO, comp::BestFitComp)
 end
 
 
-function show(io::IO, comps::OrderedDict{Symbol, BestFitComp})
+function show(io::IO, pred::BestFitPredRef)
+    println(io)
+    section(io, "Prediction: $(pred ⋄ :id):")
+
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, comp) in comps
+    for (cname, comp) in pred
         (t, f, e, w) = preparetable(cname, comp)
         (length(t) > 0)  ||  continue
         table = vcat(table, t)
@@ -326,9 +330,7 @@ function show(io::IO, res::BestFitResult)
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for id in 1:length(res.preds)
-        println(io)
-        section(io, "Prediction: $id:")
-        show(io, res.preds[id])
+        show(io, res[id])
     end
 
     println(io)
