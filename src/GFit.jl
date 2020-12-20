@@ -716,7 +716,10 @@ function fit!(model::Model, data::Vector{T};
         i += 1
     end
 
-    preds = fill(OrderedDict{Symbol, BestFitComp}(), length(model.preds))
+    preds = Vector{OrderedDict{Symbol, BestFitComp}}()
+    for id in 1:length(model.preds)
+        push!(preds, OrderedDict{Symbol, BestFitComp}())
+    end
     for (cid, ceval) in model.priv.cevals
         preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid], :dict), bfpars)
     end
