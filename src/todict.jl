@@ -93,7 +93,7 @@ end
 
 function todict(pred::Prediction)
     out = MDict()
-    out[:x] = rebin_data(todict_opt[:rebin], domain(pred))
+    out[:x] = rebin_data(todict_opt[:rebin], pred.domain[1])
     out[:components] = MDict()
     out[:compevals]  = MDict()
     for (cname, ceval) in pred.cevals
@@ -147,9 +147,11 @@ end
 
 function todict(res::BestFitResult)
     out = MDict()
-    preds = fill(MDict(:components => MDict()), maximum(getfield.(keys(res.comps), :id)))
-    for (cid, comp) in res.comps
-        preds[cid.id][:components][cid.name] = todict(comp)
+    preds = [MDict(:components => MDict()) for id in 1:length(res.preds)]
+    for id in 1:length(res.preds)
+        for (cname, comp) in res.preds[id]
+            preds[id][:components][cname] = todict(comp)
+        end
     end
     out[:predictions] = preds
     out[:ndata] = res.ndata
