@@ -19,14 +19,14 @@ end
 
 const showsettings = ShowSettings()
 
-function printtable(args...; formatters=(), kw...)
+function printtable(args...; formatters=(), hlines=:none, kw...)
     if showsettings.plain
         c = crayon"default"
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_markdown, hlines=:none,
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
                      border_crayon=c, header_crayon=c, subheader_crayon=c,
                      highlighters=())
     else
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat,
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
                      border_crayon=showsettings.border, header_crayon=showsettings.header, subheader_crayon=showsettings.subheader,
                      kw...)
     end
@@ -126,7 +126,7 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::AbstractComponent, cname="")
+function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
@@ -135,16 +135,17 @@ function preparetable(comp::AbstractComponent, cname="")
     (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
     ctype = join(ctype, ".")
 
-    for (pname, param) in getparams(comp)
-        parname = string(pname[1])
-        if pname[2] >= 1
-            parname *= "[" * string(pname[2]) * "]"
+    for (qpname, param) in getparams(comp)
+        parname = string(qpname.name)
+        if qpname.index >= 1
+            parname *= "[" * string(qpname.index) * "]"
         end
         parname *= (param.fixed  ?  " (FIXED)"  :  "")
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
-        table = vcat(table, [cname ctype parname param.val range])
+        table = vcat(table,
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname param.val range])
         push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
         if !showsettings.plain
@@ -161,53 +162,42 @@ function preparetable(comp::AbstractComponent, cname="")
 end
 
 
-show(io::IO, comp::AbstractComponent) =
-    show(io, OrderedDict(Symbol("?") => comp), OrderedDict(Symbol("?") => false))
-
-
-function show(io::IO, dict::OrderedDict{Symbol, T}, cfixed::OrderedDict{Symbol, Bool}) where T <: AbstractComponent
-    (length(dict) > 0)  ||  (return nothing)
-    table = Matrix{Union{String,Float64}}(undef, 0, 5)
-    fixed = Vector{Bool}()
-    error = Vector{Bool}()
-    hrule = Vector{Int}()
-    push!(hrule, 0, 1)
-    for (cname, comp) in dict
-        (t, f, e) = preparetable(comp, string(cname) .* (cfixed[cname]  ?  " (FIXED)"  :  ""))
-        table = vcat(table, t)
-        append!(fixed, f .| cfixed[cname])
-        append!(error, e)
-        push!(hrule, length(error)+1)
-    end
-    printtable(io, table , ["Component" "Type" "Param." "Value" "Range"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
+function show(io::IO, comp::AbstractComponent)
+    (table, fixed, error) = preparetable(comp)
+    printtable(io, table, ["Component", "Type", "Param.", "Value", "Range"],
+               formatters=ft_printf(showsettings.floatformat, [4]),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
                              Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
 end
 
 
-show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
-function show(io::IO, model::Model)
-    section(io, "Components:")
-    length(model.comps) != 0  || (return nothing)
-    show(io, model.comps, model.cfixed)
-
-    for i in 1:length(model.preds)
-        println(io)
-        section(io, "Prediction #$i:")
-        show(io, model.preds[i])
-    end
-end
-
-
-
-function show(io::IO, pred::Prediction)
+function show(io::IO, pred::PredRef)
+    println(io)
+    section(io, "Prediction: $(pred ⋄ :id):")
     (length(pred.cevals) == 0)  &&  (return nothing)
-    table = Matrix{Union{String,Int,Float64}}(undef,
-                                              length(pred.cevals) + length(pred.revals), 6)
+
+    table = Matrix{Union{String,Float64}}(undef, 0, 5)
+    fixed = Vector{Bool}()
     error = Vector{Bool}()
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1)
+    for (cname, ceval) in pred.cevals
+        comp = ceval.comp
+        (t, f, e) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
+        table = vcat(table, t)
+        append!(fixed, f .| (ceval.cfixed >= 1))
+        append!(error, e)
+        push!(hrule, length(error)+1)
+    end
+    printtable(io, table, ["Component", "Type", "Param.", "Value", "Range"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
+               highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
+                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4))), showsettings.error)))
 
     i = 1
+    error = Vector{Bool}()
+    table = Matrix{Union{String,Int,Float64}}(undef,
+                                              length(pred.cevals) + length(pred.revals), 6)
     for (cname, ceval) in pred.cevals
         result = ceval.buffer
         v = view(result, findall(isfinite.(result)))
@@ -243,46 +233,58 @@ function show(io::IO, pred::Prediction)
 end
 
 
+#Is this needed? show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
+
+function show(io::IO, model::Model)
+    for id in 1:length(model.preds)
+        show(io, model[id])
+    end
+end
+
+
 show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
                                         (par.val == par.patched  ?  ""  :
                                          " (patched value: " * string(par.patched) * ")"))
 
 
-function preparetable(comp::BestFitComp)
+function preparetable(cname::Symbol, comp::BestFitComp)
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
 
-    for (pname, param) in comp
-        if isa(param, Vector{BestFitPar})
-            for ii in 1:length(param)
-                par = param[ii]
+    cname = string(cname)
+    for (pname, params) in comp
+        if isa(params, AbstractArray)
+            for ii in 1:length(params)
+                par = params[ii]
                 (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
                 spname = string(pname) * "[" * string(ii) * "]"
-                table = vcat(table, ["" spname par.val par.unc par.patched])
+                table = vcat(table, [cname spname par.val par.unc par.patched])
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
+                showsettings.plain  ||  (cname = "")
             end
         else
-            par = param
+            par = params
             (!showsettings.showfixed)  &&  par.fixed  &&  (par.val == par.patched)  &&  continue
             spname = string(pname)
-            table = vcat(table, ["" spname par.val par.unc par.patched])
+            table = vcat(table, [cname spname par.val par.unc par.patched])
             push!(fixed, par.fixed)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.patched)
         end
+        showsettings.plain  ||  (cname = "")
     end
     return (table, fixed, error, watch)
 end
 
 
 function show(io::IO, comp::BestFitComp)
-    (table, fixed, error, watch) = preparetable(comp)
+    (table, fixed, error, watch) = preparetable(Symbol("?"), comp)
     (length(table) == 0)  &&  return
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Patched"],
+    printtable(io, table , ["Component", "Param.", "Value", "Uncert.", "Patched"],
                hlines=[0,1,size(table)[1]+1], formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
@@ -290,8 +292,9 @@ function show(io::IO, comp::BestFitComp)
 end
 
 
-function show(io::IO, res::BestFitResult)
-    section(io, "Best Fit results:")
+function show(io::IO, pred::BestFitPredRef)
+    println(io)
+    section(io, "Prediction: $(pred ⋄ :id):")
 
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
@@ -299,27 +302,34 @@ function show(io::IO, res::BestFitResult)
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, comp) in res.comps
-        if length(comp) > 0
-            (t, f, e, w) = preparetable(comp)
-            (length(t) > 0)  ||  continue
-            if showsettings.plain
-                t[:,1] .= string(cname)
-            else
-                t[1,1] = string(cname)
-            end
-            table = vcat(table, t)
-            append!(fixed, f)
-            append!(error, e)
-            append!(watch, w)
-            push!(hrule, length(error)+1)
-        end
+    for (cname, comp) in pred
+        (t, f, e, w) = preparetable(cname, comp)
+        (length(t) > 0)  ||  continue
+        table = vcat(table, t)
+        append!(fixed, f)
+        append!(error, e)
+        append!(watch, w)
+        push!(hrule, length(error)+1)
     end
-    printtable(io, table , ["Component" "Param." "Value" "Uncert." "Patched"],
+    printtable(io, table, ["Component", "Param.", "Value", "Uncert.", "Patched"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, [3,4,5]),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (2,3,4))), showsettings.fixed),
                              Highlighter((data,i,j) -> (watch[i]  &&  (j==5)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
+end
+
+function show(io::IO, res::BestFitResult)
+    section(io, "Best Fit results:")
+
+    table = Matrix{Union{String,Float64}}(undef, 0, 6)
+    fixed = Vector{Bool}()
+    error = Vector{Bool}()
+    watch = Vector{Bool}()
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1)
+    for id in 1:length(res.preds)
+        show(io, res[id])
+    end
 
     println(io)
     println(io, @sprintf("    #Data  : %8d              Cost   : %-10.5g", res.ndata, res.cost))
@@ -344,7 +354,7 @@ function show(io::IO, res::BestFitResult)
     println(io, @sprintf("              Elapsed: %-10.4g s", res.elapsed))
 end
 
-
+#=
 function savelog(filename::String, args...; plain=true)
     orig = showsettings.plain
     showsettings.plain = plain
@@ -359,3 +369,4 @@ function savelog(filename::String, args...; plain=true)
     end
     showsettings.plain = orig
 end
+=#

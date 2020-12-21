@@ -10,6 +10,8 @@ import Base.show
 import Base.ndims
 import Base.size
 import Base.length
+import Base.haskey
+import Base.keys
 import Base.getindex
 import Base.reshape
 import Base.propertynames
@@ -17,29 +19,27 @@ import Base.getproperty
 import Base.setproperty!
 import Base.iterate
 
+⋄ = getfield
+
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, thaw, freeze, fit!,
-    metadict, savelog
+    Model, patch!, evaluate, isfixed, thaw, freeze, fit!
 
 const MDict = OrderedDict{Symbol, Any}
 
-
 include("domain.jl")
-
 
 # ====================================================================
 # Parameter
 #
 mutable struct Parameter
-    meta::MDict
     val::Float64
     low::Float64              # lower limit value
     high::Float64             # upper limit value
     step::Float64
     fixed::Bool
-    Parameter(value::Number) = new(MDict(), float(value), -Inf, +Inf, NaN, false)
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
 end
 
 # ====================================================================
@@ -51,15 +51,38 @@ end
 abstract type AbstractComponent end
 
 
+# ====================================================================
+struct ParamID
+    name::Symbol
+    index::Int
+    ParamID(pname::Symbol) = new(pname, 0)                  # scalar param
+    ParamID(pname::Symbol, index::Int) = new(pname, index)  # vector of params
+end
+
+struct CompID
+    id::Int
+    name::Symbol
+    CompID(cname::Symbol) = new(1, cname)  # default on first prediction
+    CompID(id::Int, cname::Symbol) = new(id, cname)
+end
+
+struct CompParamID
+    comp::CompID
+    param::ParamID
+end
+
+
+
+# ====================================================================
 function getparams(comp::AbstractComponent)
-    params = OrderedDict{Tuple{Symbol,Int}, Parameter}()
+    params = OrderedDict{ParamID, Parameter}()
     for pname in fieldnames(typeof(comp))
         par = getfield(comp, pname)
         if isa(par, Parameter)
-            params[(pname, 0)] = par
+            params[ParamID(pname)] = par
         elseif isa(par, Vector{Parameter})
             for i in 1:length(par)
-                params[(pname, i)] = par[i]
+                params[ParamID(pname, i)] = par[i]
             end
         end
     end
@@ -72,12 +95,12 @@ end
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
-    params::OrderedDict{Tuple{Symbol,Int}, Parameter}
+    params::OrderedDict{ParamID, Parameter}
     cdata
     counter::Int
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
-    ipar::Vector{Int}  # handled by Model
+    cfixed::Int8
 
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         params = getparams(comp)
@@ -85,8 +108,8 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         buffer = compeval_array(comp, domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain, params, cdata, 0,
-            fill(NaN, length(params)), 
-            buffer, Vector{Int}())
+            fill(NaN, length(params)),
+            buffer, false)
     end
 end
 
@@ -108,17 +131,17 @@ end
 
 # ====================================================================
 # Component fall back methods
-compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) =
-    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_cdata`.")
+function compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) end
+#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_cdata`.")
 
-compeval_array(comp::AbstractComponent, domain::AbstractDomain) =
-    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_array`.")
+function compeval_array(comp::AbstractComponent, domain::AbstractDomain) end
+#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_array`.")
 
-evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} =
-    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
+function evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} end
+#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
-evaluate(c::CompEval{TComp, TDomain}) where {TComp, TDomain} = 
-    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
+function evaluate(c::CompEval{TComp, TDomain}) where {TComp, TDomain} end
+#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
 
 # ====================================================================
@@ -212,7 +235,6 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    meta::MDict
     orig_domain::AbstractDomain
     domain::AbstractLinearDomain
     cevals::OrderedDict{Symbol, CompEval}
@@ -222,7 +244,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(MDict(), domain, flatten(domain),
+        pred = new(domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -234,7 +256,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(MDict(), domain, flatten(domain),
+        pred = new(domain, flatten(domain),
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -251,7 +273,7 @@ function add_comps!(pred::Prediction, comp_iterable...)
     for (cname, comp) in extract_components(comp_iterable...)
         @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
-        pred.cevals[cname] = CompEval(comp, pred.domain)
+        pred.cevals[cname] = CompEval(deepcopy(comp), pred.domain)
     end
 end
 
@@ -293,7 +315,7 @@ end
 
 
 function evaluate(pred::Prediction)
-    for (name, ceval) in pred.cevals
+    for (cname, ceval) in pred.cevals
         evaluate_cached(ceval)
     end
     reduce(pred)
@@ -321,53 +343,37 @@ end
 
 
 # ====================================================================
-struct PatchComp
-    pvalues::Vector{Float64}
-    ipar::OrderedDict{Symbol, Vector{Int}}
-end
-
-function Base.getproperty(comp::PatchComp, pname::Symbol)
-    v = getfield(comp, :pvalues)
-    i = getfield(comp, :ipar)[pname]
-    (length(i) == 1)  &&  (i = i[1])
-    return v[i]
-end
-
-function Base.setproperty!(comp::PatchComp, pname::Symbol, value::Real)
-    v = getfield(comp, :pvalues)
-    d = getfield(comp, :ipar)
-    i = get(d, pname, nothing)
-    if isnothing(i)
-        # Avoid issuing an error here to simplify patch functions
-        @warn "Attempt to patch a non-existing parameter named $pname"
-        return value
-    end
-    @assert length(i) == 1
-    v[i[1]] = value
-end
-
-
+include("HashVector.jl")
 
 # ====================================================================
-# Global model, actually a collection of `Prediction`s.
-mutable struct Model
-    meta::MDict
-    preds::Vector{Prediction}
-    comps::OrderedDict{Symbol, AbstractComponent}
-    cfixed::OrderedDict{Symbol, Bool}
-    params::OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}
-    patchbay::OrderedDict{Symbol, PatchComp}
+# Model and ModelInternals structures
+#
+const PatchComp = HashVector{Float64}
+
+struct ModelInternals
+    cevals::OrderedDict{CompID, CompEval}
+    params::OrderedDict{CompParamID, Parameter}
+    par_indices::OrderedDict{CompID, Vector{Int}}
     pvalues::Vector{Float64}
     patched::Vector{Float64}
+    patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
     buffer::Vector{Float64}
+end
+ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
+                                  OrderedDict{CompParamID, Parameter}(),
+                                  OrderedDict{CompID, Vector{Int}}(),
+                                  Vector{Float64}(), Vector{Float64}(),
+                                  Vector{OrderedDict{Symbol, PatchComp}}(),
+                                  Vector{Float64}())
+
+mutable struct Model
+    meta::Vector{MDict}
+    preds::Vector{Prediction}
+    priv::ModelInternals
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(MDict(), v, OrderedDict{Symbol, AbstractComponent}(),
-                    OrderedDict{Symbol, Bool}(),
-                    OrderedDict{Tuple{Symbol, Symbol, Int}, Parameter}(),
-                    OrderedDict{Symbol, PatchComp}(),
-                    Vector{Float64}(), Vector{Float64}(), Vector{Float64}(), Vector{Function}())
+        model = new(Vector{MDict}(), v, ModelInternals(), Vector{Function}())
         evaluate(model)
         return model
     end
@@ -375,74 +381,111 @@ mutable struct Model
     Model(args...) = Model([Prediction(args...)])
 end
 
-function evaluate(model::Model)
-    @assert length(model.preds) >= 1
 
-    # Save list of previously fixed components
-    cfixed = deepcopy(model.cfixed)
+struct PredRef
+    model::Model
+    id::Int
+end
+deref(p::PredRef) = (p ⋄ :model).preds[p ⋄ :id]
+Base.getproperty(p::PredRef, name::Symbol) = getproperty(deref(p), name)
 
-    # Collect components and parameters
-    empty!(model.comps)
-    empty!(model.cfixed)
-    empty!(model.params)
-    for pred in model.preds
-        for (cname, ceval) in pred.cevals
-            model.comps[cname] = ceval.comp
-            model.cfixed[cname] = get(cfixed, cname, false)
-            for (pname, par) in ceval.params
-                cpname = (cname, pname[1], pname[2])
-                model.params[cpname] = par
-            end
-        end
-    end
 
-    # Prepare vectors of parameter values (pvalues) and "patched"
-    # values (patched)
-    model.pvalues = [par.val for par in values(model.params)]
-    model.patched = deepcopy(model.pvalues)
 
-    # Populate CompEval.ipar and evaluate all predictions
-    empty!(model.patchbay)
+function ModelInternals(model::Model)
+    cevals = OrderedDict{CompID, CompEval}()
+    params = OrderedDict{CompParamID, Parameter}()
+    par_indices = OrderedDict{CompID, Vector{Int}}()
+
     ndata = 0
-    cpnames = keys(model.params)
-    for pred in model.preds
+    i = 1
+    for id in 1:length(model.preds)
+        pred = model.preds[id]
         for (cname, ceval) in pred.cevals
-            empty!(ceval.ipar)
-            liveipar = OrderedDict{Symbol, Vector{Int}}()
-
-            for (pname, par) in ceval.params
-                cpname = (cname, pname[1], pname[2])
-                i = findall(cpnames .== Ref(cpname))
-                @assert length(i) == 1
-                push!(ceval.ipar, i[1])
-
-                haskey(liveipar, pname[1])  ||  (liveipar[pname[1]] = Vector{Int}())
-                push!( liveipar[pname[1]], i[1])
+            cid = CompID(id, cname)
+            cevals[cid] = ceval
+            par_indices[cid] = Vector{Int}()
+            for (pid, par) in ceval.params
+                params[CompParamID(cid, pid)] = par
+                push!(par_indices[cid], i)
+                i += 1
             end
             evaluate_cached(ceval)
-
-            model.patchbay[cname] = PatchComp(model.patched, liveipar)
         end
         reduce(pred)
         ndata += length(geteval(pred))
     end
 
-    model.buffer = Vector{Float64}(undef, ndata)
+    pvalues = getfield.(values(params), :val)
+    patched = deepcopy(pvalues)
+
+    patchcomps = [OrderedDict{Symbol, PatchComp}() for id in 1:length(model.preds)]
+    i = 1
+    for (cid, ceval) in cevals
+        ipar = OrderedDict{Symbol, Union{Int, Vector{Int}}}()
+        for (pid, par) in ceval.params
+            if pid.index == 0
+                ipar[pid.name] = i
+            elseif pid.index == 1
+                ipar[pid.name] = [i]
+            else
+                push!(ipar[pid.name], i)
+            end
+            i += 1
+        end
+        patchcomps[cid.id][cid.name] = HashVector(ipar, patched)
+    end
+
+    return ModelInternals(cevals, params, par_indices, pvalues, patched, patchcomps,
+                          fill(NaN, ndata))
+end
+
+
+function evaluate(model::Model)
+    @assert length(model.preds) >= 1
+    model.priv = ModelInternals(model)
     quick_evaluate(model)
+
+    # Prepare meta data
+    while length(model.meta) < length(model.preds)
+        push!(model.meta, MDict())
+    end
+    for id in 1:length(model.preds)
+        pred = model.preds[id]
+        meta = model.meta[id]
+
+        haskey(meta, :components)  ||  (meta[:components] = MDict())
+        for (cname, ceval) in pred.cevals
+            haskey(meta[:components], cname)  ||  (meta[:components][cname] = MDict(:params => MDict()))
+            for (pid, param) in ceval.params
+                if pid.index >= 1
+                    pname = Symbol(pid.name, "[", pid.index, "]")
+                else
+                    pname = pid.name
+                end
+                haskey(meta[:components][cname][:params], pname)  ||  (meta[:components][cname][:params][pname] = MDict())
+            end
+        end
+
+        haskey(meta, :reducers)  ||  (meta[:reducers] = MDict())
+        for (rname, reval) in pred.revals
+            haskey(meta[:reducers], rname)  ||  (meta[:reducers][rname] = MDict())
+        end
+    end
+
     return model
 end
 
+
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
-    model.patched .= model.pvalues  # copy all values by default
+    model.priv.patched .= model.priv.pvalues  # copy all values by default
+    tmp = (length(model.preds) == 1  ?  model.priv.patchcomps[1]  :  model.priv.patchcomps)
     for func in model.patchfuncts
-        func(model.patchbay)
+        func(tmp)
     end
 
-    for pred in model.preds
-        for (cname, ceval) in pred.cevals
-            evaluate_cached(ceval, model.patched[ceval.ipar])
-        end
+    for (cid, ceval) in model.priv.cevals
+        evaluate_cached(ceval, model.priv.patched[model.priv.par_indices[cid]])
     end
     for pred in model.preds
         reduce(pred)
@@ -456,29 +499,28 @@ function add!(model::Model, p::Prediction)
     evaluate(model)
 end
 
+add!(model::Model, args...) = add!(model[1], args...)
 
-function add!(model::Model, comp_iterable...; id::Int=1)
+function add!(p::PredRef, comp_iterable...)
     @assert length(comp_iterable) > 0
-    add_comps!(  model.preds[id], comp_iterable...)
-    evaluate(model)
+    add_comps!(deref(p), comp_iterable...)
+    evaluate(p ⋄ :model)
 end
 
-
-function add!(model::Model, reducer::Reducer, comp_iterable...; id::Int=1)
+function add!(p::PredRef, reducer::Reducer, comp_iterable...)
     if length(comp_iterable) > 0
-        add_comps!(  model.preds[id], comp_iterable...)
+        add_comps!(deref(p), comp_iterable...)
     end
-    add_reducer!(model.preds[id], reducer)
-    evaluate(model)
+    add_reducer!(deref(p), reducer)
+    evaluate(p ⋄ :model)
 end
 
-
-function add!(model::Model, redpair::Pair{Symbol, Reducer}, comp_iterable...; id::Int=1)
+function add!(p::PredRef, redpair::Pair{Symbol, Reducer}, comp_iterable...)
     if length(comp_iterable) > 0
-        add_comps!(model.preds[id], comp_iterable...)
+        add_comps!(deref(p), comp_iterable...)
     end
-    add_reducer!(model.preds[id], redpair)
-    evaluate(model)
+    add_reducer!(deref(p), redpair)
+    evaluate(p ⋄ :model)
 end
 
 
@@ -490,19 +532,24 @@ function patch!(func::Function, model::Model)
 end
 
 
-function freeze(model::Model, cname::Symbol)
-    evaluate(model)
-    @assert cname in keys(model.cfixed) "Component $cname is not defined"
-    model.cfixed[cname] = true
-    model
+isfixed(pref::PredRef, cname::Symbol) = (pref.cevals[cname].cfixed >= 1)
+isfixed(model::Model, cname::Symbol) = isfixed(model[1], cname)
+
+freeze(model::Model, cname::Symbol) = freeze(model[1], cname)
+function freeze(pref::PredRef, cname::Symbol)
+    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
+    pref.cevals[cname].cfixed = 1
+    evaluate(pref ⋄ :model)
+    nothing
 end
 
 
-function thaw(model::Model, cname::Symbol)
-    evaluate(model)
-    @assert cname in keys(model.cfixed) "Component $cname is not defined"
-    model.cfixed[cname] = false
-    model
+thaw(model::Model, cname::Symbol) = thaw(model[1], cname)
+function thaw(pref::PredRef, cname::Symbol)
+    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
+    pref.cevals[cname].cfixed = 0
+    evaluate(pref ⋄ :model)
+    nothing
 end
 
 
@@ -516,17 +563,11 @@ struct BestFitPar
     patched::Float64  # value after transformation
 end
 
-struct BestFitComp
-    params::OrderedDict{Symbol, Union{BestFitPar, Vector{BestFitPar}}}
-    BestFitComp() = new(OrderedDict{Symbol, Union{BestFitPar, Vector{BestFitPar}}}())
-end
-
-Base.length(comp::BestFitComp) = length(getfield(comp, :params))
-Base.iterate(comp::BestFitComp, args...) = iterate(getfield(comp, :params), args...)
+const BestFitComp = HashVector{BestFitPar}
 
 
 struct BestFitResult
-    comps::OrderedDict{Symbol, BestFitComp}
+    preds::Vector{OrderedDict{Symbol, BestFitComp}}
     ndata::Int
     dof::Int
     cost::Float64
@@ -534,6 +575,15 @@ struct BestFitResult
     log10testprob::Float64
     elapsed::Float64
 end
+
+
+struct BestFitPredRef
+    result::BestFitResult
+    id::Int
+end
+deref(p::BestFitPredRef) = (p ⋄ :result).preds[p ⋄ :id]
+Base.getindex(p::BestFitPredRef, name::Symbol) = getindex(deref(p), name)
+Base.iterate(p::BestFitPredRef, args...) = iterate(deref(p), args...)
 
 
 # ====================================================================
@@ -555,10 +605,10 @@ function residuals1d(model::Model, data1d::Vector{Measures_1D})
         pred = model.preds[i]
         eval = geteval(pred)
         c2 = c1 + length(eval) - 1
-        model.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
+        model.priv.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
         c1 = c2 + 1
     end
-    return model.buffer
+    return model.priv.buffer
 end
 
 
@@ -612,23 +662,24 @@ fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
     fit!(model, [data]; kw...)
 
 function fit!(model::Model, data::Vector{T};
-              id::Int=0,
+              only_id::Int=0,
               minimizer=lsqfit()) where T<:AbstractMeasures
     elapsedTime = Base.time_ns()
     evaluate(model)
 
-    if id != 0
-        origcfixed = deepcopy(model.cfixed)
-        for (cname, comp) in model.comps
-            if !haskey(model.preds[id].cevals, cname)
-                model.cfixed[cname] = true
+    if only_id != 0
+        for id in 1:length(model.preds)
+            (id == only_id)  &&  continue
+            for (cname, ceval) in model.preds[id].cevals
+                @assert 0 <= ceval.cfixed <= 1
+                ceval.cfixed += 1
             end
         end
     end
 
     free = Vector{Bool}()
-    for (cpname, par) in model.params
-        push!(free, (!par.fixed)  &&  (!model.cfixed[cpname[1]]))
+    for (cpid, par) in model.priv.params
+        push!(free, (!par.fixed)  &&  (model.priv.cevals[cpid.comp].cfixed == 0))
     end
     ifree = findall(free)
     @assert length(ifree) > 0 "No free parameter in the model"
@@ -638,113 +689,94 @@ function fit!(model::Model, data::Vector{T};
 
     # Evaluate normalized residuals starting from free parameter values
     function pval2resid(pvalues_free::Vector{Float64})
-        model.pvalues[ifree] .= pvalues_free  # update parameter values
+        model.priv.pvalues[ifree] .= pvalues_free  # update parameter values
         quick_evaluate(model)
         return residuals1d(model, data1d)
     end
 
     (status, best_val, best_unc) = minimize(minimizer, pval2resid,
-                                            collect(values(model.params))[ifree])
+                                            collect(values(model.priv.params))[ifree])
+    model.priv.pvalues[ifree] .= best_val
 
-    model.pvalues[ifree] .= best_val
     # Copy best fit values back into components.  This is needed since
     # the evaluated components are stored in the Model, not in
     # BestFitResult, hence I do this to maintain a coherent status.
-    setfield!.(values(model.params), :val, model.pvalues)
-    uncerts = fill(NaN, length(model.pvalues))
+    setfield!.(values(model.priv.params), :val, model.priv.pvalues)
+    uncerts = fill(NaN, length(model.priv.pvalues))
     uncerts[ifree] .= best_unc
 
     # Prepare output
     quick_evaluate(model)  # ensure best fit values are used
-    comps = OrderedDict{Symbol, BestFitComp}()
-    for cname in keys(model.comps)
-        comps[cname] = BestFitComp()
-    end
 
+    bfpars = Vector{BestFitPar}()
     i = 1
-    for (cpname, par) in model.params
-        cname = cpname[1]
-        pname = cpname[2]
-        parid = cpname[3]
-        bfpar = BestFitPar(model.pvalues[i], uncerts[i],
-                           !(i in ifree), model.patched[i])
-        if parid == 0
-            #Base.setindex!(comp::BestFitComp, x, p::Symbol) = getfield(comp, :params)[p] = x
-            getfield(comps[cname], :params)[pname] = bfpar
-        else
-            if parid == 1
-                getfield(comps[cname], :params)[pname] = [bfpar]
-            else
-                push!(getfield(comps[cname], :params)[pname], bfpar)
-            end
-        end
+    for (cpid, par) in model.priv.params
+        push!(bfpars, BestFitPar(model.priv.pvalues[i], uncerts[i],
+                                 !(i in ifree), model.priv.patched[i]))
         i += 1
     end
-    cost = sum(abs2, model.buffer)
-    dof = length(model.buffer) - length(ifree)
 
-    result = BestFitResult(comps, length(model.buffer), dof, cost, status,
+    preds = [OrderedDict{Symbol, BestFitComp}() for id in 1:length(model.preds)]
+    for (cid, ceval) in model.priv.cevals
+        preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid.id][cid.name], :dict), bfpars)
+    end
+
+    cost = sum(abs2, model.priv.buffer)
+    dof = length(model.priv.buffer) - length(ifree)
+
+    result = BestFitResult(preds, length(model.priv.buffer), dof, cost, status,
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
                            float(Base.time_ns() - elapsedTime) / 1.e9)
 
-    if id != 0
-        for cname in keys(origcfixed)
-            model.cfixed[cname] = origcfixed[cname]
+    if only_id != 0
+        for id in 1:length(model.preds)
+            (id == only_id)  &&  continue
+            for (cname, ceval) in model.preds[id].cevals
+                @assert 0<= ceval.cfixed <= 2
+                ceval.cfixed -= 1
+            end
         end
+        evaluate(model)
     end
-
     return result
 end
 
 
 # ====================================================================
 # User interface
-#
-Base.propertynames(comp::BestFitComp) = keys(getfield(comp, :params))
-Base.getproperty(comp::BestFitComp, p::Symbol) = getfield(comp, :params)[p]
 
 ##
-(m::Model)(; id::Int=1) = geteval(m.preds[id])
-(m::Model)(name::Symbol; id::Int=1) = geteval(m.preds[id], name)
-
-##
-Base.getindex(p::Prediction, cname::Symbol) = p.cevals[cname].comp
-Base.getindex(m::Model, cname::Symbol) = m.comps[cname]
-Base.getindex(res::BestFitResult, cname::Symbol) = res.comps[cname]
-
-##
-domain(pred::Prediction; dim::Int=1) = pred.orig_domain[dim]
-domain(m::Model; id::Int=1, dim::Int=1) = m.preds[id].orig_domain[dim]
-
-
-##
-metadict(d::AbstractData) = d.meta
-metadict(param::Parameter) = param.meta
-metadict(m::Model; id::Int=1) = m.preds[id].meta
-
-function metadict(m::Model, name::Symbol)
-    if haskey(m.comps, name)
-        haskey(m.meta, name)  ||  (m.meta[name] = MDict())
-        comp = m.comps[name]
-        if name in fieldnames(typeof(comp))
-            field = getfield(comp, name)
-            if isa(field, MDict)
-                m.meta[name] = field
-            end
-        end
-
-        return m.meta[name]
-    else
-        for pred in m.preds
-            if haskey(pred.revals, name)
-                haskey(m.meta, name)  ||  (m.meta[name] = MDict())
-                return m.meta[name]
-            end
-        end
-    end
-    error("Name $name is not defined")
+(p::PredRef)() = geteval(deref(p))
+(p::PredRef)(name::Symbol) = geteval(deref(p), name)
+function (m::Model)()
+    evaluate(m)
+    m[1]()
+end
+function (m::Model)(name::Symbol)
+    evaluate(m)
+    m[1](name)
 end
 
+##
+Base.keys(m::Model) = keys(m[1])
+Base.keys(p::PredRef) = keys(p.cevals)
+Base.haskey(p::PredRef, name::Symbol) = haskey(p.cevals, name)
+Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
+
+##
+Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
+Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
+Base.getindex(m::Model, id::Int) = PredRef(m, id)
+Base.getindex(m::Model, cname::Symbol) = m[1][cname]
+Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
+Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
+
+##
+domain(pref::PredRef; dim::Int=1) = pref.orig_domain[dim]
+domain(m::Model; dim::Int=1) = domain(m[1], dim=dim)
+
+
+# ====================================================================
 include("todict.jl")
 include("show.jl")
 

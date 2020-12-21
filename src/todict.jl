@@ -28,7 +28,6 @@ end
 
 function todict(param::Parameter)
     out = MDict()
-    out[:meta] = param.meta
     out[:fixed] = param.fixed
     out[:value] = param.val
     out[:low] = param.low
@@ -47,10 +46,10 @@ function todict(comp::AbstractComponent)
     out[:type] = ctype
 
     out[:params] = MDict()
-    for (pname, param) in getparams(comp)
-        parname = pname[1]
-        if pname[2] >= 1
-            parname = Symbol(parname, "[", pname[2], "]")
+    for (pid, param) in getparams(comp)
+        parname = pid.name
+        if pid.index >= 1
+            parname = Symbol(parname, "[", pid.index, "]")
         end
         out[:params][parname] = todict(param)
     end
@@ -94,11 +93,13 @@ end
 
 function todict(pred::Prediction)
     out = MDict()
-    out[:meta] = pred.meta
-    out[:x] = rebin_data(todict_opt[:rebin], domain(pred))
+    out[:x] = rebin_data(todict_opt[:rebin], pred.domain[1])
     out[:components] = MDict()
+    out[:compevals]  = MDict()
     for (cname, ceval) in pred.cevals
-        out[:components][cname] = todict(ceval, forceadd = (cname in todict_opt[:selcomps]))
+        out[:components][cname] = todict(ceval.comp)
+        out[:components][cname][:fixed] = (ceval.cfixed >= 1)
+        out[:compevals][ cname] = todict(ceval, forceadd = (cname in todict_opt[:selcomps]))
     end
     out[:reducers] = MDict()
     for (rname, reval) in pred.revals
@@ -111,9 +112,9 @@ end
 
 function todict(pred::Prediction, data::Measures_1D)
     out = MDict()
-    out[:meta] = data.meta
     p = rebin_data(todict_opt[:rebin], geteval(pred))
     y, err = rebin_data(todict_opt[:rebin], data.val, data.unc)
+    out[:meta] = data.meta
     out[:y] = y
     out[:err] = err
     out[:residuals] = (y .- p) ./ err
@@ -132,14 +133,13 @@ end
 
 function todict(comp::BestFitComp)
     out = MDict()
-    params = getfield(comp, :params)
-    for (pname, param) in params
-        if isa(param, Vector)
-            for i in 1:length(param)
-                out[Symbol(pname, "[", i, "]")] = todict(param[i])
+    for (pname, params) in comp
+        if isa(params, AbstractArray)
+            for i in 1:length(params)
+                out[Symbol(pname, "[", i, "]")] = todict(params[i])
             end
         else
-            out[pname] = todict(param)
+            out[pname] = todict(params)
         end
     end
     return out
@@ -147,10 +147,13 @@ end
 
 function todict(res::BestFitResult)
     out = MDict()
-    out[:components] = MDict()
-    for (cname, comp) in res.comps
-        out[:components][cname] = todict(comp)
+    preds = [MDict(:components => MDict()) for id in 1:length(res.preds)]
+    for id in 1:length(res.preds)
+        for (cname, comp) in res.preds[id]
+            preds[id][:components][cname] = todict(comp)
+        end
     end
+    out[:predictions] = preds
     out[:ndata] = res.ndata
     out[:dof] = res.dof
     out[:cost] = res.cost
@@ -164,28 +167,28 @@ end
 todict(model::Model, data::T) where T <: AbstractMeasures = todict(model, [data])
 todict(model::Model, data::T, bestfit::BestFitResult) where T <: AbstractMeasures = todict(model, [data], bestfit)
 
+function recursive_copy!(from::MDict, to::MDict)
+    for (key, value) in from
+        if haskey(to, key)
+            @assert isa(value,   MDict)
+            @assert isa(to[key], MDict)
+            recursive_copy!(value, to[key])
+        else
+            haskey(to, :meta)  ||  (to[:meta] = MDict())
+            to[:meta][key] = value
+        end
+    end
+end
+
 function todict(model::Model,
                 data::Union{Nothing, Vector{T}}=nothing,
                 bestfit::Union{Nothing, BestFitResult}=nothing) where T <: AbstractMeasures
-
     out = MDict()
 
-    out[:components] = MDict()
-    for (cname, comp) in model.comps
-        out[:components][cname] = todict(comp)
-        out[:components][cname][:fixed] = model.cfixed[cname]
-        out[:components][cname][:meta] = metadict(model, cname)
-    end
-
     out[:predictions] = Vector{MDict}()
-    for pred in model.preds
-        push!(out[:predictions], todict(pred))
-        for (name, ceval) in pred.cevals
-            out[:predictions][end][:components][name][:meta] = metadict(model, name)
-        end
-        for (name, ceval) in pred.revals
-            out[:predictions][end][:reducers][name][:meta] = metadict(model, name)
-        end
+    for id in 1:length(model.preds)
+        push!(out[:predictions], todict(model.preds[id]))
+        recursive_copy!(model.meta[id], out[:predictions][end])
     end
 
     if !isnothing(data)

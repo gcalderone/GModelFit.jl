@@ -1,21 +1,24 @@
+The typical use case for `GFit` is as follows: you observe a physical phenomenon with one (or more) instrument(s) and wish to fit those data against a (possibly very complex) theoretical model, in order to extract the characterizing quantities represented by the model parameters.
+
+
 # GFit.jl
 
 `GFit` is a general purpose, data-driven model fitting framework for Julia.
 
+**Note: This package is still in active development, and the interface may undergo significant breaking changes.**
+
 [![Build Status](https://travis-ci.org/gcalderone/GFit.jl.svg?branch=master)](https://travis-ci.org/gcalderone/GFit.jl)
 
-It provides the basic tools to build, inspect and fit complex models against empirical data.
 
-The typical use case for `GFit` is as follows: you observe a physical phenomenon with one (or more) instrument(s) and wish to fit those data against a (possibly very complex) theoretical model, in order to extract the characterizing quantities represented by the model parameters.  `GFit` provides the following functionalities:
-- it handles data of any dimensionality;
-- the fitting model is evaluated on a user provided domain;
-- the fitting model is built up by combining one or more *components*, either builtin or implemented by the user, using a standard Julia mathematical expression;
+This package provides the basic tools to build, evaluate, and fit complex models against empirical data.  `GFit` provides the following functionalities:
+- it handles datasets of any dimensionality;
+- the fitting model is build by combining one or more *components* (either builtin or implemented by the user) using a standard Julia mathematical expression, and evaluated on a user provided domain;
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations;
-- User provided components can pre-compute quantities based on the model domain, and store them in a private structure;
-- Model parameters can be fixed to a specific value, limited in an interval, or be dynamically calculated (patched) using a mathematical expression involving the other parameters;
+- user provided components can pre-compute quantities based on the model domain, and store them in a private structure;
+- model parameters can be fixed to a specific value, limited in an interval, or be dynamically calculated (patched) using a mathematical expression involving other parameters;
 - multiple data sets can be fitted simultaneously;
 - it allows to use different minimizers, and compare their results and performances (currently only two minimizers are supported: [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl));
-- it provides several facilities for interactive fitting and results displaying.
+- it provides several facilities for interactive fitting and result displaying.
 
 See below for a simple example, and the `examples` directory for more complex ones.
 
@@ -23,85 +26,93 @@ See below for a simple example, and the `examples` directory for more complex on
 ```julia
 ] add GFit
 ```
-
 ## Simple example
-Assume the model to be compared with empirical data has 5 parameters and the following analytical formula:
+
+Assume the model to be compared with empirical data has the following analytical formula:
 ```julia
 f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +  p4 * sin(p5 * x))  *  cos(x)
 ```
-
-To simulate a measurement process we'll evaluate the model on a domain and add some random noise to a model realization:
-
+where `p1`, ..., `p5` are the model parameters to be estimated.  In this example we'll assume the *"true"* values for the parameters are:
 ```julia
-# Actual model parameters:
-params = [1, 1.e-3, 1.e-6, 4, 5]
-
+# True model parameters:
+true_params = [1, 2, 1.e-3, 4, 5]
+```
+and that the model should be evaluated on the following domain:
+```julia
 # Domain for model evaluation
-x = 1.:50:10000
+x = 1.:0.0005:10
+```
 
-# Evaluated model
-y = f(x, params...);
-
+We'll generate a mock empirical dataset by simulating a measurement process on the model evaluation, and adding some random noise.
+```
 # Random noise
 using Random
-rng = MersenneTwister(0);
-noise = randn(rng, length(x));
+noise = randn(MersenneTwister(0), length(x));
+empirical_dataset = f(x, true_params...) .+ noise
 ```
 
-In order to use the `GFit` framework we must create a `Domain` and a `Measures` objects to encapsulate the model domain and empirical data:
+In order to use the `GFit` framework we must wrap the model domain and the empirical dataset into `Domain` and `Measures` objects:
 ```julia
 using GFit
-data = Measures(y .+ noise, 1.)
+domain = Domain(x)
+data = Measures(empirical_dataset, 1.)
 ```
-The second argument to the `Measures` function is the (1 sigma Gaussian) uncertainty associated to each data sample.  It can either be an array with the same shape as the first argument or a scalar.  In the latter case all data samples are assumed to have the same uncertainty.
+The second argument to the `Measures` constructor is the (1-sigma Gaussian) uncertainty associated to each data sample.  It can either be an array with the same shape as the first argument or a scalar.  In the latter case all data samples are assumed to have the same uncertainty.
 
-Also, we must create a `Model` object containing a reference to the analytical formula, and prepare it for evaluation on the domain `dom`
+Also, we must create a `Model` object containing a reference to the analytical formula, and prepare it for evaluation on the domain:
 ```julia
-model = Model(Domain(x), :comp1 => GFit.FuncWrap(f, params...))
+model = Model(domain, :comp1 => GFit.FuncWrap(f, true_params...))
 ```
-The `comp1` symbol is the name we chose to identify the component in the model.  Any other valid symbol could have been used.
-
-The parameter initial values are those given in the component constructors.  Such values can be changed as follows:
+The `comp1` symbol is the arbitrary name we chose to identify the component in the model, while `GFit.FuncWrap` is the component type which, as the name suggests, is simply a wrapper to a user defined function, accepting the function itself and an initial guess estimate of the parameters.  Such values can be modified as follows:
 ```julia
 model[:comp1].p[1].val = 1
-model[:comp1].p[2].val = 1.e-3
+model[:comp1].p[2].val = 2
  ```
 etc.
 
-
-Finally, we are ready to fit the model against empirical data:
+We are now ready to fit the model against empirical data:
 ```julia
 bestfit = fit!(model, data)
 ```
-Note that the `fit!` function modifies the `model1` objects as follows:
+Note that the `fit!` function modifies the `model` objects as follows:
 - it updates the model parameter with the best fit ones;
 - it updates the internal cache of component evaluations with those resulting from best fit parameters;
 - it updates the evaluation counter for each component (see below);
 
-The procedure outlined above may seem cumbersome at first, however it is key to define very complex models and to improve performances, as shown below.
+The best fit values for the parameters, as well as their uncertainties, can be retrieved as follows:
+```julia
+show(bestfit[:comp1])
+println(bestfit[:comp1].p[1].val, " ± ", bestfit[:comp1].p[1].unc)
+```
 
+The procedure outlined above shows the main steps involved in a typical `GFit` session, namely:
+- wrap one (or more) domain(s) in `Domain` object(s):
+- wrap one (ore more) empirical dataset(s) in `Measures` object(s):
+- prepare a single `Model` object, and fit against the dataset(s);
+- inspect the results.
 
+The rest of this document shows to build arbitrarily complex models.
 
 ## Multiple components
 
-A model is typically made up of many *components*, joined toghether with a standard mathematical expression.  The previous example can easily be re-implemented by splitting the analytical formula in 3 parts:
+A model can contain many *components*, combined with a standard mathematical expression.  The previous example can easily be re-implemented by splitting the analytical formula in 3 parts, each assigned to a different `FuncWrap` component, and combined using a *reducer* function:
 ```julia
 f1(x, p1, p2, p3) = @.  p1  +  p2 * x  +  p3 * x^2
 f2(x, p4, p5) = @. p4 * sin(p5 * x)
 f3(x) = cos.(x)
 
-model = Model(Domain(x),
+model = Model(domain,
               @reducer((comp1, comp2, comp3) -> (comp1 .+ comp2) .* comp3),
-              :comp1 => GFit.FuncWrap(f1, params[1], params[2], params[3]),
-              :comp2 => GFit.FuncWrap(f2, params[4], params[5]),
+              :comp1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
+              :comp2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
               :comp3 => GFit.FuncWrap(f3))
 bestfit = fit!(model, data)
 ```
-Now we used 3 components (named `comp1`, `comp2` and `comp3`) and combined them with the mathematical expression in the second argument (the so-called *reducer*). **Any** valid mathematical expression is allowed.
+Note that the anonymous function used in the `@reducer` macro is just a standard Julia function, whose inputs are standard Julia `Array`s.
 
-Note that we obtained exactly the same result as before, but we **gained a factor ~3** in execution time.  Such perfromance improvement is due to the fact that the component evaluations are internally cached, and are re-evaluated only if necessary, i.e. when one of the parameter value is modified by the minimizer algorithm. In this particular case the `comp3` component, having no free parameter, is evaluated only once.
+Also note that the results are identical as those obtained with previous example, but the performances are now much, but we **gained a factor ~5** in execution time.  Such perfromance improvement is due to the fact that the component evaluations are internally cached, and are re-evaluated only if necessary, i.e. when one of the parameter value is modified by the minimizer algorithm. In this particular case the `comp3` component, having no free parameter, is evaluated only once.
 
-To check how many time each component and the model are evaluated simply type the name of the `Model` object in the REPL or call the `show` method, i.e.: `show(model)`, and check the `Counter` column.
+To check how many time each component and reducer are evaluated simply type the name of the `Model` object in the REPL or call `show(model)`, and check the `Eval. count` column.
 
 
 ## Fitting multiple data sets
@@ -326,7 +337,7 @@ A parameter may be "*patched*", i.e. its value being re-calculated before actual
 @patch!(model, model[:comp1].p[2] .= model[:comp1].p[1])
 model[:comp1].p[2].fixed = true
 ```
-Note that in the above example we had to fix the `p[2]` parameter otherwise the minizer will try to find a best fit for a parameter which has no influence on the final model, since its value will always be overwritten by the expression. 
+Note that in the above example we had to fix the `p[2]` parameter otherwise the minizer will try to find a best fit for a parameter which has no influence on the final model, since its value will always be overwritten by the expression.
 
 Another possibility is to use one parameter value to calculate another one's:
 ```julia
