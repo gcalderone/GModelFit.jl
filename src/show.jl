@@ -19,14 +19,14 @@ end
 
 const showsettings = ShowSettings()
 
-function printtable(args...; formatters=(), kw...)
+function printtable(args...; formatters=(), hlines=:none, kw...)
     if showsettings.plain
         c = crayon"default"
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_markdown, hlines=:none,
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
                      border_crayon=c, header_crayon=c, subheader_crayon=c,
                      highlighters=())
     else
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat,
+        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
                      border_crayon=showsettings.border, header_crayon=showsettings.header, subheader_crayon=showsettings.subheader,
                      kw...)
     end
@@ -264,7 +264,7 @@ function preparetable(cname::Symbol, comp::BestFitComp)
                 push!(fixed, par.fixed)
                 push!(error, !isfinite(par.unc))
                 push!(watch, par.val != par.patched)
-                cname = ""
+                showsettings.plain  ||  (cname = "")
             end
         else
             par = params
@@ -275,7 +275,7 @@ function preparetable(cname::Symbol, comp::BestFitComp)
             push!(error, !isfinite(par.unc))
             push!(watch, par.val != par.patched)
         end
-        cname = ""
+        showsettings.plain  ||  (cname = "")
     end
     return (table, fixed, error, watch)
 end
@@ -354,7 +354,7 @@ function show(io::IO, res::BestFitResult)
     println(io, @sprintf("              Elapsed: %-10.4g s", res.elapsed))
 end
 
-
+#=
 function savelog(filename::String, args...; plain=true)
     orig = showsettings.plain
     showsettings.plain = plain
@@ -369,3 +369,4 @@ function savelog(filename::String, args...; plain=true)
     end
     showsettings.plain = orig
 end
+=#

@@ -24,8 +24,7 @@ import Base.iterate
 
 export Domain, CartesianDomain, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, isfixed, thaw, freeze, fit!,
-    savelog
+    Model, patch!, evaluate, isfixed, thaw, freeze, fit!
 
 const MDict = OrderedDict{Symbol, Any}
 
