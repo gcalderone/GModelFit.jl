@@ -672,6 +672,7 @@ function fit!(model::Model, data::Vector{T};
         for id in 1:length(model.preds)
             (id == only_id)  &&  continue
             for (cname, ceval) in model.preds[id].cevals
+                @assert 0 <= ceval.cfixed <= 1
                 ceval.cfixed += 1
             end
         end
@@ -732,7 +733,7 @@ function fit!(model::Model, data::Vector{T};
         for id in 1:length(model.preds)
             (id == only_id)  &&  continue
             for (cname, ceval) in model.preds[id].cevals
-                (ceval.cfixed > 1)  &&  (ceval.cfixed = 1)
+                @assert 0<= ceval.cfixed <= 2
                 ceval.cfixed -= 1
             end
         end
