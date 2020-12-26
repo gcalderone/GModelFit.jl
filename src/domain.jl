@@ -33,16 +33,6 @@ length(dom::CartesianDomain) = length(dom.index)
 size(dom::CartesianDomain) = dom.size
 getindex(dom::CartesianDomain, dim) = dom.axis[dim]
 
-function flatten(dom::CartesianDomain{N}) where N
-    out = Matrix{Float64}(undef, N, length(dom.index))
-    ci = Tuple.(CartesianIndices(dom.size))[dom.index]
-    for i = 1:N
-        out[i, :] .= dom.axis[i][getindex.(ci, i)]
-    end
-    return Domain(getindex.(Ref(out), 1:N, :)...)
-end
-
-
 
 # ====================================================================
 # Measures and Counts types
@@ -95,10 +85,27 @@ iterate(d::Counts, args...) = iterate(d.val, args...)
 # Methods to "flatten" a multidimensional object into a 1D one
 #
 flatten(dom::Domain) = dom
-flatten(data::Measures{1}, dom::Domain)::Measures{1} = data
-flatten(data::Counts{1}, dom::Domain)::Counts{1} = data
-flatten(data::Measures, dom::Domain)::Measures{1}    = Measures(data.val[:], data.unc[:])
-flatten(data::Counts  , dom::Domain)::Counts{1}      = Counts(  , data.val)
+
+function flatten(dom::CartesianDomain{N}) where N
+    out = Matrix{Float64}(undef, N, length(dom.index))
+    ci = Tuple.(CartesianIndices(dom.size))[dom.index]
+    for i = 1:N
+        out[i, :] .= dom.axis[i][getindex.(ci, i)]
+    end
+    return Domain(getindex.(Ref(out), 1:N, :)...)
+end
+
+function flatten(data::Measures{N}, dom::Domain{N}) where N
+    @assert length(domain) == length(data)
+    (N == 1)  &&  return data
+    return Measures(data.val[:], data.unc[:])
+end
+
+function flatten(data::Counts  {N}, dom::Domain{N}) where N
+    @assert length(domain) == length(data)
+    (N == 1)  &&  return data
+    return Counts(data.val)
+end
 
 
 #=
