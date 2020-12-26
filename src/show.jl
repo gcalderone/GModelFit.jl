@@ -45,6 +45,7 @@ function left(s::String, maxlen::Int)
     return s[1:maxlen]
 end
 
+#=
 function show(io::IO, dom::AbstractCartesianDomain)
     section(io, "Cartesian domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
@@ -62,15 +63,15 @@ function show(io::IO, dom::AbstractCartesianDomain)
     printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
                formatters=ft_printf(showsettings.floatformat, 3:6))
 end
+=#
 
-
-function show(io::IO, dom::AbstractLinearDomain)
+function show(io::IO, dom::Domain)
     section(io, "Linear domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 3)
     for i in 1:ndims(dom)
         table[i, 1] = i
-        table[i, 2] = getaxismin(dom, i)
-        table[i, 3] = getaxismax(dom, i)
+        table[i, 2] = minimum(dom.axis[i])
+        table[i, 3] = maximum(dom.axis[i])
     end
     printtable(io, table, ["Dim", "Min val", "Max val"],
                formatters=ft_printf(showsettings.floatformat, 2:3))
@@ -78,9 +79,11 @@ end
 
 
 # Special case for Domain_1D: treat it as a Cartesian domain, despite it is a Linear one.
-function show(io::IO, dom::Domain_1D)
+function show(io::IO, dom::Domain{1})
     section(io, "Domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1, ndims(dom)+1)
     for i in 1:ndims(dom)
         a = dom[i]
         b = 0
@@ -93,13 +96,15 @@ function show(io::IO, dom::Domain_1D)
         table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
     end
     printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
-               formatters=ft_printf(showsettings.floatformat, 3:6))
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
 end
 
 
-function show(io::IO, data::AbstractData)
+function show(io::IO, data::T) where T <: AbstractData
     section(io, typeof(data), ": (length: ", (length(data.val)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
@@ -111,8 +116,9 @@ function show(io::IO, data::AbstractData)
         push!(error, nan > 0)
         table = vcat(table, [string(name) minimum(a) maximum(a) mean(a) median(a) std(a) (nan > 0  ?  string(nan)  :  "") ])
     end
+    push!(hrule, 0, size(table)[1]+1)
     printtable(io, table, ["", "Min", "Max", "Mean", "Median", "Std. dev.", "Nan/Inf"],
-               formatters=ft_printf(showsettings.floatformat, 2:6),
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 2:6),
                highlighters=(Highlighter((data,i,j) -> error[i], showsettings.error)))
 end
 

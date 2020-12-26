@@ -14,7 +14,7 @@ end
 compeval_cdata(comp::FuncWrap, domain::AbstractDomain) = nothing
 compeval_array(comp::FuncWrap, domain::AbstractDomain) = fill(NaN, length(domain))
 
-function evaluate(c::CompEval{FuncWrap, T}, params...) where T <: AbstractLinearDomain
+function evaluate(c::CompEval{FuncWrap, T}, params...) where T <: AbstractDomain
     if ndims(c.domain) == 1
         c.buffer .= c.comp.func(c.domain[1], params...)
     else

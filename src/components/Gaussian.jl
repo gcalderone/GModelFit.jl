@@ -62,15 +62,15 @@ mutable struct Gaussian_2D_cdata
     Gaussian_2D_cdata() = new(Vector{Int}(), Vector{Int}())
 end
 
-compeval_cdata(comp::Gaussian_1D, domain::Domain_1D) = Gaussian_1D_cdata()
-compeval_cdata(comp::Gaussian_2D, domain::Domain_2D) = Gaussian_2D_cdata()
-compeval_array(comp::Gaussian_1D, domain::Domain_1D) = fill(NaN, length(domain))
-compeval_array(comp::Gaussian_2D, domain::Domain_2D) = fill(NaN, length(domain))
+compeval_cdata(comp::Gaussian_1D, domain::Domain{1}) = Gaussian_1D_cdata()
+compeval_cdata(comp::Gaussian_2D, domain::Domain{2}) = Gaussian_2D_cdata()
+compeval_array(comp::Gaussian_1D, domain::Domain{1}) = fill(NaN, length(domain))
+compeval_array(comp::Gaussian_2D, domain::Domain{2}) = fill(NaN, length(domain))
 
 
 # ====================================================================
 # Evaluate component 
-function evaluate(c::CompEval{Gaussian_1D, Domain_1D},
+function evaluate(c::CompEval{Gaussian_1D, Domain{1}},
                   norm, center, sigma)
     # TODO: optimize using cdata
     x = c.domain[1]
@@ -79,7 +79,7 @@ function evaluate(c::CompEval{Gaussian_1D, Domain_1D},
 end
 
 
-function evaluate(ce::CompEval{Gaussian_2D, Domain_2D},
+function evaluate(ce::CompEval{Gaussian_2D, Domain{2}},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2

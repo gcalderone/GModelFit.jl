@@ -236,7 +236,7 @@ end
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
     orig_domain::AbstractDomain
-    domain::AbstractLinearDomain
+    domain::Domain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
@@ -587,8 +587,8 @@ Base.iterate(p::BestFitPredRef, args...) = iterate(deref(p), args...)
 
 
 # ====================================================================
-function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
-    out = Vector{Measures_1D}()
+function data1D(model::Model, data::Vector{Measures{N}}) where N
+    out = Vector{Measures{1}}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
         @assert(length(data[i]) == length(geteval(pred)),
@@ -599,7 +599,7 @@ function data1D(model::Model, data::Vector{T}) where T<:AbstractMeasures
 end
 
 
-function residuals1d(model::Model, data1d::Vector{Measures_1D})
+function residuals1d(model::Model, data1d::Vector{Measures{1}})
     c1 = 1
     for i in 1:length(model.preds)
         pred = model.preds[i]
@@ -658,12 +658,12 @@ end;
 
 
 # ====================================================================
-fit!(model::Model, data::T; kw...) where T<:AbstractMeasures =
+fit!(model::Model, data::Measures; kw...) =
     fit!(model, [data]; kw...)
 
-function fit!(model::Model, data::Vector{T};
+function fit!(model::Model, data::Vector{Measures{N}};
               only_id::Int=0,
-              minimizer=lsqfit()) where T<:AbstractMeasures
+              minimizer=lsqfit()) where N
     elapsedTime = Base.time_ns()
     evaluate(model)
 

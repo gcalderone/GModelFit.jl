@@ -110,7 +110,7 @@ function todict(pred::Prediction)
 end
 
 
-function todict(pred::Prediction, data::Measures_1D)
+function todict(pred::Prediction, data::Measures{1})
     out = MDict()
     p = rebin_data(todict_opt[:rebin], geteval(pred))
     y, err = rebin_data(todict_opt[:rebin], data.val, data.unc)
@@ -164,8 +164,8 @@ function todict(res::BestFitResult)
 end
 
 
-todict(model::Model, data::T) where T <: AbstractMeasures = todict(model, [data])
-todict(model::Model, data::T, bestfit::BestFitResult) where T <: AbstractMeasures = todict(model, [data], bestfit)
+todict(model::Model, data::T) where T <: AbstractData = todict(model, [data])
+todict(model::Model, data::T, bestfit::BestFitResult) where T <: AbstractData = todict(model, [data], bestfit)
 
 function recursive_copy!(from::MDict, to::MDict)
     for (key, value) in from
@@ -182,7 +182,7 @@ end
 
 function todict(model::Model,
                 data::Union{Nothing, Vector{T}}=nothing,
-                bestfit::Union{Nothing, BestFitResult}=nothing) where T <: AbstractMeasures
+                bestfit::Union{Nothing, BestFitResult}=nothing) where T <: AbstractData
     out = MDict()
 
     out[:predictions] = Vector{MDict}()

@@ -6,6 +6,6 @@ end
 compeval_cdata(comp::SimplePar, domain::AbstractDomain) = nothing
 compeval_array(comp::SimplePar, domain::AbstractDomain) = [NaN]
 
-function evaluate(c::CompEval{SimplePar, T}, par) where T <: AbstractLinearDomain
+function evaluate(c::CompEval{SimplePar, T}, par) where T <: AbstractDomain
     c.buffer[1] = par
 end
