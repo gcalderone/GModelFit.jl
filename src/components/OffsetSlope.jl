@@ -40,13 +40,13 @@ compeval_array(comp::OffsetSlope_2D, domain::Domain{2}) = fill(NaN, length(domai
 
 # ====================================================================
 # Evaluate component 
-function evaluate(c::CompEval{OffsetSlope_1D, Domain{1}},
+function evaluate(c::CompEval{OffsetSlope_1D, 1},
                   offset, x0, slope)
     @. (c.buffer = slope * (c.domain[1] - x0) + offset)
 end
 
 
-function evaluate(c::CompEval{OffsetSlope_2D, Domain{2}},
+function evaluate(c::CompEval{OffsetSlope_2D, 2},
                    offset, x0, y0, slopeX, slopeY)
     x = c.domain[1]
     y = c.domain[2]

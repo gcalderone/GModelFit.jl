@@ -92,9 +92,9 @@ end
 # ====================================================================
 # CompEval: a wrapper for a component evaluated on a specific domain
 #
-mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
+mutable struct CompEval{TComp <: AbstractComponent, N}
     comp::TComp
-    domain::TDomain
+    domain::Domain{N}
     params::OrderedDict{ParamID, Parameter}
     cdata
     counter::Int
@@ -102,11 +102,11 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     buffer::Vector{Float64}
     cfixed::Int8
 
-    function CompEval(comp::AbstractComponent, domain::AbstractDomain)
+    function CompEval(comp::AbstractComponent, domain::Domain{N}) where N
         params = getparams(comp)
         cdata  = compeval_cdata(comp, domain)
         buffer = compeval_array(comp, domain)
-        return new{typeof(comp), typeof(domain)}(
+        return new{typeof(comp), ndims(domain)}(
             comp, domain, params, cdata, 0,
             fill(NaN, length(params)),
             buffer, false)

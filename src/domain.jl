@@ -96,13 +96,13 @@ function flatten(dom::CartesianDomain{N}) where N
 end
 
 function flatten(data::Measures{N}, dom::Domain{N}) where N
-    @assert length(domain) == length(data)
+    @assert length(dom) == length(data)
     (N == 1)  &&  return data
     return Measures(data.val[:], data.unc[:])
 end
 
-function flatten(data::Counts  {N}, dom::Domain{N}) where N
-    @assert length(domain) == length(data)
+function flatten(data::Counts{N}, dom::Domain{N}) where N
+    @assert length(dom) == length(data)
     (N == 1)  &&  return data
     return Counts(data.val)
 end
