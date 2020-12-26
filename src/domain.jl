@@ -2,47 +2,46 @@ abstract type AbstractDomain{N} end
 
 struct Domain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
-    length::Int
 
     function Domain(axis::Vararg{AbstractVector{T},N}) where {T <: Real, N}
         if N > 1
             @assert all(length(axis[1]) .== [length.(axis)...])
         end
-        return new{N}(deepcopy(axis), length(axis[1]))
+        return new{N}(deepcopy(axis))
     end
 end
 
 ndims(dom::Domain{N}) where N = N
-length(dom::Domain) = dom.length
+length(dom::Domain) = length(dom.axis[1])
 getindex(dom::Domain, dim) = dom.axis[dim]
 
-#=
-struct CartesianDomain{N} <: AbstractCartesianDomain{N}
+
+struct CartesianDomain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
     size::NTuple{N, Int}
     index::Vector{Int}
 
-    function CartesianDomain(axis::Vararg{AbstractVector{T},N}) where {T <: Real, N}
+    function CartesianDomain(axis::Vararg{AbstractVector{T},N}; index=nothing) where {T <: Real, N}
         @assert N >= 2
-        index = collect(1:prod(length.(axis)))
+        isnothing(index)  &&  (index = collect(1:prod(length.(axis))))
         return new{N}(deepcopy(axis), tuple(length.(axis)...), index)
     end
 end
 
 ndims(dom::CartesianDomain{N}) where N = N
+length(dom::CartesianDomain) = length(dom.index)
 size(dom::CartesianDomain) = dom.size
 getindex(dom::CartesianDomain, dim) = dom.axis[dim]
 
-function flatten(dom::CartesianDomain{N})::Domain{N} where N    
+function flatten(dom::CartesianDomain{N}) where N
     out = Matrix{Float64}(undef, N, length(dom.index))
+    ci = Tuple.(CartesianIndices(dom.size))[dom.index]
     for i = 1:N
-        (d1, d2) = Tuple((CartesianIndices(xdom.size)))[dom.index[i]])
-        out[1, i] = (dom.axis[1])[d1]
-        out[2, i] = (dom.axis[2])[d2]
+        out[i, :] .= dom.axis[i][getindex.(ci, i)]
     end
-    return Domain(out[1, :], out[2, :])
+    return Domain(getindex.(Ref(out), 1:N, :)...)
 end
-=#
+
 
 
 # ====================================================================
@@ -98,10 +97,9 @@ iterate(d::Counts, args...) = iterate(d.val, args...)
 flatten(dom::Domain) = dom
 flatten(data::Measures{1}, dom::Domain)::Measures{1} = data
 flatten(data::Counts{1}, dom::Domain)::Counts{1} = data
-flatten(data::Measures, dom::Domain)::Measures{1}    = Measures(data.meta, data.val[:], data.unc[:])
-#flatten(data::AbstractMeasures, dom::AbstractCartesianDomain)::Measures{1} = Measures(data.meta, data.val[dom.index], data.unc[dom.index])
-flatten(data::Counts  , dom::Domain)::Counts{1}      = Counts(  data.meta, data.val)
-#flatten(data::AbstractCounts  , dom::AbstractCartesianDomain)::Counts{1}   = Counts(  data.meta, data.val[dom.index])
+flatten(data::Measures, dom::Domain)::Measures{1}    = Measures(data.val[:], data.unc[:])
+flatten(data::Counts  , dom::Domain)::Counts{1}      = Counts(  , data.val)
+
 
 #=
 """
