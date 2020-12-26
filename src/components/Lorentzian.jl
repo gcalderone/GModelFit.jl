@@ -45,7 +45,7 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 
 # ====================================================================
 # Evaluate component 
-function evaluate(buffer, comp::Lorentzian_1D, domain::Domain{1},
+function evaluate(buffer, comp::Lorentzian_1D, domain::AbstractDomain{1},
                   norm, center, fwhm)
     x = domain[1]
 
@@ -56,7 +56,7 @@ function evaluate(buffer, comp::Lorentzian_1D, domain::Domain{1},
 end
 
 
-function evaluate(buffer, comp::Lorentzian_2D, domain::Domain{2},
+function evaluate(buffer, comp::Lorentzian_2D, domain::AbstractDomain{2},
                   norm, centerX, centerY, fwhmX, fwhmY)
     x = domain[1]
     y = domain[2]

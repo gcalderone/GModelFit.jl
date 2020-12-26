@@ -34,13 +34,13 @@ OffsetSlope(offset, x0, y0, slopeX, slopeY) = OffsetSlope_2D(offset, x0, y0, slo
 
 # ====================================================================
 # Evaluate component
-function evaluate(buffer, comp::OffsetSlope_1D, domain::Domain{1},
+function evaluate(buffer, comp::OffsetSlope_1D, domain::AbstractDomain{1},
                   offset, x0, slope)
     @. (buffer = slope * (c.domain[1] - x0) + offset)
 end
 
 
-function evaluate(buffer, comp::OffsetSlope_2D, domain::Domain{2},
+function evaluate(buffer, comp::OffsetSlope_2D, domain::AbstractDomain{2},
                   offset, x0, y0, slopeX, slopeY)
     x = domain[1]
     y = domain[2]

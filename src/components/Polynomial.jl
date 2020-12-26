@@ -7,7 +7,7 @@ mutable struct Polynomial <: AbstractComponent
     end
 end
 
-function evaluate(buffer, comp::Polynomial, domain::Domain{1},
+function evaluate(buffer, comp::Polynomial, domain::AbstractDomain{1},
                   coeffs...)
     buffer .= coeffs[1]
     x = domain[1]
