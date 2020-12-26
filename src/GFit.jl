@@ -127,7 +127,7 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
             evaluate(c.buffer, c.comp, c.domain, pvalues...)
         else
             evaluate(c.buffer, c.comp, c.domain, c.cdata, pvalues...)
-        end            
+        end
     end
     return c.buffer
 end
@@ -137,10 +137,6 @@ end
 # Component fall back methods
 compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) = nothing
 compeval_array(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
-
-#evaluate(buffer, comp::TComp, domain::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
-#    error("No `evaluate` method accepting $TComp, $TDomain.")
-
 
 
 # ====================================================================

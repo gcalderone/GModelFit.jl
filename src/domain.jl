@@ -27,7 +27,7 @@ struct CartesianDomain{N} <: AbstractDomain{N}
     ldomain::Domain{N}
 
     function CartesianDomain(axis::Vararg{AbstractVector{T},N}; roi=nothing) where {T <: Real, N}
-        @assert N >= 2
+        @assert N >= 2 "Cartesian domains needs at least 2 dimensions"
         len = prod(length.(axis))
         ss = tuple(length.(axis)...)
         isnothing(roi)  &&  (roi = collect(1:len))
@@ -43,7 +43,6 @@ struct CartesianDomain{N} <: AbstractDomain{N}
     end
 
     function CartesianDomain(lengths::Vararg{T,N}; kw...) where {T <: Integer, N}
-        @assert N >= 2
         @assert all(lengths .>= 1)
         axis = [collect(1.:lengths[i]) for i in 1:N]
         return CartesianDomain(axis...; kw...)
@@ -110,26 +109,25 @@ iterate(d::Counts, args...) = iterate(d.val, args...)
 # Methods to "flatten" a multidimensional object into a 1D one
 # TODO: check these
 function flatten(data::Measures{N}, dom::Domain{N}) where N
-    @assert length(dom) == length(data)
+    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
     (N == 1)  &&  return data
     return Measures(data.val[:], data.unc[:])
 end
 
 function flatten(data::Counts{N}, dom::Domain{N}) where N
-    @assert length(dom) == length(data)
+    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
     (N == 1)  &&  return data
     return Counts(data.val)
 end
 
-
 function flatten(data::Measures{N}, dom::CartesianDomain{N}) where N
-    @assert length(dom) == length(data)
+    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
     (N == 1)  &&  return data
     return Measures(data.val[roi(dom)], data.unc[roi(dom)])
 end
 
 function flatten(data::Counts{N}, dom::CartesianDomain{N}) where N
-    @assert length(dom) == length(data)
+    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
     (N == 1)  &&  return data
     return Counts(data.val[roi(dom)])
 end
