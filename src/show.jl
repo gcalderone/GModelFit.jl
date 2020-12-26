@@ -100,7 +100,13 @@ function show(io::IO, dom::Domain{1})
 end
 
 
-function show(io::IO, data::T) where T <: AbstractData
+#=
+The following is needed since AbstractData <: AbstractArray:
+without it the show(bstractArray) would be invoked.
+=#
+show(io::IO, mime::MIME"text/plain", data::AbstractData) = show(io, data)
+
+function show(io::IO, data::AbstractData)
     section(io, typeof(data), ": (length: ", (length(data.val)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     hrule = Vector{Int}()
@@ -238,8 +244,6 @@ function show(io::IO, pred::PredRef)
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
 end
 
-
-#Is this needed? show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
 
 function show(io::IO, model::Model)
     for id in 1:length(model.preds)
