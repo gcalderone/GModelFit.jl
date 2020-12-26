@@ -94,7 +94,7 @@ end
 #
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
-    domain::TDomain  # TODO: questo non serve
+    domain::TDomain
     params::OrderedDict{ParamID, Parameter}
     cdata
     counter::Int
@@ -123,7 +123,11 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
         c.lastvalues .= pvalues
         c.counter += 1
         @assert all(.!isnan.(pvalues))
-        evaluate(c, pvalues...)
+        if isnothing(c.cdata)
+            evaluate(c.buffer, c.comp, c.domain, pvalues...)
+        else
+            evaluate(c.buffer, c.comp, c.domain, c.cdata, pvalues...)
+        end            
     end
     return c.buffer
 end
@@ -134,8 +138,8 @@ end
 compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) = nothing
 compeval_array(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
 
-evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} =
-    error("No `evaluate` method accepting CompEval{$TComp, $TDomain}.")
+#evaluate(buffer, comp::TComp, domain::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
+#    error("No `evaluate` method accepting $TComp, $TDomain.")
 
 
 
@@ -231,7 +235,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    domain::Domain
+    domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
@@ -586,8 +590,6 @@ function data1D(model::Model, data::Vector{Measures{N}}) where N
     out = Vector{Measures{1}}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        @assert(length(data[i]) == length(geteval(pred)),
-                "Length of dataset $i do not match corresponding model prediction.")
         push!(out, flatten(data[i], pred.domain))
     end
     return out

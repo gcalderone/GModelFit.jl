@@ -12,12 +12,7 @@ struct FuncWrap <: AbstractComponent
 end
 
 
-function evaluate(c::CompEval{FuncWrap, T}, params...) where T <: AbstractDomain
-    if ndims(c.domain) == 1
-        c.buffer .= c.comp.func(c.domain[1], params...)
-    else
-        dom = [c.domain[i] for i in 1:ndims(c.domain)]
-        c.buffer .= c.comp.func(dom..., params...)
-    end
-    nothing
+function evaluate(buffer, comp::FuncWrap, domain::AbstractDomain,
+                  params...)
+    buffer .= comp.func(domain..., params...)
 end

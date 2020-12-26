@@ -33,7 +33,7 @@ struct CartesianDomain{N} <: AbstractDomain{N}
         isnothing(roi)  &&  (roi = collect(1:len))
 
         # Prepare corresponding linear domain
-        matrix = Matrix{Float64}(undef, N, len)
+        matrix = Matrix{Float64}(undef, N, length(roi))
         ci = Tuple.(CartesianIndices(ss))[roi]
         for i = 1:N
             matrix[i, :] .= axis[i][getindex.(ci, i)]
@@ -119,6 +119,19 @@ function flatten(data::Counts{N}, dom::Domain{N}) where N
     @assert length(dom) == length(data)
     (N == 1)  &&  return data
     return Counts(data.val)
+end
+
+
+function flatten(data::Measures{N}, dom::CartesianDomain{N}) where N
+    @assert length(dom) == length(data)
+    (N == 1)  &&  return data
+    return Measures(data.val[roi(dom)], data.unc[roi(dom)])
+end
+
+function flatten(data::Counts{N}, dom::CartesianDomain{N}) where N
+    @assert length(dom) == length(data)
+    (N == 1)  &&  return data
+    return Counts(data.val[roi(dom)])
 end
 
 

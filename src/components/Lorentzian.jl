@@ -45,23 +45,23 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 
 # ====================================================================
 # Evaluate component 
-function evaluate(ce::CompEval{Lorentzian_1D, Domain{1}},
+function evaluate(buffer, comp::Lorentzian_1D, domain::Domain{1},
                   norm, center, fwhm)
-    x = ce.domain[1]
+    x = domain[1]
 
-    @. (c.eval = norm /
+    @. (buffer = norm /
         (1. +
          ((x - center) / fwhm)^2.
         ))
 end
 
 
-function evaluate(ce::CompEval{Lorentzian_2D, Domain{2}},
+function evaluate(buffer, comp::Lorentzian_2D, domain::Domain{2},
                   norm, centerX, centerY, fwhmX, fwhmY)
-    x = ce.domain[1]
-    y = ce.domain[2]
+    x = domain[1]
+    y = domain[2]
 
-    @. (c.eval = norm /
+    @. (buffer = norm /
         (1. +
          ((x - centerX) / fwhmX)^2. +
          ((y - centerY) / fwhmY)^2.
