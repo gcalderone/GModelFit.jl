@@ -46,13 +46,9 @@ function left(s::String, maxlen::Int)
 end
 
 
-# Treat Domain{1} as a Cartesian domain, despite it is a Linear one.
+
 function show(io::IO, dom::AbstractDomain)
-    if isa(dom, Domain)
-        section(io, "Linear Domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
-    else
-        section(io, "Cartesian domain (ndims: ", ndims(dom), ", length: ", length(dom.index), ")")
-    end
+    section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     hrule = Vector{Int}()
     push!(hrule, 0, 1, ndims(dom)+1)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
@@ -64,10 +60,10 @@ function show(io::IO, dom::AbstractDomain)
             b = b[2:end]
         end
         table[i, 1] = i
-        table[i, 2] = length(a)
+        table[i, 2] = isa(dom, Domain)  ?  length(a)  :  length(axis(dom, i))
         table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
     end
-    if isa(dom, Domain)  &&  (ndims(dom) >= 2)
+    if isa(dom, Domain)  &&  (ndims(dom) >= 2) # treat Domain{1} as a Cartesian one, despite it is a linear one.
         printtable(io, table[:, 1:4], ["Dim", "Size", "Min val", "Max val"],
                    hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:4))
     else

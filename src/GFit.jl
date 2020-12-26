@@ -22,7 +22,7 @@ import Base.iterate
 ⋄ = getfield
 
 
-export Domain, CartesianDomain, Measures,
+export Domain, CartesianDomain, axis, roi, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate, isfixed, thaw, freeze, fit!
 
@@ -92,9 +92,9 @@ end
 # ====================================================================
 # CompEval: a wrapper for a component evaluated on a specific domain
 #
-mutable struct CompEval{TComp <: AbstractComponent, N}
+mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
-    domain::Domain{N}
+    domain::TDomain  # TODO: questo non serve
     params::OrderedDict{ParamID, Parameter}
     cdata
     counter::Int
@@ -102,11 +102,11 @@ mutable struct CompEval{TComp <: AbstractComponent, N}
     buffer::Vector{Float64}
     cfixed::Int8
 
-    function CompEval(comp::AbstractComponent, domain::Domain{N}) where N
+    function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         params = getparams(comp)
         cdata  = compeval_cdata(comp, domain)
         buffer = compeval_array(comp, domain)
-        return new{typeof(comp), ndims(domain)}(
+        return new{typeof(comp), typeof(domain)}(
             comp, domain, params, cdata, 0,
             fill(NaN, length(params)),
             buffer, false)
@@ -131,17 +131,12 @@ end
 
 # ====================================================================
 # Component fall back methods
-function compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) end
-#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_cdata`.")
+compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) = nothing
+compeval_array(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
 
-function compeval_array(comp::AbstractComponent, domain::AbstractDomain) end
-#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_array`.")
+evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} =
+    error("No `evaluate` method accepting CompEval{$TComp, $TDomain}.")
 
-function evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} end
-#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
-
-function evaluate(c::CompEval{TComp, TDomain}) where {TComp, TDomain} end
-#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
 
 
 # ====================================================================
@@ -152,6 +147,7 @@ include("components/SimplePar.jl")
 include("components/FuncWrap.jl")
 include("components/OffsetSlope.jl")
 include("components/Gaussian.jl")
+include("components/Lorentzian.jl")
 
 
 # ====================================================================
@@ -235,7 +231,6 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    orig_domain::AbstractDomain
     domain::Domain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
@@ -244,7 +239,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(domain, flatten(domain),
+        pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -256,7 +251,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(domain, flatten(domain),
+        pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -772,7 +767,7 @@ Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
 Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
 
 ##
-domain(pref::PredRef; dim::Int=1) = pref.orig_domain[dim]
+domain(pref::PredRef; dim::Int=1) = pref.domain[dim]
 domain(m::Model; dim::Int=1) = domain(m[1], dim=dim)
 
 

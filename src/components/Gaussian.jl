@@ -64,13 +64,11 @@ end
 
 compeval_cdata(comp::Gaussian_1D, domain::Domain{1}) = Gaussian_1D_cdata()
 compeval_cdata(comp::Gaussian_2D, domain::Domain{2}) = Gaussian_2D_cdata()
-compeval_array(comp::Gaussian_1D, domain::Domain{1}) = fill(NaN, length(domain))
-compeval_array(comp::Gaussian_2D, domain::Domain{2}) = fill(NaN, length(domain))
 
 
 # ====================================================================
 # Evaluate component 
-function evaluate(c::CompEval{Gaussian_1D, 1},
+function evaluate(c::CompEval{Gaussian_1D, Domain{1}},
                   norm, center, sigma)
     # TODO: optimize using cdata
     x = c.domain[1]
@@ -79,7 +77,7 @@ function evaluate(c::CompEval{Gaussian_1D, 1},
 end
 
 
-function evaluate(ce::CompEval{Gaussian_2D, 2},
+function evaluate(ce::CompEval{Gaussian_2D, Domain{2}},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2

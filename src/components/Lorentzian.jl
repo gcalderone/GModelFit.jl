@@ -44,15 +44,8 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 
 
 # ====================================================================
-compeval_cdata(comp::Lorentzian_1D, domain::Domain{1}) = nothing
-compeval_cdata(comp::Lorentzian_2D, domain::Domain{2}) = nothing
-compeval_array(comp::Lorentzian_1D, domain::Domain{1}) = fill(NaN, length(domain))
-compeval_array(comp::Lorentzian_2D, domain::Domain{2}) = fill(NaN, length(domain))
-
-
-# ====================================================================
 # Evaluate component 
-function evaluate(ce::CompEval{Lorentzian_1D, 1},
+function evaluate(ce::CompEval{Lorentzian_1D, Domain{1}},
                   norm, center, fwhm)
     x = ce.domain[1]
 
@@ -63,7 +56,7 @@ function evaluate(ce::CompEval{Lorentzian_1D, 1},
 end
 
 
-function evaluate(ce::CompEval{Lorentzian_2D, 2},
+function evaluate(ce::CompEval{Lorentzian_2D, Domain{2}},
                   norm, centerX, centerY, fwhmX, fwhmY)
     x = ce.domain[1]
     y = ce.domain[2]
