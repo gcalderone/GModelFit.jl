@@ -22,7 +22,7 @@ import Base.iterate
 ⋄ = getfield
 
 
-export Domain, CartesianDomain, Measures,
+export Domain, CartesianDomain, axis, roi, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate, isfixed, thaw, freeze, fit!
 
@@ -123,7 +123,11 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
         c.lastvalues .= pvalues
         c.counter += 1
         @assert all(.!isnan.(pvalues))
-        evaluate(c, pvalues...)
+        if isnothing(c.cdata)
+            evaluate(c.buffer, c.comp, c.domain, pvalues...)
+        else
+            evaluate(c.buffer, c.comp, c.domain, c.cdata, pvalues...)
+        end
     end
     return c.buffer
 end
@@ -131,17 +135,8 @@ end
 
 # ====================================================================
 # Component fall back methods
-function compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) end
-#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_cdata`.")
-
-function compeval_array(comp::AbstractComponent, domain::AbstractDomain) end
-#    error("Component " * string(typeof(comp)) * " must implement its own method for `compeval_array`.")
-
-function evaluate(c::CompEval{TComp, TDomain}, args...) where {TComp, TDomain} end
-#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
-
-function evaluate(c::CompEval{TComp, TDomain}) where {TComp, TDomain} end
-#    error("Component " * string(TComp) * " must implement its own method for `evaluate`.")
+compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) = nothing
+compeval_array(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
 
 
 # ====================================================================
@@ -152,6 +147,7 @@ include("components/SimplePar.jl")
 include("components/FuncWrap.jl")
 include("components/OffsetSlope.jl")
 include("components/Gaussian.jl")
+include("components/Lorentzian.jl")
 
 
 # ====================================================================
@@ -235,8 +231,7 @@ end
 # ====================================================================
 # A model prediction suitable to be compared to experimental data
 mutable struct Prediction
-    orig_domain::AbstractDomain
-    domain::Domain
+    domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
@@ -244,7 +239,7 @@ mutable struct Prediction
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(domain, flatten(domain),
+        pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -256,7 +251,7 @@ mutable struct Prediction
     function Prediction(domain::AbstractDomain,
                         redpair::Pair{Symbol, Reducer}, comp_iterable...)
         @assert length(comp_iterable) > 0
-        pred = new(domain, flatten(domain),
+        pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
@@ -591,8 +586,6 @@ function data1D(model::Model, data::Vector{Measures{N}}) where N
     out = Vector{Measures{1}}()
     for i in 1:length(model.preds)
         pred = model.preds[i]
-        @assert(length(data[i]) == length(geteval(pred)),
-                "Length of dataset $i do not match corresponding model prediction.")
         push!(out, flatten(data[i], pred.domain))
     end
     return out
@@ -772,7 +765,7 @@ Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
 Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
 
 ##
-domain(pref::PredRef; dim::Int=1) = pref.orig_domain[dim]
+domain(pref::PredRef; dim::Int=1) = pref.domain[dim]
 domain(m::Model; dim::Int=1) = domain(m[1], dim=dim)
 
 

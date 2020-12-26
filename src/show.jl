@@ -45,45 +45,13 @@ function left(s::String, maxlen::Int)
     return s[1:maxlen]
 end
 
-#=
-function show(io::IO, dom::AbstractCartesianDomain)
-    section(io, "Cartesian domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
-    table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
-    for i in 1:ndims(dom)
-        a = dom[i]
-        b = 0
-        if length(a) > 1
-            b = a .- circshift(a, 1)
-            b = b[2:end]
-        end
-        table[i, 1] = i
-        table[i, 2] = length(a)
-        table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
-    end
-    printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
-               formatters=ft_printf(showsettings.floatformat, 3:6))
-end
-=#
-
-function show(io::IO, dom::Domain)
-    section(io, "Linear domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
-    table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 3)
-    for i in 1:ndims(dom)
-        table[i, 1] = i
-        table[i, 2] = minimum(dom.axis[i])
-        table[i, 3] = maximum(dom.axis[i])
-    end
-    printtable(io, table, ["Dim", "Min val", "Max val"],
-               formatters=ft_printf(showsettings.floatformat, 2:3))
-end
 
 
-# Special case for Domain_1D: treat it as a Cartesian domain, despite it is a Linear one.
-function show(io::IO, dom::Domain{1})
-    section(io, "Domain (ndims: ", ndims(dom), ", length: ", length(dom), ")")
-    table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
+function show(io::IO, dom::AbstractDomain)
+    section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     hrule = Vector{Int}()
     push!(hrule, 0, 1, ndims(dom)+1)
+    table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
         a = dom[i]
         b = 0
@@ -92,15 +60,26 @@ function show(io::IO, dom::Domain{1})
             b = b[2:end]
         end
         table[i, 1] = i
-        table[i, 2] = length(a)
+        table[i, 2] = isa(dom, Domain)  ?  length(a)  :  length(axis(dom, i))
         table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
     end
-    printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
+    if isa(dom, Domain)  &&  (ndims(dom) >= 2) # treat Domain{1} as a Cartesian one, despite it is a linear one.
+        printtable(io, table[:, 1:4], ["Dim", "Size", "Min val", "Max val"],
+                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:4))
+    else
+        printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
+                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
+    end
 end
 
 
-function show(io::IO, data::T) where T <: AbstractData
+#=
+The following is needed since AbstractData <: AbstractArray:
+without it the show(bstractArray) would be invoked.
+=#
+show(io::IO, mime::MIME"text/plain", data::AbstractData) = show(io, data)
+
+function show(io::IO, data::AbstractData)
     section(io, typeof(data), ": (length: ", (length(data.val)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     hrule = Vector{Int}()
@@ -238,8 +217,6 @@ function show(io::IO, pred::PredRef)
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
 end
 
-
-#Is this needed? show(io::IO, mime::MIME"text/plain", model::Model) = show(io, model)
 
 function show(io::IO, model::Model)
     for id in 1:length(model.preds)

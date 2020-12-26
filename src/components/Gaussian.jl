@@ -9,7 +9,7 @@ mutable struct Gaussian_1D <: AbstractComponent
     function Gaussian_1D(norm::Number, center::Number, sigma::Number)
         @assert norm  > 0
         @assert sigma > 0
-        
+
         out = new(Parameter(norm), Parameter(center), Parameter(sigma))
         out.norm.low = 0
         out.sigma.low = 0
@@ -64,22 +64,20 @@ end
 
 compeval_cdata(comp::Gaussian_1D, domain::Domain{1}) = Gaussian_1D_cdata()
 compeval_cdata(comp::Gaussian_2D, domain::Domain{2}) = Gaussian_2D_cdata()
-compeval_array(comp::Gaussian_1D, domain::Domain{1}) = fill(NaN, length(domain))
-compeval_array(comp::Gaussian_2D, domain::Domain{2}) = fill(NaN, length(domain))
 
 
 # ====================================================================
-# Evaluate component 
-function evaluate(c::CompEval{Gaussian_1D, Domain{1}},
+# Evaluate component
+function evaluate(buffer, comp::Gaussian_1D, domain::Domain{1}, cdata,
                   norm, center, sigma)
     # TODO: optimize using cdata
-    x = c.domain[1]
-    @. (c.buffer = exp( ((x - center) / sigma)^2. / (-2.)) / 
+    x = domain[1]
+    @. (buffer = exp( ((x - center) / sigma)^2. / (-2.)) /
         2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
 end
 
 
-function evaluate(ce::CompEval{Gaussian_2D, Domain{2}},
+function evaluate(buffer, comp::Gaussian_2D, domain::Domain{2}, cdata,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -87,10 +85,10 @@ function evaluate(ce::CompEval{Gaussian_2D, Domain{2}},
     c =  (sin(angle) / sigmaX)^2 / 2  +  (cos(angle) / sigmaY)^2 / 2
 
     # TODO: optimize using cdata
-    x = ce.domain[1]
-    y = ce.domain[2]
-    
-    @. (ce.buffer = norm *
+    x = domain[1]
+    y = domain[2]
+
+    @. (buffer = norm *
         exp(
             -(
                 a * (x - centerX)^2. +

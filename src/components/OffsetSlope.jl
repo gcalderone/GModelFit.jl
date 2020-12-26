@@ -31,27 +31,21 @@ end
 OffsetSlope(offset, x0, slope) = OffsetSlope_1D(offset, x0, slope)
 OffsetSlope(offset, x0, y0, slopeX, slopeY) = OffsetSlope_2D(offset, x0, y0, slopeX, slopeY)
 
-compeval_cdata(comp::OffsetSlope_1D, domain::Domain{1}) = nothing
-compeval_cdata(comp::OffsetSlope_2D, domain::Domain{2}) = nothing
-
-compeval_array(comp::OffsetSlope_1D, domain::Domain{1}) = fill(NaN, length(domain))
-compeval_array(comp::OffsetSlope_2D, domain::Domain{2}) = fill(NaN, length(domain))
-
 
 # ====================================================================
-# Evaluate component 
-function evaluate(c::CompEval{OffsetSlope_1D, Domain{1}},
+# Evaluate component
+function evaluate(buffer, comp::OffsetSlope_1D, domain::Domain{1},
                   offset, x0, slope)
-    @. (c.buffer = slope * (c.domain[1] - x0) + offset)
+    @. (buffer = slope * (c.domain[1] - x0) + offset)
 end
 
 
-function evaluate(c::CompEval{OffsetSlope_2D, Domain{2}},
-                   offset, x0, y0, slopeX, slopeY)
-    x = c.domain[1]
-    y = c.domain[2]
-    @. (c.buffer = 
-        slopeX * (x - x0) + 
+function evaluate(buffer, comp::OffsetSlope_2D, domain::Domain{2},
+                  offset, x0, y0, slopeX, slopeY)
+    x = domain[1]
+    y = domain[2]
+    @. (buffer =
+        slopeX * (x - x0) +
         slopeY * (y - y0) +
         offset)
 end
