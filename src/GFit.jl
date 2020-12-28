@@ -24,7 +24,7 @@ import Base.iterate
 
 export Domain, CartesianDomain, axis, roi, Measures,
     Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate, isfixed, thaw, freeze, fit!
+    Model, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 const MDict = OrderedDict{Symbol, Any}
 
@@ -46,8 +46,8 @@ end
 # A *component* is a generic implementation of a constituent part of a
 # model.
 #
-# A component must inherit `AbstractComponent`, and implement the
-# `ceval_data` and `evaluate` methods
+# A component must inherit `AbstractComponent` and implement the
+# `evaluate!` method (optionally also `prepare!`)
 abstract type AbstractComponent end
 
 
@@ -96,7 +96,6 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     params::OrderedDict{ParamID, Parameter}
-    cdata
     counter::Int
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
@@ -104,10 +103,9 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         params = getparams(comp)
-        cdata  = compeval_cdata(comp, domain)
-        buffer = compeval_array(comp, domain)
+        buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
-            comp, domain, params, cdata, 0,
+            comp, domain, params, 0,
             fill(NaN, length(params)),
             buffer, false)
     end
@@ -123,11 +121,7 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
         c.lastvalues .= pvalues
         c.counter += 1
         @assert all(.!isnan.(pvalues))
-        if isnothing(c.cdata)
-            evaluate(c.buffer, c.comp, c.domain, pvalues...)
-        else
-            evaluate(c.buffer, c.comp, c.domain, c.cdata, pvalues...)
-        end
+        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
     end
     return c.buffer
 end
@@ -135,8 +129,7 @@ end
 
 # ====================================================================
 # Component fall back methods
-compeval_cdata(comp::AbstractComponent, domain::AbstractDomain) = nothing
-compeval_array(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
+prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
 
 
 # ====================================================================
@@ -304,12 +297,12 @@ function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     eval = reducer.funct(args...)
     pred.revals[rname] = ReducerEval(args, reducer.funct, 1, eval)
     pred.rsel = rname
-    evaluate(pred)
+    evaluate!(pred)
     return pred
 end
 
 
-function evaluate(pred::Prediction)
+function evaluate!(pred::Prediction)
     for (cname, ceval) in pred.cevals
         evaluate_cached(ceval)
     end
@@ -369,7 +362,7 @@ mutable struct Model
 
     function Model(v::Vector{Prediction})
         model = new(Vector{MDict}(), v, ModelInternals(), Vector{Function}())
-        evaluate(model)
+        evaluate!(model)
         return model
     end
     Model(p::Prediction) = Model([p])
@@ -435,7 +428,7 @@ function ModelInternals(model::Model)
 end
 
 
-function evaluate(model::Model)
+function evaluate!(model::Model)
     @assert length(model.preds) >= 1
     model.priv = ModelInternals(model)
     quick_evaluate(model)
@@ -491,7 +484,7 @@ end
 
 function add!(model::Model, p::Prediction)
     push!(model.preds, p)
-    evaluate(model)
+    evaluate!(model)
 end
 
 add!(model::Model, args...) = add!(model[1], args...)
@@ -499,7 +492,7 @@ add!(model::Model, args...) = add!(model[1], args...)
 function add!(p::PredRef, comp_iterable...)
     @assert length(comp_iterable) > 0
     add_comps!(deref(p), comp_iterable...)
-    evaluate(p ⋄ :model)
+    evaluate!(p ⋄ :model)
 end
 
 function add!(p::PredRef, reducer::Reducer, comp_iterable...)
@@ -507,7 +500,7 @@ function add!(p::PredRef, reducer::Reducer, comp_iterable...)
         add_comps!(deref(p), comp_iterable...)
     end
     add_reducer!(deref(p), reducer)
-    evaluate(p ⋄ :model)
+    evaluate!(p ⋄ :model)
 end
 
 function add!(p::PredRef, redpair::Pair{Symbol, Reducer}, comp_iterable...)
@@ -515,14 +508,14 @@ function add!(p::PredRef, redpair::Pair{Symbol, Reducer}, comp_iterable...)
         add_comps!(deref(p), comp_iterable...)
     end
     add_reducer!(deref(p), redpair)
-    evaluate(p ⋄ :model)
+    evaluate!(p ⋄ :model)
 end
 
 
 # ====================================================================
 function patch!(func::Function, model::Model)
     push!(model.patchfuncts, func)
-    evaluate(model)
+    evaluate!(model)
     return model
 end
 
@@ -534,7 +527,7 @@ freeze(model::Model, cname::Symbol) = freeze(model[1], cname)
 function freeze(pref::PredRef, cname::Symbol)
     @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
     pref.cevals[cname].cfixed = 1
-    evaluate(pref ⋄ :model)
+    evaluate!(pref ⋄ :model)
     nothing
 end
 
@@ -543,7 +536,7 @@ thaw(model::Model, cname::Symbol) = thaw(model[1], cname)
 function thaw(pref::PredRef, cname::Symbol)
     @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
     pref.cevals[cname].cfixed = 0
-    evaluate(pref ⋄ :model)
+    evaluate!(pref ⋄ :model)
     nothing
 end
 
@@ -658,7 +651,7 @@ function fit!(model::Model, data::Vector{Measures{N}};
               only_id::Int=0,
               minimizer=lsqfit()) where N
     elapsedTime = Base.time_ns()
-    evaluate(model)
+    evaluate!(model)
 
     if only_id != 0
         for id in 1:length(model.preds)
@@ -729,7 +722,7 @@ function fit!(model::Model, data::Vector{Measures{N}};
                 ceval.cfixed -= 1
             end
         end
-        evaluate(model)
+        evaluate!(model)
     end
     return result
 end
@@ -742,11 +735,11 @@ end
 (p::PredRef)() = geteval(deref(p))
 (p::PredRef)(name::Symbol) = geteval(deref(p), name)
 function (m::Model)()
-    evaluate(m)
+    evaluate!(m)
     m[1]()
 end
 function (m::Model)(name::Symbol)
-    evaluate(m)
+    evaluate!(m)
     m[1](name)
 end
 

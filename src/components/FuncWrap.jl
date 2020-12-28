@@ -12,7 +12,7 @@ struct FuncWrap <: AbstractComponent
 end
 
 
-function evaluate(buffer, comp::FuncWrap, domain::AbstractDomain,
-                  params...)
+function evaluate!(buffer, comp::FuncWrap, domain::AbstractDomain,
+                   params...)
     buffer .= comp.func(domain..., params...)
 end

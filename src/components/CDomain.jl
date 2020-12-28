@@ -3,6 +3,6 @@ struct CDomain <: AbstractComponent
     CDomain(dim::Int=1) = new(dim)
 end
 
-compeval_array(comp::CDomain, domain::AbstractDomain) = deepcopy(domain[comp.dim])
+prepare!(comp::CDomain, domain::AbstractDomain) = deepcopy(domain[comp.dim])
 
-evaluate(buffer, comp::CDomain, domain::AbstractDomain) = nothing
+evaluate!(buffer, comp::CDomain, domain::AbstractDomain) = nothing
