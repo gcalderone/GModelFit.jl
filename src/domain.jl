@@ -27,7 +27,7 @@ struct CartesianDomain{N} <: AbstractDomain{N}
     ldomain::Domain{N}
 
     function CartesianDomain(axis::Vararg{AbstractVector{T},N}; roi=nothing) where {T <: Real, N}
-        @assert N >= 2 "Cartesian domains needs at least 2 dimensions"
+        @assert N >= 2 "A cartesian domain requires at least 2 dimensions"
         len = prod(length.(axis))
         ss = tuple(length.(axis)...)
         isnothing(roi)  &&  (roi = collect(1:len))
@@ -122,13 +122,11 @@ end
 
 function flatten(data::Measures{N}, dom::CartesianDomain{N}) where N
     @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
-    (N == 1)  &&  return data
     return Measures(data.val[roi(dom)], data.unc[roi(dom)])
 end
 
 function flatten(data::Counts{N}, dom::CartesianDomain{N}) where N
     @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
-    (N == 1)  &&  return data
     return Counts(data.val[roi(dom)])
 end
 

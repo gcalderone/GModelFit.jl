@@ -236,7 +236,7 @@ mutable struct Prediction
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
-        add_comps!(  pred, comp_iterable...)
+        add_comps!(pred, comp_iterable...)
         add_reducer!(pred, :sum1 => Reducer(sum_of_array))
         return pred
     end
@@ -248,7 +248,7 @@ mutable struct Prediction
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
                    Symbol(""), 0)
-        add_comps!(  pred, comp_iterable...)
+        add_comps!(pred, comp_iterable...)
         add_reducer!(pred, redpair)
         return pred
     end
