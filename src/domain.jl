@@ -107,7 +107,7 @@ iterate(d::Counts, args...) = iterate(d.val, args...)
 
 # ====================================================================
 # Methods to "flatten" a multidimensional object into a 1D one
-# TODO: check these
+#
 function flatten(data::Measures{N}, dom::Domain{N}) where N
     @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
     (N == 1)  &&  return data

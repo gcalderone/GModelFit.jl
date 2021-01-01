@@ -601,7 +601,7 @@ end
 # ====================================================================
 abstract type AbstractMinimizer end
 
-using LsqFit
+import LsqFit
 mutable struct lsqfit <: AbstractMinimizer
 end
 
@@ -614,12 +614,12 @@ function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
                                upper=getfield.(params, :high))
     status = :Error
     (bestfit.converged)  &&  (status = :OK)
-    error = LsqFit.margin_error(bestfit, 0.6827)
+    error = LsqFit.stderror(bestfit)
     return (status, getfield.(Ref(bestfit), :param), error)
 end
 
 
-using CMPFit;
+import CMPFit;
 
 mutable struct cmpfit <: AbstractMinimizer;
     config::CMPFit.Config;
