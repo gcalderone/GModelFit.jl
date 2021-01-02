@@ -1,25 +1,49 @@
-abstract type AbstractDomain{N} end
+abstract type AbstractDomain{N} <: AbstractVector{Union{Float64, Vector{Float64}}} end
 
 struct Domain{N} <: AbstractDomain{N}
-    coords::NTuple{N, Vector{Float64}}
+    coords::AbstractMatrix{Float64}
+
+    Domain(coords::Matrix{T}) where {T <: Real} =
+        new{size(coords)[2]}(coords)
 
     function Domain(coords::Vararg{AbstractVector{T},N}) where {T <: Real, N}
         (N > 1)  &&  (@assert all(length(coords[1]) .== [length.(coords)...]))
-        return new{N}(deepcopy(coords))
+        mat = deepcopy(coords[1])
+        if N > 1
+            for i in 2:N
+                mat = hcat(mat, coords[i])
+            end
+        else
+            mat = reshape(mat, length(mat), 1)
+        end
+        return new{N}(mat)
     end
+
     function Domain(length::Integer)
         @assert length >= 1
-        return new{1}((collect(1.:length),))
+        return new{1}(reshape(collect(1.:length), length, 1))
     end
 end
 
 ndims(d::Domain{N}) where N = N
-length(d::Domain) = length(d.coords[1])
-getindex(d::Domain, dim) = d.coords[dim]
-function iterate(d::Domain{N}, dim=1) where N
-    (dim > N)  &&  (return nothing)
-    return (d[dim], dim+1)
+length(d::Domain) = size(d.coords)[1]
+size(d::Domain{N}) where N = (length(d),)
+
+getindex(d::Domain{1}, ::Colon) = d.coords[:, 1]
+getindex(d::Domain{1}, index::Integer) = d.coords[index, 1]
+getindex(d::Domain, dim::Integer) = d.coords[:, dim]
+
+function iterate(d::Domain{1}, ii=1)
+    (ii > size(d.coords)[1])  &&  (return nothing)
+    return (d.coords[ii, 1], ii+1)
 end
+function iterate(d::Domain, ii=1)
+    (ii > size(d.coords)[1])  &&  (return nothing)
+    return (d.coords[ii, :], ii+1)
+end
+
+coords(d::Domain{N}) where N = [d.coords[:, i] for i in 1:N]
+
 
 struct CartesianDomain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
@@ -33,12 +57,12 @@ struct CartesianDomain{N} <: AbstractDomain{N}
         isnothing(roi)  &&  (roi = collect(1:len))
 
         # Prepare corresponding linear domain
-        matrix = Matrix{Float64}(undef, N, length(roi))
+        mat = Matrix{Float64}(undef, length(roi), N)
         ci = Tuple.(CartesianIndices(ss))[roi]
         for i = 1:N
-            matrix[i, :] .= axis[i][getindex.(ci, i)]
+            mat[:, i] .= axis[i][getindex.(ci, i)]
         end
-        ldomain = Domain(getindex.(Ref(matrix), 1:N, :)...)
+        ldomain = Domain(mat)
         return new{N}(deepcopy(axis), roi, ldomain)
     end
 
@@ -52,11 +76,13 @@ end
 # Forward methods to ldomain field
 ndims(d::CartesianDomain{N}) where N = N
 length(d::CartesianDomain) = length(d.ldomain)
-getindex(d::CartesianDomain, dim) = getindex(d.ldomain, dim)
+size(d::CartesianDomain) = size(d.ldomain)
+getindex(d::CartesianDomain, ii) = getindex(d.ldomain, ii)
 iterate(d::CartesianDomain, args...) = iterate(d.ldomain, args...)
+coords(d::CartesianDomain) = coords(d.ldomain)
 
 # Cartesian-only methods
-size(d::CartesianDomain) = tuple(length.(d.axis)...)
+orig_size(d::CartesianDomain) = tuple(length.(d.axis)...)
 axis(d::CartesianDomain, dim) = d.axis[dim]
 roi(d::CartesianDomain) = d.roi
 
@@ -121,12 +147,12 @@ function flatten(data::Counts{N}, dom::Domain{N}) where N
 end
 
 function flatten(data::Measures{N}, dom::CartesianDomain{N}) where N
-    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
+    @assert (length(dom) <= length(data)  &&  prod(orig_size(dom)) == length(data)) "Domain and dataset have incompatible lengths"
     return Measures(data.val[roi(dom)], data.unc[roi(dom)])
 end
 
 function flatten(data::Counts{N}, dom::CartesianDomain{N}) where N
-    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
+    @assert (length(dom) <= length(data)  &&  prod(orig_size(dom)) == length(data)) "Domain and dataset have incompatible lengths"
     return Counts(data.val[roi(dom)])
 end
 

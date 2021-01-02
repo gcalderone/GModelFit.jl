@@ -53,9 +53,8 @@ end
 
 # ====================================================================
 # Evaluate component
-function evaluate!(buffer, comp::Gaussian_1D, domain::AbstractDomain{1},
+function evaluate!(buffer, comp::Gaussian_1D, x::AbstractDomain{1},
                    norm, center, sigma)
-    x = domain[1]
     @. (buffer = exp( ((x - center) / sigma)^2. / (-2.)) /
         2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
 end

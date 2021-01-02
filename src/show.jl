@@ -47,20 +47,25 @@ end
 
 
 
+show(io::IO, mime::MIME"text/plain", domain::AbstractDomain) = show(io, domain)
 function show(io::IO, dom::AbstractDomain)
     section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     hrule = Vector{Int}()
     push!(hrule, 0, 1, ndims(dom)+1)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
-        a = dom[i]
+        if isa(dom, Domain{1})
+            a = convert(Vector{Float64}, dom)
+        else
+            a = isa(dom, Domain)  ?  dom[i]  :  axis(dom, i)
+        end
         b = 0
         if length(a) > 1
             b = a .- circshift(a, 1)
             b = b[2:end]
         end
         table[i, 1] = i
-        table[i, 2] = isa(dom, Domain)  ?  length(a)  :  length(axis(dom, i))
+        table[i, 2] = length(a)
         table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
     end
     if isa(dom, Domain)  &&  (ndims(dom) >= 2) # treat Domain{1} as a Cartesian one, despite it is a linear one.

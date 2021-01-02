@@ -22,7 +22,7 @@ import Base.iterate
 ⋄ = getfield
 
 
-export Domain, CartesianDomain, axis, roi, Measures,
+export Domain, CartesianDomain, coords, axis, roi, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
@@ -758,8 +758,8 @@ Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
 Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
 
 ##
-domain(pref::PredRef; dim::Int=1) = pref.domain[dim]
-domain(m::Model; dim::Int=1) = domain(m[1], dim=dim)
+domain(pref::PredRef) = pref.domain
+domain(m::Model) = domain(m[1])
 
 
 # ====================================================================

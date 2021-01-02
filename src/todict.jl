@@ -93,7 +93,7 @@ end
 
 function todict(pred::Prediction)
     out = MDict()
-    out[:x] = rebin_data(todict_opt[:rebin], pred.domain[1])
+    out[:x] = rebin_data(todict_opt[:rebin], pred.domain[:])
     out[:components] = MDict()
     out[:compevals]  = MDict()
     for (cname, ceval) in pred.cevals

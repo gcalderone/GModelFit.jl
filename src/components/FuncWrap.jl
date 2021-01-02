@@ -14,5 +14,5 @@ end
 
 function evaluate!(buffer, comp::FuncWrap, domain::AbstractDomain,
                    params...)
-    buffer .= comp.func(domain..., params...)
+    buffer .= comp.func(coords(domain)..., params...)
 end

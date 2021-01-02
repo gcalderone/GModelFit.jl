@@ -10,14 +10,14 @@ The typical use case for `GFit` is as follows: you observe a physical phenomenon
 [![Build Status](https://travis-ci.org/gcalderone/GFit.jl.svg?branch=master)](https://travis-ci.org/gcalderone/GFit.jl)
 
 
-This package provides the basic tools to build, evaluate, and fit complex models against empirical data.  `GFit` provides the following functionalities:
+The package provides the basic tools to build, evaluate, and fit complex models against empirical data.  `GFit` provides the following functionalities:
 - it handles datasets of any dimensionality;
-- the fitting model is build by combining one or more *components* (either builtin or implemented by the user) using a standard Julia mathematical expression, and evaluated on a user provided domain;
+- the fitting model is build by combining one or more *building blocks*, dubbed components (either builtin or implemented by the user) using a standard Julia mathematical expression, and evaluated on a user provided domain;
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations;
-- user provided components can pre-compute quantities based on the model domain, and store them in a private structure;
+- user provided components can pre-compute quantities based on the model domain, and store them in structures;
 - model parameters can be fixed to a specific value, limited in an interval, or be dynamically calculated (patched) using a mathematical expression involving other parameters;
 - multiple data sets can be fitted simultaneously;
-- it allows to use different minimizers, and compare their results and performances (currently only two minimizers are supported: [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl));
+- it support different minimizers (currently only: [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl) are supported);
 - it provides several facilities for interactive fitting and result displaying.
 
 See below for a simple example, and the `examples` directory for more complex ones.
