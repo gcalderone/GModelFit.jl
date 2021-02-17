@@ -1,10 +1,11 @@
 abstract type AbstractDomain{N} <: AbstractVector{Union{Float64, Vector{Float64}}} end
 
 struct Domain{N} <: AbstractDomain{N}
+    meta::MDict
     coords::AbstractMatrix{Float64}
 
     Domain(coords::Matrix{T}) where {T <: Real} =
-        new{size(coords)[2]}(coords)
+        new{size(coords)[2]}(MDict(), coords)
 
     function Domain(coords::Vararg{AbstractVector{T},N}) where {T <: Real, N}
         (N > 1)  &&  (@assert all(length(coords[1]) .== [length.(coords)...]))
@@ -16,12 +17,12 @@ struct Domain{N} <: AbstractDomain{N}
         else
             mat = reshape(mat, length(mat), 1)
         end
-        return new{N}(mat)
+        return new{N}(MDict(), mat)
     end
 
     function Domain(length::Integer)
         @assert length >= 1
-        return new{1}(reshape(collect(1.:length), length, 1))
+        return new{1}(MDict(), reshape(collect(1.:length), length, 1))
     end
 end
 
@@ -46,6 +47,7 @@ coords(d::Domain{N}) where N = [d.coords[:, i] for i in 1:N]
 
 
 struct CartesianDomain{N} <: AbstractDomain{N}
+    meta::MDict
     axis::NTuple{N, Vector{Float64}}
     roi::Vector{Int}
     ldomain::Domain{N}
@@ -63,13 +65,13 @@ struct CartesianDomain{N} <: AbstractDomain{N}
             mat[:, i] .= axis[i][getindex.(ci, i)]
         end
         ldomain = Domain(mat)
-        return new{N}(deepcopy(axis), roi, ldomain)
+        return new{N}(MDict(), deepcopy(axis), roi, ldomain)
     end
 
     function CartesianDomain(lengths::Vararg{T,N}; kw...) where {T <: Integer, N}
         @assert all(lengths .>= 1)
         axis = [collect(1.:lengths[i]) for i in 1:N]
-        return CartesianDomain(axis...; kw...)
+        return CartesianDomain(MDict(), axis...; kw...)
     end
 end
 
