@@ -101,7 +101,10 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     buffer::Vector{Float64}
     cfixed::Int8
 
-    function CompEval(comp::AbstractComponent, domain::AbstractDomain)
+    function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
+        # Components internal state may be affected by `prepare!`
+        # call.  Avoid overwriting input state with a deep copy.
+        comp = deepcopy(_comp)
         params = getparams(comp)
         buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
