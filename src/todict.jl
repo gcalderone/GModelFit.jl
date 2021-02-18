@@ -106,6 +106,8 @@ function todict(pred::Prediction)
         out[:reducers][rname] = todict(reval)
     end
     out[:main_reducer] = pred.rsel
+    out[:reducers][pred.rsel][:y] = pred.folded  # TODO: remove this
+    out[:folded] = pred.folded
     return out
 end
 

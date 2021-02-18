@@ -232,13 +232,16 @@ mutable struct Prediction
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
     counter::Int
+    instr_response::Function
+    folded::Vector{Float64}
 
     function Prediction(domain::AbstractDomain, comp_iterable...)
         @assert length(comp_iterable) > 0
         pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
-                   Symbol(""), 0)
+                   Symbol(""), 0,
+                   identity, Vector{Float64}())
         add_comps!(pred, comp_iterable...)
         add_reducer!(pred, :sum1 => Reducer(sum_of_array))
         return pred
@@ -250,7 +253,8 @@ mutable struct Prediction
         pred = new(domain,
                    OrderedDict{Symbol, CompEval}(),
                    OrderedDict{Symbol, ReducerEval}(),
-                   Symbol(""), 0)
+                   Symbol(""), 0,
+                   identity, Vector{Float64}())
         add_comps!(pred, comp_iterable...)
         add_reducer!(pred, redpair)
         return pred
@@ -266,6 +270,13 @@ function add_comps!(pred::Prediction, comp_iterable...)
         @assert !haskey(pred.revals, cname)  "Name $cname already exists"
         pred.cevals[cname] = CompEval(deepcopy(comp), pred.domain)
     end
+end
+
+function set_instr_response!(pred::Prediction, funct::Function)
+    pred.instr_response = funct
+    empty!(pred.folded)
+    append!(pred.folded, pred.instr_response(pred.domain, geteval(pred, pred.rsel)))
+    nothing
 end
 
 sum_of_array( arg::Array) = arg
@@ -319,11 +330,20 @@ function reduce(pred::Prediction)
         reval.counter += 1
         reval.buffer .= reval.funct(reval.args...)
     end
+    if pred.instr_response == identity
+        if length(pred.folded) != length(geteval(pred, pred.rsel))
+            empty!(pred.folded)
+            append!(pred.folded, geteval(pred, pred.rsel))
+        end
+        pred.folded .= geteval(pred, pred.rsel)
+    else
+        pred.folded .= pred.instr_response(pred.domain, geteval(pred, pred.rsel))
+    end
     pred.counter += 1
 end
 
 
-geteval(pred::Prediction) = geteval(pred, pred.rsel)
+geteval(pred::Prediction) = pred.folded
 function geteval(pred::Prediction, name::Symbol)
     if haskey(pred.cevals, name)
         return pred.cevals[name].buffer
@@ -764,6 +784,8 @@ Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
 domain(pref::PredRef) = pref.domain
 domain(m::Model) = domain(m[1])
 
+set_instr_response!(p::PredRef, funct::Function) =
+    set_instr_response!(deref(p), funct)
 
 # ====================================================================
 include("todict.jl")
