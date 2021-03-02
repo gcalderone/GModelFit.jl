@@ -769,8 +769,14 @@ end
 ##
 Base.keys(m::Model) = keys(m[1])
 Base.keys(p::PredRef) = keys(p.cevals)
+Base.keys(res::BestFitResult) = keys(res.preds[1])
+Base.keys(a::BestFitPredRef) = keys(a.result.preds[a.id])
+
+##
 Base.haskey(p::PredRef, name::Symbol) = haskey(p.cevals, name)
 Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
+Base.haskey(res::BestFitResult, name::Symbol) = haskey(res.preds[1], name)
+Base.haskey(a::BestFitPredRef, name::Symbol) =  haskey(a.result.preds[a.id], name)
 
 ##
 Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
