@@ -688,6 +688,10 @@ function fit!(model::Model, data::Vector{Measures{N}};
 
     free = Vector{Bool}()
     for (cpid, par) in model.priv.params
+        if !(par.low <= par.val <= par.high)
+            s = "Value outside limits for param $cpid\n" * string(par)
+            error(s)
+        end
         push!(free, (!par.fixed)  &&  (model.priv.cevals[cpid.comp].cfixed == 0))
     end
     ifree = findall(free)
