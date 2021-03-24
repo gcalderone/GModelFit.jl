@@ -106,8 +106,7 @@ function todict(pred::Prediction)
         out[:reducers][rname] = todict(reval)
     end
     out[:main_reducer] = pred.rsel
-    out[:reducers][pred.rsel][:y] = pred.folded  # TODO: remove this
-    out[:folded] = pred.folded
+    out[:folded_model] = rebin_data(todict_opt[:rebin], pred.folded)
     return out
 end
 
