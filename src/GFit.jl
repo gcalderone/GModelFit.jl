@@ -26,7 +26,6 @@ export Domain, CartesianDomain, coords, axis, roi, Measures,
     Prediction, Reducer, @reducer, add!, domain,
     Model, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
-const MDict = OrderedDict{Symbol, Any}
 
 include("domain.jl")
 
@@ -123,7 +122,11 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0))
         c.lastvalues .= pvalues
         c.counter += 1
-        @assert all(.!isnan.(pvalues))
+        if !all(.!isnan.(pvalues))
+            println("One or more parameter values are NaN:")
+            println(pvalues)
+            @assert all(.!isnan.(pvalues))
+        end
         evaluate!(c.buffer, c.comp, c.domain, pvalues...)
     end
     return c.buffer
@@ -378,13 +381,12 @@ ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   Vector{Float64}())
 
 mutable struct Model
-    meta::Vector{MDict}
     preds::Vector{Prediction}
     priv::ModelInternals
     patchfuncts::Vector{Function}
 
     function Model(v::Vector{Prediction})
-        model = new(Vector{MDict}(), v, ModelInternals(), Vector{Function}())
+        model = new(v, ModelInternals(), Vector{Function}())
         evaluate!(model)
         return model
     end
@@ -455,34 +457,6 @@ function evaluate!(model::Model)
     @assert length(model.preds) >= 1
     model.priv = ModelInternals(model)
     quick_evaluate(model)
-
-    # Prepare meta data
-    while length(model.meta) < length(model.preds)
-        push!(model.meta, MDict())
-    end
-    for id in 1:length(model.preds)
-        pred = model.preds[id]
-        meta = model.meta[id]
-
-        haskey(meta, :components)  ||  (meta[:components] = MDict())
-        for (cname, ceval) in pred.cevals
-            haskey(meta[:components], cname)  ||  (meta[:components][cname] = MDict(:params => MDict()))
-            for (pid, param) in ceval.params
-                if pid.index >= 1
-                    pname = Symbol(pid.name, "[", pid.index, "]")
-                else
-                    pname = pid.name
-                end
-                haskey(meta[:components][cname][:params], pname)  ||  (meta[:components][cname][:params][pname] = MDict())
-            end
-        end
-
-        haskey(meta, :reducers)  ||  (meta[:reducers] = MDict())
-        for (rname, reval) in pred.revals
-            haskey(meta[:reducers], rname)  ||  (meta[:reducers][rname] = MDict())
-        end
-    end
-
     return model
 end
 
@@ -798,7 +772,6 @@ set_instr_response!(p::PredRef, funct::Function) =
     set_instr_response!(deref(p), funct)
 
 # ====================================================================
-include("todict.jl")
 include("show.jl")
 
 end
