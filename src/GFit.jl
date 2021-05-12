@@ -5,6 +5,7 @@ using Statistics, Distributions
 using DataStructures
 using LsqFit
 using ExprTools
+using Dates
 
 import Base.show
 import Base.ndims
@@ -558,6 +559,7 @@ struct BestFitResult
     cost::Float64
     status::Symbol      #:OK, :Warn, :Error
     log10testprob::Float64
+    timestamp::DateTime
     elapsed::Float64
 end
 
@@ -647,6 +649,7 @@ fit!(model::Model, data::Measures; kw...) =
 function fit!(model::Model, data::Vector{Measures{N}};
               only_id::Int=0,
               minimizer=lsqfit()) where N
+    timestamp = now()
     elapsedTime = Base.time_ns()
     evaluate!(model)
 
@@ -713,6 +716,7 @@ function fit!(model::Model, data::Vector{Measures{N}};
 
     result = BestFitResult(preds, length(model.priv.buffer), dof, cost, status,
                            logccdf(Chisq(dof), cost) * log10(exp(1)),
+                           timestamp,
                            float(Base.time_ns() - elapsedTime) / 1.e9)
 
     if only_id != 0
