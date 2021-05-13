@@ -213,32 +213,29 @@ f2(x, p4, p5) = @. p4 * sin(p5 * x)
 f3(x) = cos.(x)
 true_vals = [1, 2, 1.e-3, 4, 5]
 
-# Prepare first domain
-dom1 = Domain(1:1e-1:10)
-dom2 = Domain(2:5e-2:9)
+# Prepare domains
+dom1 = Domain(1:1e-2:10)
+dom2 = Domain(2:5e-3:9)
 
-# Prepare list of common components in a Dict:
+# Prepare list of common components in a Dict
 comps = Dict(:f1 => GFit.FuncWrap(f1, true_vals[1], true_vals[2], true_vals[3]),
              :f2 => GFit.FuncWrap(f2, true_vals[4], true_vals[5]),
              :f3 => GFit.FuncWrap(f3))
 
-# Prepare two predictions, one for each domain. Here we also assume
-# that the second data set requires a multiplicative calibration
-# factor as free parameter
-pred1 = Prediction(dom1,  @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
-pred2 = Prediction(dom2,
-                   @reducer((calib, f1, f2, f3) -> (f1 .+ f2) .* f3 .* calib),
-                   :calib => 1.5, comps...);
+# Prepare two predictions, one for each domain. Also assume that 
+# f2.p[2] is supposed to change between the first and second observations
+pred1 = Prediction(dom1, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
+comps[:f2].p[2].val = 10
+pred2 = Prediction(dom2, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
 
 # Prepare global model
 model = Model([pred1 , pred2])
 
-# Prepare mock data sets, including an inter-calibration factor of 1.3.
-# Note: we now need to append an index to `model` in order to refer to a
-# specific prediction.
+# Prepare mock data sets. Here we assume that the two observations are 
+# not calibrated, and that the true inter-calibration factor is 1.5.
 rng = MersenneTwister(0)
-data1 = Measures(model[1]() .+ randn(rng, length(dom1)), 1.)
-data2 = Measures(model[2]() .+ randn(rng, length(dom2)), 1.)
+data1 = Measures(        model[1]() .+ randn(rng, length(dom1)) , 1.)
+data2 = Measures(1.5 .* (model[2]() .+ randn(rng, length(dom2))), 1.5)
 
 # Fit the model against the data
 bestfit = fit!(model, [data1, data2])
@@ -250,13 +247,13 @@ using Gnuplot
 @gp :- domain(model[2])[:] data2.val data2.unc "w yerr t 'Data 2'"
 @gp :- domain(model[2])[:] model[2]() "w l t 'Model 2' lw 5"
 ```
-
+In the above example the two predictions are completely independent, hence there is no added benefit in fitting the two datasets simultaneously.  In order to introduce a link between the parameter in the first and second observation we should use the `patch!` method:
 ```julia
-model[2][:f1].p[1].fixed = 1
-model[2][:f1].p[2].fixed = 1
-model[2][:f1].p[3].fixed = 1
-model[2][:f2].p[1].fixed = 1
-model[2][:f2].p[2].fixed = 1
+model[2][:f1].p[1].fixed = true
+model[2][:f1].p[2].fixed = true
+model[2][:f1].p[3].fixed = true
+model[2][:f2].p[1].fixed = true
+model[2][:f2].p[2].fixed = true
 patch!(model) do m
     m[2][:f1].p[1] = m[1][:f1].p[1]
     m[2][:f1].p[2] = m[1][:f1].p[2]
@@ -264,7 +261,11 @@ patch!(model) do m
     m[2][:f2].p[1] = m[1][:f2].p[1]
     m[2][:f2].p[2] = m[1][:f2].p[2]
 end
+# @reducer((calib, f1, f2, f3) -> (f1 .+ f2) .* f3 .* calib),
+# :calib => 1.5, comps...);
 ```
+
+
 
 ## Retrieve results
 
