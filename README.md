@@ -35,7 +35,7 @@ See below for a simple example, and the `examples` directory for more complex on
 
 - ***Domain***: an N-dimensional domain where the model is supposed to be evaluated.  It is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation, and is represented by an object of type `Domain{N}`, where `N` (>=1) is the dimensionality.  All numbers in a domain are treated as `Float64`;
 
-- ***Measurement***: a container for the N-dimensional empirical data and their $1\sigma$ Gaussian uncertainties, represented by an object of type `Measurement{N}` (in the future further options will be available, such as Poisson counts);
+- ***Measures***: a container for the N-dimensional empirical data and their $1\sigma$ Gaussian uncertainties, represented by an object of type `Measures{N}` (in the future further options will be available, such as Poisson counts);
 
 - ***Component***: a Julia function used to map a `Domain` object into a `Vector{Float64}` , represeting the component evaluation.  Components are typically parametrized, and the values for such parametrized are changed during the fitting process until an optimal match between the global model and the empirical data is achieved.  All component objects have a common supertype (`GFit.AbstractComponent`), and represent the atomic *building block* of a (potentially very complex) model. The `GFit` caching mechanism operates at the component level (i.e. a component is actually evaluated only if at least one of its parameter values has changed);
 
@@ -49,15 +49,15 @@ See below for a simple example, and the `examples` directory for more complex on
   
   - a `Reducer` object, used to combine the component evaluations into a single evaluation output;
   
-  The prediction evaluation is suitable to be compared to the empirical data in a `Measurement` object. All predictions are represented by object of type `Prediction`;
+  The prediction evaluation is suitable to be compared to the empirical data in a `Measures` object. All predictions are represented by object of type `Prediction`;
 
-- ***Model***: a container for one or more predictions, representing the global model, and suitable to be compared to several `Measurement` objects to perform multi-dataset fitting.  All predictions in a model are identified by a unique integer ID, starting from 1. If only one prediction is present, the concept of *model* and *prediction* are almost equivalent, and the `GFit` API implicitly assumes `id=1` in all methods accepting a `Model` object. The mechanism to link a parameter value to an expression involving other parameters operates at the `Model` level.
+- ***Model***: a container for one or more predictions, representing the global model, and suitable to be compared to several `Measures` objects to perform multi-dataset fitting.  All predictions in a model are identified by a unique integer ID, starting from 1. If only one prediction is present, the concept of *model* and *prediction* are almost equivalent, and the `GFit` API implicitly assumes `id=1` in all methods accepting a `Model` object. The mechanism to link a parameter value to an expression involving other parameters operates at the `Model` level.
 
 The package most important function is `fit!`. The purpose of the function is to identify the parameter values which minimize the differences between the model evaluation and the empirical data.  The function arguments are:
 
 - a`Model` object (containing one or more `Prediction` objects;
 
-- either a scalar or a vector of `Measurement` objects, representing the empirical data.
+- either a scalar or a vector of `Measures` objects, representing the empirical data.
 
 The `fit!` function modifies its `Model` input (hence the exclamation mark in the name) by replacing the the initial parameter values with the best fit ones. The function returns an object of type `BesftFitResult`, containing the best fit parameter values, along with their uncertainties.
 
@@ -93,7 +93,7 @@ true_params = [1, 2, 1.e-3, 4, 5]
 The code is as follows:
 
 ```julia
-using GFit
+using GFit, Random
 
 # Model formula and true parameter values
 f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +
@@ -103,13 +103,13 @@ true_params = [1, 2, 1.e-3, 4, 5]
 # Prepare domain
 domain = Domain(1.:5e-3:10)
 
-# Prepare a model with a single component of type GFit.FuncWrap.
-# 
+# Prepare a model with a single component of type GFit.FuncWrap
 model = Model(domain, :f => GFit.FuncWrap(f, true_params...))
 
 # Create mock data set by evaluating the model and adding some
 # random noise.  All uncertainties are equal to 1.
-data = Measures(model() + randn(length(domain)), 1.)
+rng = MersenneTwister(0)
+data = Measures(model() + randn(rng, length(domain)), 1.)
 
 # Fit the model against the data
 bestfit = fit!(model, data)
@@ -135,23 +135,38 @@ model[:comp1].p[2].val = 2
 A model may contain many components, combined with a standard mathematical expression.  The previous example can easily be re-implemented by splitting the analytical formula in 3 parts, each assigned to a different `FuncWrap` component, and combined using the `@reducer` macro:
 
 ```julia
+using GFit, Random
+
+# Model formula and true parameter values
 f1(x, p1, p2, p3) = @.  p1  +  p2 * x  +  p3 * x^2
 f2(x, p4, p5) = @. p4 * sin(p5 * x)
 f3(x) = cos.(x)
+true_params = [1, 2, 1.e-3, 4, 5]
 
+# Prepare domain
+domain = Domain(1.:5e-3:10)
+
+# Prepare a model with 3 single components of type GFit.FuncWrap
 model = Model(domain,
               @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3),
               :f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
               :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
               :f3 => GFit.FuncWrap(f3))
+
+# Create mock data set by evaluating the model and adding some
+# random noise.  All uncertainties are equal to 1.
+rng = MersenneTwister(0)
+data = Measures(model() + randn(rng, length(domain)), 1.)
+
+# Fit the model against the data
 bestfit = fit!(model, data)
 ```
 
 Note that the anonymous function used in the `@reducer` macro is just a standard Julia function, whose inputs are standard Julia `Vector`s.
 
-Also note that the results are identical as those obtained with the previous example, but the execution time is now supposed to be much shorter (verify using a much finer domain, e.g. `Domain(1.:5e-6:10)`).  Such improvement is due to the fact that the component evaluations are internally cached, and are re-evaluated only if necessary, i.e. when one of the parameter value is modified by the minimizer algorithm. In this particular case the `comp3` component, having no free parameter, is evaluated only once.
+Also note that the results are identical as those obtained with the previous example, but the execution time is now supposed to be much shorter (verify using a much finer domain, e.g. `Domain(1.:5e-6:10)`).  Such improvement is due to the caching mechanism which operates at the component level: a component is evaluated only if necessary, i.e. when one of the parameter value is modified by the minimizer. In this particular case the `f3` component, having no free parameter, is evaluated only once.
 
-To check how many time each component and reducer are evaluated simply type the name of the `Model` object in the REPL or call `show(model)`, and check the `Eval. count` column.
+To check how many time each component and reducer are evaluated simply type the name of the `Model` object in the REPL (or invoke `show(model)`, and check the `Eval. count` column.
 
 ## Fitting multiple data sets
 
@@ -574,15 +589,3 @@ using Gnuplot
 # Plot using pm3d style
 @gsp "set pm3d" "set palette" dom[1] dom[2] reshape(model(), dom) "w dots"
 ```
-
-## Glossary
-
-### Domain
-
-`Domain{N}` is a N-dimensional domain where a pre
-
-### Measurement
-
-### Prediction
-
-### Model
