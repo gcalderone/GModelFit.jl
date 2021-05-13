@@ -42,13 +42,13 @@ See below for a simple example, and the `examples` directory for more complex on
 - ***Reducer***: a Julia function (encapsulated in a `Reducer` object) used to combine several component evaluations into a single evaluation output. If not explicitly mentioned when creating a `Prediction` object (see below), a default `Reducer` is created which simply performs an element-wise sum of all the components;
 
 - ***Prediction***: a container for the following objects:
-
+  
   - a `Domain` object;
-
+  
   - one or more components, all evaluated on the same domain. Each component is identified by unique name (actually a `Symbol`) within a prediction;
-
+  
   - a `Reducer` object, used to combine the component evaluations into a single evaluation output;
-
+  
   The prediction evaluation is suitable to be compared to the empirical data in a `Measures` object. All predictions are represented by object of type `Prediction`;
 
 - ***Model***: a container for one or more predictions, representing the global model, and suitable to be compared to several `Measures` objects to perform multi-dataset fitting.  All predictions in a model are identified by a unique integer ID, starting from 1. If only one prediction is present, the concept of *model* and *prediction* are almost equivalent, and the `GFit` API implicitly assumes `id=1` in all methods accepting a `Model` object. The mechanism to link a parameter value to an expression involving other parameters operates at the `Model` level.
@@ -87,7 +87,7 @@ f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +
 where `p1`, ..., `p5` are the model parameters to be estimated.  We'll assume the *true* values for the parameters are:
 
 ```julia
-true_params = [1, 2, 1.e-3, 4, 5]
+true_vals = [1, 2, 1.e-3, 4, 5]
 ```
 
 The code is as follows:
@@ -98,13 +98,13 @@ using GFit, Random
 # Model formula and true parameter values
 f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +
                                p4 * sin(p5 * x))  *  cos(x)
-true_params = [1, 2, 1.e-3, 4, 5]
+true_vals = [1, 2, 1.e-3, 4, 5]
 
 # Prepare domain
 dom = Domain(1:1e-2:10)
 
 # Prepare a model with a single component of type GFit.FuncWrap
-model = Model(dom, :f => GFit.FuncWrap(f, true_params...))
+model = Model(dom, :f => GFit.FuncWrap(f, true_vals...))
 
 # Create mock data set by evaluating the model and adding some
 # random noise.  All uncertainties are equal to 1.
@@ -127,20 +127,13 @@ A plot of the mock data set and the best fit model can be generated as follows (
 
 ```julia
 using Gnuplot
-@gp domain(model)[:] data.val data.unc "w yerr t 'Data'"
+@gp    domain(model)[:] data.val data.unc "w yerr t 'Data'"
 @gp :- domain(model)[:] model() "w l t 'Model' lw 5"
-```
-
-If needed, such values can be modified as follows:
-
-```julia
-model[:comp1].p[1].val = 1
-model[:comp1].p[2].val = 2
 ```
 
 ### Multiple components
 
-A model may contain many components, combined with a standard mathematical expression.  The previous example can easily be re-implemented by splitting the analytical formula in 3 parts, each assigned to a different `FuncWrap` component, and combined using the `@reducer` macro:
+A model can contain many components, combined with a standard mathematical expression.  The previous example can easily be re-implemented by splitting the analytical formula in 3 parts, each assigned to a different `FuncWrap` component, and combined using the `@reducer` macro:
 
 ```julia
 using GFit, Random
@@ -149,16 +142,16 @@ using GFit, Random
 f1(x, p1, p2, p3) = @.  p1  +  p2 * x  +  p3 * x^2
 f2(x, p4, p5) = @. p4 * sin(p5 * x)
 f3(x) = cos.(x)
-true_params = [1, 2, 1.e-3, 4, 5]
+true_vals = [1, 2, 1.e-3, 4, 5]
 
 # Prepare domain
 dom = Domain(1:1e-2:10)
 
-# Prepare a model with 3 single components of type GFit.FuncWrap
+# Prepare a model with three components of type GFit.FuncWrap
 model = Model(dom,
               @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3),
-              :f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
-              :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
+              :f1 => GFit.FuncWrap(f1, true_vals[1], true_vals[2], true_vals[3]),
+              :f2 => GFit.FuncWrap(f2, true_vals[4], true_vals[5]),
               :f3 => GFit.FuncWrap(f3))
 
 # Create mock data set by evaluating the model and adding some
@@ -171,7 +164,7 @@ bestfit = fit!(model, data)
 
 # Plot data and best fit model
 using Gnuplot
-@gp domain(model)[:] data.val data.unc "w yerr t 'Data'"
+@gp    domain(model)[:] data.val data.unc "w yerr t 'Data'"
 @gp :- domain(model)[:] model() "w l t 'Model' lw 5"
 ```
 
@@ -180,6 +173,32 @@ Note that the anonymous function used in the `@reducer` macro is just a standard
 Also note that the results are identical as those obtained with the previous example, but the execution time is now supposed to be much shorter (verify using a much finer domain, e.g. `Domain(1.:1e-5:10)`).  Such improvement is due to the caching mechanism which operates at the component level: a component is evaluated only if necessary, i.e. when one of the parameter value is modified by the minimizer. In this particular case the `f3` component, having no free parameter, is evaluated only once.
 
 To check how many time each component and reducer are evaluated simply type the name of the `Model` object in the REPL (or invoke `show(model)`, and check the `Eval. count` column.
+
+#### Add new components to a model
+
+The model can be built iteratively, by adding further components as they become necessary.  In the following example we will start with by neglecting `f3`, and add it subsequently:
+
+```julia
+# Fit a model with just 2 component (neglect f3)
+model = Model(dom,
+              :f1 => GFit.FuncWrap(f1, true_vals[1], true_vals[2], true_vals[3]),
+              :f2 => GFit.FuncWrap(f2, true_vals[4], true_vals[5]))
+bestfit = fit!(model, data)
+
+# The fit is clearly a bad one. Add the third component and
+# adjust initial guess values
+add!(model, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3),
+           :f3 => GFit.FuncWrap(f3))
+model[:f1].p[1].val = 1
+model[:f1].p[2].val = 2
+model[:f1].p[3].val = 0
+model[:f2].p[1].val = 4
+model[:f2].p[2].val = 5
+
+bestfit = fit!(model, data)
+@gp    domain(model)[:] data.val data.unc "w yerr t 'Data'"
+@gp :- domain(model)[:] model() "w l t 'Model' lw 5"
+```
 
 ### Multiple data sets
 
@@ -192,24 +211,24 @@ using GFit, Random
 f1(x, p1, p2, p3) = @.  p1  +  p2 * x  +  p3 * x^2
 f2(x, p4, p5) = @. p4 * sin(p5 * x)
 f3(x) = cos.(x)
-true_params = [1, 2, 1.e-3, 4, 5]
+true_vals = [1, 2, 1.e-3, 4, 5]
 
 # Prepare first domain
-dom1 = Domain(1:1e-2:10)
-dom2 = Domain(2:5e-3:9)
+dom1 = Domain(1:1e-1:10)
+dom2 = Domain(2:5e-2:9)
 
 # Prepare list of common components in a Dict:
-comps = Dict(:f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
-             :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
+comps = Dict(:f1 => GFit.FuncWrap(f1, true_vals[1], true_vals[2], true_vals[3]),
+             :f2 => GFit.FuncWrap(f2, true_vals[4], true_vals[5]),
              :f3 => GFit.FuncWrap(f3))
 
 # Prepare two predictions, one for each domain. Here we also assume
 # that the second data set requires a multiplicative calibration
 # factor as free parameter
-pred1 = Prediction(dom1, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
+pred1 = Prediction(dom1,  @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
 pred2 = Prediction(dom2,
-                   @reducer((calib, f1, f2, f3) ->(f1 .+ f2) .* f3 .* calib),
-                  :calib => 1.3, comps...);
+                   @reducer((calib, f1, f2, f3) -> (f1 .+ f2) .* f3 .* calib),
+                   :calib => 1.5, comps...);
 
 # Prepare global model
 model = Model([pred1 , pred2])
@@ -226,14 +245,26 @@ bestfit = fit!(model, [data1, data2])
 
 # Plot data and best fit model
 using Gnuplot
-@gp domain(model[1])[:] data1.val data1.unc "w yerr t 'Data'"
-@gp :- domain(model[1])[:] model[1]() "w l t 'Model' lw 5"
-
-@gp domain(model[2])[:] data2.val data2.unc "w yerr t 'Data'"
-@gp :- domain(model[2])[:] model[2]() "w l t 'Model' lw 5"
+@gp    domain(model[1])[:] data1.val data1.unc "w yerr t 'Data 1'"
+@gp :- domain(model[1])[:] model[1]() "w l t 'Model 1' lw 5"
+@gp :- domain(model[2])[:] data2.val data2.unc "w yerr t 'Data 2'"
+@gp :- domain(model[2])[:] model[2]() "w l t 'Model 2' lw 5"
 ```
 
-
+```julia
+model[2][:f1].p[1].fixed = 1
+model[2][:f1].p[2].fixed = 1
+model[2][:f1].p[3].fixed = 1
+model[2][:f2].p[1].fixed = 1
+model[2][:f2].p[2].fixed = 1
+patch!(model) do m
+    m[2][:f1].p[1] = m[1][:f1].p[1]
+    m[2][:f1].p[2] = m[1][:f1].p[2]
+    m[2][:f1].p[3] = m[1][:f1].p[3]
+    m[2][:f2].p[1] = m[1][:f2].p[1]
+    m[2][:f2].p[2] = m[1][:f2].p[2]
+end
+```
 
 ## Retrieve results
 
@@ -532,13 +563,13 @@ The constructors are defined as follows:
 The parameters are:
 
 - 1D:
-
+  
   - `norm::Parameter`: the area below the Gaussian function;
   - `center::Parameter`: the location of the center of the Gaussian;
   - `sigma::Parameter`: the width the Gaussian;
 
 - 2D:
-
+  
   - `norm::Parameter`: the volume below the Gaussian function;
   - `centerX::Parameter`: the X coordinate of the center of the Gaussian;
   - `centerY::Parameter`: the Y coordinate of the center of the Gaussian;
@@ -558,13 +589,13 @@ The constructors are defined as follows:
 The parameters are:
 
 - 1D:
-
+  
   - `norm::Parameter`: the area below the Lorentzian function;
   - `center::Parameter`: the location of the center of the Lorentzian;
   - `fwhm::Parameter`: the full-width at half maximum of the Lorentzian;
 
 - 2D:
-
+  
   - `norm::Parameter`: the volume below the Lorentzian function;
   - `centerX::Parameter`: the X coordinate of the center of the Lorentzian;
   - `centerY::Parameter`: the Y coordinate of the center of the Lorentzian;
