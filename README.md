@@ -73,7 +73,7 @@ All the following example follow the same patterns:
 
 4. Fit the model against the dataset, and display the results.
 
-In a real life example, where the ground truth is unknown and we wish to estimate the parameter values, we would need to provide sensible inital guess values in step 2, and use actual empirical dataset(s) in step 3.
+In a real life example, where the ground truth is unknown and we wish to estimate the parameter values, we would need to provide sensible inital guess values in step 2, and use empirical dataset(s) in step 3.
 
 ### Simple example using a mathematical expression
 
@@ -202,7 +202,7 @@ bestfit = fit!(model, data)
 
 ### Multiple data sets
 
-In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two different instruments, or at two different times, and wish to use both data sets to constrain the model parameters.  The following example shows how to fit multiple data sets simultaneously:
+In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two different instruments, or at two different times, and wish to use both data sets to constrain the model parameters.  The following example shows how to fit multiple data sets simultaneously and introduce a link between the parameter values:
 
 ```julia
 using GFit, Random
@@ -222,20 +222,36 @@ comps = Dict(:f1 => GFit.FuncWrap(f1, true_vals[1], true_vals[2], true_vals[3]),
              :f2 => GFit.FuncWrap(f2, true_vals[4], true_vals[5]),
              :f3 => GFit.FuncWrap(f3))
 
-# Prepare two predictions, one for each domain. Also assume that 
-# f2.p[2] is supposed to change between the first and second observations
+# Prepare two predictions (one for each domain) and the global model. 
+# Here we also foresee a global multiplicative calibration factor between 
+# the two observations
 pred1 = Prediction(dom1, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
-comps[:f2].p[2].val = 10
-pred2 = Prediction(dom2, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
-
-# Prepare global model
+pred2 = Prediction(dom2, @reducer((f1, f2, f3, calib) -> (f1 .+ f2) .* f3 .* calib),
+                         :calib => 1.5, comps...);
 model = Model([pred1 , pred2])
 
-# Prepare mock data sets. Here we assume that the two observations are 
-# not calibrated, and that the true inter-calibration factor is 1.5.
+# Multiple data sets fitting is useful only if the parameters in the
+# predictions are somehow linked. Here we will force all parameters in 
+# the second prediction to be the same as those in the first one
+patch!(model) do m
+    m[2][:f1].p[1] = m[1][:f1].p[1]
+    m[2][:f1].p[2] = m[1][:f1].p[2]
+    m[2][:f1].p[3] = m[1][:f1].p[3]
+    m[2][:f2].p[1] = m[1][:f2].p[1]
+    m[2][:f2].p[2] = m[1][:f2].p[2]
+end
+# Also we need to keep the patched parameters fixed
+model[2][:f1].p[1].fixed = true
+model[2][:f1].p[2].fixed = true
+model[2][:f1].p[3].fixed = true
+model[2][:f2].p[1].fixed = true
+model[2][:f2].p[2].fixed = true
+
+
+# Prepare mock data sets, using an inter-calibration factor of 1.5
 rng = MersenneTwister(0)
-data1 = Measures(        model[1]() .+ randn(rng, length(dom1)) , 1.)
-data2 = Measures(1.5 .* (model[2]() .+ randn(rng, length(dom2))), 1.5)
+data1 = Measures(model[1]() .+ randn(rng, length(dom1)), 1.)
+data2 = Measures(model[2]() .+ randn(rng, length(dom2)), 1.)
 
 # Fit the model against the data
 bestfit = fit!(model, [data1, data2])
@@ -247,25 +263,6 @@ using Gnuplot
 @gp :- domain(model[2])[:] data2.val data2.unc "w yerr t 'Data 2'"
 @gp :- domain(model[2])[:] model[2]() "w l t 'Model 2' lw 5"
 ```
-In the above example the two predictions are completely independent, hence there is no added benefit in fitting the two datasets simultaneously.  In order to introduce a link between the parameter in the first and second observation we should use the `patch!` method:
-```julia
-model[2][:f1].p[1].fixed = true
-model[2][:f1].p[2].fixed = true
-model[2][:f1].p[3].fixed = true
-model[2][:f2].p[1].fixed = true
-model[2][:f2].p[2].fixed = true
-patch!(model) do m
-    m[2][:f1].p[1] = m[1][:f1].p[1]
-    m[2][:f1].p[2] = m[1][:f1].p[2]
-    m[2][:f1].p[3] = m[1][:f1].p[3]
-    m[2][:f2].p[1] = m[1][:f2].p[1]
-    m[2][:f2].p[2] = m[1][:f2].p[2]
-end
-# @reducer((calib, f1, f2, f3) -> (f1 .+ f2) .* f3 .* calib),
-# :calib => 1.5, comps...);
-```
-
-
 
 ## Retrieve results
 
