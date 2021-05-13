@@ -42,13 +42,13 @@ See below for a simple example, and the `examples` directory for more complex on
 - ***Reducer***: a Julia function (encapsulated in a `Reducer` object) used to combine several component evaluations into a single evaluation output. If not explicitly mentioned when creating a `Prediction` object (see below), a default `Reducer` is created which simply performs an element-wise sum of all the components;
 
 - ***Prediction***: a container for the following objects:
-  
+
   - a `Domain` object;
-  
+
   - one or more components, all evaluated on the same domain. Each component is identified by unique name (actually a `Symbol`) within a prediction;
-  
+
   - a `Reducer` object, used to combine the component evaluations into a single evaluation output;
-  
+
   The prediction evaluation is suitable to be compared to the empirical data in a `Measures` object. All predictions are represented by object of type `Prediction`;
 
 - ***Model***: a container for one or more predictions, representing the global model, and suitable to be compared to several `Measures` objects to perform multi-dataset fitting.  All predictions in a model are identified by a unique integer ID, starting from 1. If only one prediction is present, the concept of *model* and *prediction* are almost equivalent, and the `GFit` API implicitly assumes `id=1` in all methods accepting a `Model` object. The mechanism to link a parameter value to an expression involving other parameters operates at the `Model` level.
@@ -80,7 +80,7 @@ In a real life example, where the ground truth is unknown and we wish to estimat
 The model to be compared with empirical data is a simple analytical formula:
 
 ```julia
-f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +  
+f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +
                                p4 * sin(p5 * x))  *  cos(x)
 ```
 
@@ -101,7 +101,7 @@ f(x, p1, p2, p3, p4, p5) = @. (p1  +  p2 * x  +  p3 * x^2  +
 true_params = [1, 2, 1.e-3, 4, 5]
 
 # Prepare domain
-dom = Domain(1.:1e-2:10)
+dom = Domain(1:1e-2:10)
 
 # Prepare a model with a single component of type GFit.FuncWrap
 model = Model(dom, :f => GFit.FuncWrap(f, true_params...))
@@ -109,7 +109,7 @@ model = Model(dom, :f => GFit.FuncWrap(f, true_params...))
 # Create mock data set by evaluating the model and adding some
 # random noise.  All uncertainties are equal to 1.
 rng = MersenneTwister(0)
-data = Measures(model() + randn(rng, length(dom)), 1.)
+data = Measures(model() .+ randn(rng, length(dom)), 1.)
 
 # Fit the model against the data
 bestfit = fit!(model, data)
@@ -124,12 +124,12 @@ println(bestfit[:f].p[1].val, " ± ", bestfit[:f].p[1].unc)
 ```
 
 A plot of the mock data set and the best fit model can be generated as follows (here I will use [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl/), but any other plotting framework would do the job):
+
 ```julia
 using Gnuplot
 @gp domain(model)[:] data.val data.unc "w yerr t 'Data'"
 @gp :- domain(model)[:] model() "w l t 'Model' lw 5"
 ```
-
 
 If needed, such values can be modified as follows:
 
@@ -152,7 +152,7 @@ f3(x) = cos.(x)
 true_params = [1, 2, 1.e-3, 4, 5]
 
 # Prepare domain
-dom = Domain(1.:1e-2:10)
+dom = Domain(1:1e-2:10)
 
 # Prepare a model with 3 single components of type GFit.FuncWrap
 model = Model(dom,
@@ -164,7 +164,7 @@ model = Model(dom,
 # Create mock data set by evaluating the model and adding some
 # random noise.  All uncertainties are equal to 1.
 rng = MersenneTwister(0)
-data = Measures(model() + randn(rng, length(dom)), 1.)
+data = Measures(model() .+ randn(rng, length(dom)), 1.)
 
 # Fit the model against the data
 bestfit = fit!(model, data)
@@ -181,12 +181,9 @@ Also note that the results are identical as those obtained with the previous exa
 
 To check how many time each component and reducer are evaluated simply type the name of the `Model` object in the REPL (or invoke `show(model)`, and check the `Eval. count` column.
 
+### Multiple data sets
 
-### Fitting multiple data sets
-
-`GFit` allows to fit multiple data sets simultaneously.
-
-In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two different instruments, or in two different times, and wish to use both data sets to constrain the model parameters.  Here we will simulate a second data sets by adding random noise to the previously calculated model, and creating a second `Measures` object:
+In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two different instruments, or at two different times, and wish to use both data sets to constrain the model parameters.  The following example shows how to fit multiple data sets simultaneously:
 
 ```julia
 using GFit, Random
@@ -198,63 +195,45 @@ f3(x) = cos.(x)
 true_params = [1, 2, 1.e-3, 4, 5]
 
 # Prepare first domain
-dom = Domain(1.:5e-3:10)
+dom1 = Domain(1:1e-2:10)
+dom2 = Domain(2:5e-3:9)
 
-# Prepare a model with 3 single components of type GFit.FuncWrap
-model = Model(dom,
-              @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3),
-              :f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
-              :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
-              :f3 => GFit.FuncWrap(f3))
+# Prepare list of common components in a Dict:
+comps = Dict(:f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
+             :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
+             :f3 => GFit.FuncWrap(f3))
 
-# Create first mock data set by evaluating the model and adding some
-# random noise.  All uncertainties are equal to 1.
+# Prepare two predictions, one for each domain. Here we also assume
+# that the second data set requires a multiplicative calibration
+# factor as free parameter
+pred1 = Prediction(dom1, @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3), comps);
+pred2 = Prediction(dom2,
+                   @reducer((calib, f1, f2, f3) ->(f1 .+ f2) .* f3 .* calib),
+                  :calib => 1.3, comps...);
+
+# Prepare global model
+model = Model([pred1 , pred2])
+
+# Prepare mock data sets, including an inter-calibration factor of 1.3.
+# Note: we now need to append an index to `model` in order to refer to a
+# specific prediction.
 rng = MersenneTwister(0)
-data1 = Measures(model() + randn(rng, length(dom)), 1.)
-
-# Create a second domain and mock datasetm as if it was observed by a
-# different instrument:
-domain = Domain(1.:5e-3:10)
-
-# Prepare a model with 3 single components of type GFit.FuncWrap
-model = Model(domain,
-              @reducer((f1, f2, f3) -> (f1 .+ f2) .* f3),
-              :f1 => GFit.FuncWrap(f1, true_params[1], true_params[2], true_params[3]),
-              :f2 => GFit.FuncWrap(f2, true_params[4], true_params[5]),
-              :f3 => GFit.FuncWrap(f3))
-
-# Create first mock data set by evaluating the model and adding some
-# random noise.  All uncertainties are equal to 1.
-rng = MersenneTwister(0)
-data1 = Measures(model() + randn(rng, length(domain)), 1.)
-
-
-
+data1 = Measures(model[1]() .+ randn(rng, length(dom1)), 1.)
+data2 = Measures(model[2]() .+ randn(rng, length(dom2)), 1.)
 
 # Fit the model against the data
-bestfit = fit!(model, data)
+bestfit = fit!(model, [data1, data2])
 
+# Plot data and best fit model
+using Gnuplot
+@gp domain(model[1])[:] data1.val data1.unc "w yerr t 'Data'"
+@gp :- domain(model[1])[:] model[1]() "w l t 'Model' lw 5"
 
-
-noise = randn(rng, length(domain));
-data2 = Measures(1.3 * (model() .+ noise), 1.3)
+@gp domain(model[2])[:] data2.val data2.unc "w yerr t 'Data'"
+@gp :- domain(model[2])[:] model[2]() "w l t 'Model' lw 5"
 ```
 
-Note that we multiplied all data by a factor 1.3, to simulate a different calibration between the instruments.  To take into account such calibration we add a second *prediction* into the model, as well as a further scalar component named `calib`:
 
-```julia
-add!(model, Prediction(domain,
-            @reducer((calib, comp1, comp2, comp3) -> calib .* (comp1 .+ comp2) .* comp3),
-            :calib => 1, model.comps...))
-```
-
-Note that the new prediction uses a different expression to be evaluated.  If needed, also the `Domain` object may be different from the first one.  The latter posssibility allows, for instance, to fit multiple data sets each observed with different instruments.
-
-Now we can fit both data sets as follows:
-
-```julia
-bestfit = fit!(model, [data, data2])
-```
 
 ## Retrieve results
 
@@ -553,13 +532,13 @@ The constructors are defined as follows:
 The parameters are:
 
 - 1D:
-  
+
   - `norm::Parameter`: the area below the Gaussian function;
   - `center::Parameter`: the location of the center of the Gaussian;
   - `sigma::Parameter`: the width the Gaussian;
 
 - 2D:
-  
+
   - `norm::Parameter`: the volume below the Gaussian function;
   - `centerX::Parameter`: the X coordinate of the center of the Gaussian;
   - `centerY::Parameter`: the Y coordinate of the center of the Gaussian;
@@ -579,13 +558,13 @@ The constructors are defined as follows:
 The parameters are:
 
 - 1D:
-  
+
   - `norm::Parameter`: the area below the Lorentzian function;
   - `center::Parameter`: the location of the center of the Lorentzian;
   - `fwhm::Parameter`: the full-width at half maximum of the Lorentzian;
 
 - 2D:
-  
+
   - `norm::Parameter`: the volume below the Lorentzian function;
   - `centerX::Parameter`: the X coordinate of the center of the Lorentzian;
   - `centerY::Parameter`: the Y coordinate of the center of the Lorentzian;
