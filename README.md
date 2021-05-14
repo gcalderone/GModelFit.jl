@@ -247,8 +247,7 @@ model[2][:f1].p[3].fixed = true
 model[2][:f2].p[1].fixed = true
 model[2][:f2].p[2].fixed = true
 
-
-# Prepare mock data sets, using an inter-calibration factor of 1.5
+# Prepare mock data sets
 rng = MersenneTwister(0)
 data1 = Measures(model[1]() .+ randn(rng, length(dom1)), 1.)
 data2 = Measures(model[2]() .+ randn(rng, length(dom2)), 1.)
@@ -269,11 +268,12 @@ using Gnuplot
 The best fit results are available as a `BestFitResult` structure, and returned by the `fit!` fuction.  From this structure the user can retrieve the parameter best fit values and uncertainties, the number of data samples, the number of degrees of freedom, the total chi-squared (`cost`) and the fitting elapsed time in seconds, e.g.:
 
 ```julia
-println(bestfit[:comp1].p[1].val)
-println(bestfit[:comp2].p[2].unc)
+println(bestfit[:f1].p[1].val)
+println(bestfit[:f2].p[2].unc)
 println(bestfit.ndata)
 println(bestfit.dof)
 println(bestfit.cost)
+println(bestfit.timestamp)
 println(bestfit.elapsed)
 ```
 
