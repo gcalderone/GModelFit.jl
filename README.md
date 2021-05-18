@@ -53,6 +53,28 @@ See below for a simple example, and the `examples` directory for more complex on
 
 - ***Model***: a container for one or more predictions, representing the global model, and suitable to be compared to several `Measures` objects to perform multi-dataset fitting.  All predictions in a model are identified by a unique integer ID, starting from 1. If only one prediction is present, the concept of *model* and *prediction* are almost equivalent, and the `GFit` API implicitly assumes `id=1` in all methods accepting a `Model` object. The mechanism to link a parameter value to an expression involving other parameters operates at the `Model` level.
 
+
+
+It is important to keep in mind the relationships among the above concepts:
+
+```
+Global model
+ |
+ + -- Prediction 1
+ |     |
+ |     + -- Component 1
+ |     |     |
+ |     |     + -- Param. 1
+ |     |     + -- Param. 2
+ |     |     + -- etc.
+ |     + -- Component 2
+ |     + -- etc.
+ + -- Prediction 2
+ + -- etc.
+```
+
+
+
 The package most important function is `fit!`. The purpose of the function is to identify the parameter values which minimize the differences between the model evaluation and the empirical data.  The function arguments are:
 
 - a`Model` object (containing one or more `Prediction` objects;
@@ -202,7 +224,7 @@ bestfit = fit!(model, data)
 
 ### Multiple data sets
 
-In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two different instruments, or at two different times, and wish to use both data sets to constrain the model parameters.  The following example shows how to fit multiple data sets simultaneously and introduce a link between the parameter values:
+In the examples above we never used the concept of *prediction* since we always dealt with a single dataset.  Now suppose you observe the same phenomenon with two (or more) different instruments, or different times, and wish to use all data sets to constrain a global model. In this case we will prepare a prediction for each dataset (in the same way as we built a model in the previous examples), and collect them in a global model. In order to take advantage of the multiple datasets fitting we will also show how to introduce constraints between prediction parameters:
 
 ```julia
 using GFit, Random
@@ -230,9 +252,8 @@ pred2 = Prediction(dom2, @reducer((f1, f2, f3, calib) -> (f1 .+ f2) .* f3 .* cal
                          :calib => 1.5, comps...);
 model = Model([pred1 , pred2])
 
-# Multiple data sets fitting is useful only if the parameters in the
-# predictions are somehow linked. Here we will force all parameters in 
-# the second prediction to be the same as those in the first one
+# Constrain (**patch**) all parameters in the second prediction to be the same as
+# those in the first one
 patch!(model) do m
     m[2][:f1].p[1] = m[1][:f1].p[1]
     m[2][:f1].p[2] = m[1][:f1].p[2]
