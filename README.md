@@ -286,7 +286,7 @@ using Gnuplot
 
 ## Retrieve results
 
-The best fit results are available as a `BestFitResult` structure, and returned by the `fit!` fuction.  From this structure the user can retrieve the parameter best fit values and uncertainties, the number of data samples, the number of degrees of freedom, the total chi-squared (`cost`) and the fitting elapsed time in seconds, e.g.:
+The best fit results are returned by the `fit!` fuction as a `BestFitResult` structure, which can be used to retrieve the parameter best fit values and uncertainties, the number of data samples, the number of degrees of freedom, the total chi-squared (`cost`) and the fitting elapsed time in seconds. E.g.:
 
 ```julia
 println(bestfit[:f1].p[1].val)
@@ -333,38 +333,6 @@ Alternatively, a plot can be obtained using the companion package [GFitViewer.jl
 using GFitViewer
 viewer(model, [data, data2], bestfit)
 ```
-
-## Built-in components
-
-### `Funcwrap`
-
-The `FuncWrap` is simply a wrapper to a user defined function of the form `f(x, [y], [z], [further dimensions...], p1, p2, [further parameters...])`.  The `x`, `y`, `z` arguments will be `Vector{Float64}` with the same number of elements, while `p1`, `p2`, etc. will be scalar floats.  The function must return a `Vector{Float64}` (regardless of thenumber of dimensions) with the same number of elements as `x`.  This components works with domains of any dimensionality.
-
-The constructor is defined as follows:
-
-```julia
-FuncWrap(func::Function, args...)
-```
-
-where `args...` is a list of numbers.
-
-The parameters are:
-
-- `p::Vector{Parameter}`: vector of parameters for the user defined function.
-
-### `SimplePar`
-
-The `SimplePar` represent a scalar component in the model, whose value is given by the `val` parameter.  This components works with domains of any dimensionality.
-
-The constructor is defined as follows:
-
-```julia
-SimplePar(val::Number)
-```
-
-The parameters are:
-
-- `val::Parameter`: the scalar value.
 
 ## Using the `CMPFit` minimizer
 
@@ -527,14 +495,55 @@ TODO: `thaw`, `freeze`
 
 # Built-in components
 
-The following components are available in the `GFit.Components` module:
+The following components are available in the `GFit` module:
+
+- FuncWrap: a Julia function wrapper;
+
+- SimplePar: a scalar parameter;
+
+- CDomain: use a model domain as a component;
 
 - OffsetSlope (1D and 2D): an offset and slope component;
+
 - Polynomial (only 1D): a n-th degree polynomial function (n > 1);
+
 - Gaussian (1D and 2D): a Gaussian function;
+
 - Lorentzian (1D and 2D): a Lorentzian function;
 
-## OffsetSlope
+### `Funcwrap`
+
+The `FuncWrap` is simply a wrapper to a user defined function of the form `f(x, [y], [z], [further dimensions...], p1, p2, [further parameters...])`.  The `x`, `y`, `z` arguments will be `Vector{Float64}` with the same number of elements, while `p1`, `p2`, etc. will be scalar floats.  The function must return a `Vector{Float64}` (regardless of thenumber of dimensions) with the same number of elements as `x`.  This components works with domains of any dimensionality.
+
+The constructor is defined as follows:
+
+```julia
+FuncWrap(func::Function, args...)
+```
+
+where `args...` is a list of numbers.
+
+The parameters are:
+
+- `p::Vector{Parameter}`: vector of parameters for the user defined function.
+
+
+### `SimplePar`
+
+The `SimplePar` represent a scalar component in the model, whose value is given by the `val` parameter.  This components works with domains of any dimensionality.
+
+The constructor is defined as follows:
+
+```julia
+SimplePar(val::Number)
+```
+
+The parameters are:
+
+- `val::Parameter`: the scalar value.
+
+
+### OffsetSlope
 
 An offset and slope component for 1D and 2D domains.  In 2D it represents a tilted plane.
 
@@ -556,7 +565,7 @@ The parameters are:
   - `slopeX::Parameter` (only 2D): the slope of the plane along the X direction;
   - `slopeY::Parameter` (only 2D): the slope of the plane along the Y direction;
 
-## Polynomial
+### Polynomial
 
 A n-th degree polynomial function (n > 1) for 1D domains.
 
@@ -569,7 +578,7 @@ The parameters are:
 
 - `coeff::Vector{Parameter}`: vector of polynomial coefficients.
 
-## Gaussian
+### Gaussian
 
 A normalized Gaussian component for 1D and 2D domains.
 
@@ -596,7 +605,7 @@ The parameters are:
   - `sigmaY::Parameter`: the width the Gaussian along the Y direction (when `angle=0`);
   - `angle::Parameter`: the rotation angle of the whole Gaussian function.
 
-## Lorentzian
+### Lorentzian
 
 A Lorentzian component for 1D and 2D domains.
 
