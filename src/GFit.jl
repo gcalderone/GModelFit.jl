@@ -381,10 +381,16 @@ ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   Vector{OrderedDict{Symbol, PatchComp}}(),
                                   Vector{Float64}())
 
+struct PatchFunction
+    f::Function
+    id::Int
+end
+
+
 mutable struct Model
     preds::Vector{Prediction}
     priv::ModelInternals
-    patchfuncts::Vector{Function}
+    patchfuncts::Vector{PatchFunction}
 
     function Model(v::Vector{Prediction})
         model = new(v, ModelInternals(), Vector{Function}())
@@ -465,9 +471,16 @@ end
 # This is supposed to be called from `fit!`, not by user
 function quick_evaluate(model::Model)
     model.priv.patched .= model.priv.pvalues  # copy all values by default
-    tmp = (length(model.preds) == 1  ?  model.priv.patchcomps[1]  :  model.priv.patchcomps)
-    for func in model.patchfuncts
-        func(tmp)
+    for pf in model.patchfuncts
+        if pf.id == 0
+            if length(model.preds) == 1
+                pf.f(model.priv.patchcomps[1])
+            else
+                pf.f(model.priv.patchcomps)
+            end
+        else
+            pf.f(model.priv.patchcomps[pf.id])
+        end
     end
 
     for (cid, ceval) in model.priv.cevals
@@ -512,11 +525,17 @@ end
 
 # ====================================================================
 function patch!(func::Function, model::Model)
-    push!(model.patchfuncts, func)
+    push!(model.patchfuncts, PatchFunction(func, 0))
     evaluate!(model)
     return model
 end
 
+function patch!(func::Function, pred::PredRef)
+    model = getfield(pred, :model)
+    push!(model.patchfuncts, PatchFunction(func, getfield(pred, :id)))
+    evaluate!(model)
+    return model
+end
 
 isfixed(pref::PredRef, cname::Symbol) = (pref.cevals[cname].cfixed >= 1)
 isfixed(model::Model, cname::Symbol) = isfixed(model[1], cname)
