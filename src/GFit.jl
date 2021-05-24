@@ -24,7 +24,7 @@ import Base.iterate
 
 
 export Domain, CartesianDomain, coords, axis, roi, Measures,
-    Prediction, @reducer, add!, domain,
+    Prediction, @reducer, reducer_sum, add!, domain,
     Model, @patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
@@ -202,7 +202,7 @@ macro reducer(expr)
      return esc(:(GFit.Reducer(GFit.@exprfunc $expr)))
 end
 
-function default_reducer(args=Symbol[])
+function reducer_sum(args=Symbol[])
     return Reducer(ExprFunction(prettify(:((argv...) -> .+(args...))),
                                 (args...) -> .+(args...),
                                 args))
