@@ -237,7 +237,7 @@ mutable struct Prediction
                    Symbol(""), 0,
                    identity, Vector{Float64}())
         add_comps!(pred, comp_iterable...)
-        add_reducer!(pred, :sum1 => default_reducer(collect(keys(pred.cevals))))
+        add_reducer!(pred, :sum1 => reducer_sum(collect(keys(pred.cevals))))
         return pred
     end
 
@@ -353,13 +353,14 @@ struct ModelInternals
     patched::Vector{Float64}
     patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
     buffer::Vector{Float64}
+    pred2buffer::Vector{NTuple{2, Int}}
 end
 ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   OrderedDict{CompParamID, Parameter}(),
                                   OrderedDict{CompID, Vector{Int}}(),
                                   Vector{Float64}(), Vector{Float64}(),
                                   Vector{OrderedDict{Symbol, PatchComp}}(),
-                                  Vector{Float64}())
+                                  Vector{Float64}(), Vector{NTuple{2, Int}}())
 
 struct PatchFunction
     exfunc::ExprFunction
@@ -398,6 +399,7 @@ function ModelInternals(model::Model)
 
     ndata = 0
     i = 1
+    pred2buffer = Vector{NTuple{2, Int}}()
     for id in 1:length(model.preds)
         pred = model.preds[id]
         for (cname, ceval) in pred.cevals
@@ -412,7 +414,10 @@ function ModelInternals(model::Model)
             evaluate_cached(ceval)
         end
         reduce(pred)
-        ndata += length(geteval(pred))
+
+        nn = length(geteval(pred))
+        push!(pred2buffer, (ndata+1, ndata+nn))
+        ndata += nn
     end
 
     pvalues = getfield.(values(params), :val)
@@ -436,7 +441,7 @@ function ModelInternals(model::Model)
     end
 
     return ModelInternals(cevals, params, par_indices, pvalues, patched, patchcomps,
-                          fill(NaN, ndata))
+                          fill(NaN, ndata), pred2buffer)
 end
 
 
@@ -463,10 +468,11 @@ function quick_evaluate(model::Model)
         end
     end
 
-    for (cid, ceval) in model.priv.cevals
+    Threads.@threads for cid in collect(keys(model.priv.cevals))
+        ceval = model.priv.cevals[cid]
         evaluate_cached(ceval, model.priv.patched[model.priv.par_indices[cid]])
     end
-    for pred in model.preds
+    Threads.@threads for pred in model.preds
         reduce(pred)
     end
     nothing
@@ -590,13 +596,11 @@ end
 
 
 function residuals1d(model::Model, data1d::Vector{Measures{1}})
-    c1 = 1
-    for i in 1:length(model.preds)
+    Threads.@threads for i in 1:length(model.preds)
         pred = model.preds[i]
+        c1, c2 = model.priv.pred2buffer[i]
         eval = geteval(pred)
-        c2 = c1 + length(eval) - 1
         model.priv.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
-        c1 = c2 + 1
     end
     return model.priv.buffer
 end
