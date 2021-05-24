@@ -4,7 +4,7 @@ using Printf, PrettyTables
 using Statistics, Distributions
 using DataStructures
 using LsqFit
-using ExprTools
+using MacroTools
 using Dates
 
 import Base.show
@@ -24,8 +24,8 @@ import Base.iterate
 
 
 export Domain, CartesianDomain, coords, axis, roi, Measures,
-    Prediction, Reducer, @reducer, add!, domain,
-    Model, patch!, evaluate!, isfixed, thaw, freeze, fit!
+    Prediction, @reducer, add!, domain,
+    Model, @patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
 include("domain.jl")
@@ -178,51 +178,40 @@ function extract_components(comp_iterable::Vararg{Pair})
 end
 
 
+# ====================================================================
+mutable struct ExprFunction
+    expr::Expr
+    funct::Function
+    args::Vector{Symbol}
+    slurpargs::Bool
+end
+
+macro exprfunc(_expr)
+    if isa(_expr, Symbol) # a function name
+        expr = prettify(:((argv...) -> $(_expr)(argv...)))
+        return :(ExprFunction($(QuoteNode(expr)), $expr, [:args], true))
+    end
+    @assert isexpr(longdef(_expr), :function)
+    expr = prettify(_expr)
+    args = convert(Vector{Symbol}, splitdef(expr)[:args])
+    return esc(:(GFit.ExprFunction($(QuoteNode(expr)), $expr, $args, false)))
+end
+
 
 # ====================================================================
 mutable struct Reducer
-    funct::Function
-    allargs::Bool
-    args::Vector{Symbol}
+    exfunc::ExprFunction
 end
 
-Reducer(f::Function) = Reducer(f, true, Vector{Symbol}())
-Reducer(f::Function, args::AbstractVector{Symbol}) =  Reducer(f, false, collect(args))
-
-macro reducer(ex)
-    @assert ex.head == Symbol("->") "Not an anonmymous function"
-    f = splitdef(ex; throw=false)
-    @assert !isnothing(f) "Not an function definition"
-
-    allargs = false
-    args = Vector{Symbol}()
-    if haskey(f, :args)
-        if (length(f[:args]) == 1)  &&
-            isa(f[:args][1], Expr)  &&  (f[:args][1].head == :...)
-            allargs= true
-        end
-        if !allargs
-            for arg in f[:args]
-                if isa(arg, Symbol)
-                    push!(args, arg)
-                elseif isa(arg, Expr)  &&  (arg.head = Symbol("::"))
-                    push!(args, arg.args[1])
-                else
-                    error("Unexpected input: $arg")
-                end
-            end
-        end
-    end
-    # Here `esc` is necessary to evaluate the function expression in
-    # the caller scope
-    return esc(:(Reducer($ex, $allargs, $args)))
+macro reducer(expr)
+     return esc(:(GFit.Reducer(GFit.@exprfunc $expr)))
 end
 
 
 # ====================================================================
 mutable struct ReducerEval
+    source::Reducer
     args::Vector{Vector{Float64}}
-    funct::Function
     counter::Int
     buffer::Vector{Float64}
 end
@@ -247,7 +236,7 @@ mutable struct Prediction
                    Symbol(""), 0,
                    identity, Vector{Float64}())
         add_comps!(pred, comp_iterable...)
-        add_reducer!(pred, :sum1 => Reducer(sum_of_array))
+        add_reducer!(pred, :sum1 => @reducer(sum_of_array))
         return pred
     end
 
@@ -296,13 +285,13 @@ function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     reducer = redpair[2]
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
     haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
-    if reducer.allargs
-        append!(reducer.args, keys(pred.cevals))
-        append!(reducer.args, keys(pred.revals))
+    if reducer.exfunc.slurpargs
+        empty!( reducer.exfunc.args)
+        append!(reducer.exfunc.args, keys(pred.cevals))
     end
 
     args = Vector{Vector{Float64}}()
-    for arg in reducer.args
+    for arg in reducer.exfunc.args
         if haskey(pred.cevals, arg)
             push!(args, pred.cevals[arg].buffer)
         else
@@ -310,10 +299,8 @@ function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
         end
     end
 
-    (reducer.funct == sum)   &&  (reducer.funct = sum_of_array)
-    (reducer.funct == prod)  &&  (reducer.funct = prod_of_array)
-    eval = reducer.funct(args...)
-    pred.revals[rname] = ReducerEval(args, reducer.funct, 1, eval)
+    eval = reducer.exfunc.funct(args...)
+    pred.revals[rname] = ReducerEval(reducer, args, 1, eval)
     pred.rsel = rname
     evaluate!(pred)
     return pred
@@ -332,7 +319,7 @@ end
 function reduce(pred::Prediction)
     for (rname, reval) in pred.revals
         reval.counter += 1
-        reval.buffer .= reval.funct(reval.args...)
+        reval.buffer .= reval.source.exfunc.funct(reval.args...)
     end
     if pred.instr_response == identity
         if length(pred.folded) != length(geteval(pred, pred.rsel))
@@ -382,7 +369,7 @@ ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
                                   Vector{Float64}())
 
 struct PatchFunction
-    f::Function
+    exfunc::ExprFunction
     id::Int
 end
 
@@ -474,12 +461,12 @@ function quick_evaluate(model::Model)
     for pf in model.patchfuncts
         if pf.id == 0
             if length(model.preds) == 1
-                pf.f(model.priv.patchcomps[1])
+                pf.exfunc.funct(model.priv.patchcomps[1])
             else
-                pf.f(model.priv.patchcomps)
+                pf.exfunc.funct(model.priv.patchcomps)
             end
         else
-            pf.f(model.priv.patchcomps[pf.id])
+            pf.exfunc.funct(model.priv.patchcomps[pf.id])
         end
     end
 
@@ -524,18 +511,24 @@ end
 
 
 # ====================================================================
-function patch!(func::Function, model::Model)
-    push!(model.patchfuncts, PatchFunction(func, 0))
+function patch!(model::Model, exfunc::ExprFunction)
+    push!(model.patchfuncts, PatchFunction(exfunc, 0))
     evaluate!(model)
     return model
 end
 
-function patch!(func::Function, pred::PredRef)
+function patch!(pred::PredRef, exfunc::ExprFunction)
     model = getfield(pred, :model)
-    push!(model.patchfuncts, PatchFunction(func, getfield(pred, :id)))
+    push!(model.patchfuncts, PatchFunction(exfunc, getfield(pred, :id)))
     evaluate!(model)
     return model
 end
+
+macro patch!(target, expr::Expr)
+    return esc(:(GFit.patch!($target, GFit.@exprfunc $expr)))
+end
+
+
 
 isfixed(pref::PredRef, cname::Symbol) = (pref.cevals[cname].cfixed >= 1)
 isfixed(model::Model, cname::Symbol) = isfixed(model[1], cname)
