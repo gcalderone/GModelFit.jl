@@ -161,8 +161,10 @@ end
 
 
 function show(io::IO, pred::PredRef)
+    id = pred ⋄ :id
+    model = pred ⋄ :model
     println(io)
-    section(io, "Prediction: $(pred ⋄ :id):")
+    section(io, "Prediction: $id:")
     (length(pred.cevals) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
@@ -215,6 +217,22 @@ function show(io::IO, pred::PredRef)
         i += 1
     end
 
+    section(io, "Prediction patch expressions:")
+    for pf in model.patchfuncts
+        if pf.id == id
+            println(io, string(pf.exfunc.expr))
+        end
+    end
+
+    println(io)
+    section(io, "Reducers:")
+    for (rname, reval) in pred.revals
+        println(io, "$rname (" * join(string.(reval.source.exfunc.args), ", ") * "):")
+        println(io, reval.source.exfunc.expr)
+        println(io)
+    end
+
+    section(io, "Evaluations:")
     printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 3:5),
@@ -225,6 +243,14 @@ end
 function show(io::IO, model::Model)
     for id in 1:length(model.preds)
         show(io, model[id])
+    end
+    println(io)
+
+    section(io, "Global patch expressions:")
+    for pf in model.patchfuncts
+        if pf.id == 0
+            println(io, string(pf.exfunc.expr))
+        end
     end
 end
 
