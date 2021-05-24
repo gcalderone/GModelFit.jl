@@ -183,18 +183,13 @@ mutable struct ExprFunction
     expr::Expr
     funct::Function
     args::Vector{Symbol}
-    slurpargs::Bool
 end
 
 macro exprfunc(_expr)
-    if isa(_expr, Symbol) # a function name
-        expr = prettify(:((argv...) -> $(_expr)(argv...)))
-        return :(ExprFunction($(QuoteNode(expr)), $expr, [:args], true))
-    end
     @assert isexpr(longdef(_expr), :function)
     expr = prettify(_expr)
     args = convert(Vector{Symbol}, splitdef(expr)[:args])
-    return esc(:(GFit.ExprFunction($(QuoteNode(expr)), $expr, $args, false)))
+    return esc(:(GFit.ExprFunction($(QuoteNode(expr)), $expr, $args)))
 end
 
 
@@ -205,6 +200,12 @@ end
 
 macro reducer(expr)
      return esc(:(GFit.Reducer(GFit.@exprfunc $expr)))
+end
+
+function default_reducer(args=Symbol[])
+    return Reducer(ExprFunction(prettify(:((argv...) -> .+(args...))),
+                                (args...) -> .+(args...),
+                                args))
 end
 
 
@@ -236,7 +237,7 @@ mutable struct Prediction
                    Symbol(""), 0,
                    identity, Vector{Float64}())
         add_comps!(pred, comp_iterable...)
-        add_reducer!(pred, :sum1 => @reducer(sum_of_array))
+        add_reducer!(pred, :sum1 => default_reducer(collect(keys(pred.cevals))))
         return pred
     end
 
@@ -272,10 +273,6 @@ function set_instr_response!(pred::Prediction, funct::Function)
     nothing
 end
 
-sum_of_array( arg::Array) = arg
-sum_of_array( args...) = .+(args...)
-prod_of_array( arg::Array) = arg
-prod_of_array(args...) = .*(args...)
 
 add_reducer!(pred::Prediction, reducer::Reducer) =
     add_reducer!(pred, Symbol(:reducer, length(pred.revals)+1) => reducer)
@@ -285,10 +282,6 @@ function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
     reducer = redpair[2]
     @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
     haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
-    if reducer.exfunc.slurpargs
-        empty!( reducer.exfunc.args)
-        append!(reducer.exfunc.args, keys(pred.cevals))
-    end
 
     args = Vector{Vector{Float64}}()
     for arg in reducer.exfunc.args
