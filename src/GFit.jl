@@ -23,7 +23,7 @@ import Base.iterate
 ⋄ = getfield
 
 
-export Domain, CartesianDomain, coords, axis, roi, Measures,
+export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
     Prediction, @reducer, reducer_sum, add!, domain,
     Model, @patch!, evaluate!, isfixed, thaw, freeze, fit!
 
@@ -142,6 +142,7 @@ prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(dom
 # ====================================================================
 # Built-in components
 #
+include("components/utils.jl")
 include("components/CDomain.jl")
 include("components/SimplePar.jl")
 include("components/FuncWrap.jl")
