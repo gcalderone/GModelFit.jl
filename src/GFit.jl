@@ -6,6 +6,7 @@ using DataStructures
 using LsqFit
 using MacroTools
 using Dates
+using ProgressMeter
 
 import Base.show
 import Base.ndims
@@ -687,15 +688,21 @@ function fit!(model::Model, data::Vector{Measures{N}};
     # Flatten empirical data
     data1d = data1D(model, data)
 
+    prog = ProgressUnknown("Minimizer iteration:",  showspeed=true)
+    dof = length(model.priv.buffer) - length(ifree)
+
     # Evaluate normalized residuals starting from free parameter values
     function pval2resid(pvalues_free::Vector{Float64})
         model.priv.pvalues[ifree] .= pvalues_free  # update parameter values
         quick_evaluate(model)
-        return residuals1d(model, data1d)
+        ret = residuals1d(model, data1d)
+        ProgressMeter.next!(prog, showvalues = [(:dof, dof), (:red_chisq, sum(abs2.(ret)) / dof)])
+        return ret
     end
 
     (status, best_val, best_unc) = minimize(minimizer, pval2resid,
                                             collect(values(model.priv.params))[ifree])
+    ProgressMeter.finish!(prog)
     model.priv.pvalues[ifree] .= best_val
 
     # Copy best fit values back into components.  This is needed since
