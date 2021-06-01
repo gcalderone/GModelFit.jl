@@ -688,7 +688,7 @@ function fit!(model::Model, data::Vector{Measures{N}};
     # Flatten empirical data
     data1d = data1D(model, data)
 
-    prog = ProgressUnknown("Minimizer iteration:",  showspeed=true)
+    prog = ProgressUnknown("Minimizer iteration:", dt=0.5, showspeed=true)
     dof = length(model.priv.buffer) - length(ifree)
 
     # Evaluate normalized residuals starting from free parameter values
@@ -696,7 +696,8 @@ function fit!(model::Model, data::Vector{Measures{N}};
         model.priv.pvalues[ifree] .= pvalues_free  # update parameter values
         quick_evaluate(model)
         ret = residuals1d(model, data1d)
-        ProgressMeter.next!(prog, showvalues = [(:dof, dof), (:red_chisq, sum(abs2.(ret)) / dof)])
+        evaluate_showvalues(ret) = () -> [(:red_chisq, sum(abs2.(ret)) / dof)]
+        ProgressMeter.next!(prog; showvalues = evaluate_showvalues(ret))
         return ret
     end
 
