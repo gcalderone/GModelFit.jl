@@ -160,19 +160,25 @@ function show(io::IO, comp::AbstractComponent)
 end
 
 
-function show(io::IO, pred::PredRef)
-    id = pred ⋄ :id
-    model = pred ⋄ :model
+function show(io::IO, red::ExprReducer)
+    println(io, red.ef.expr)
+end
+
+function show(io::IO, red::SumReducer)
+    println(io, "∑ " * join(string.(red.list), ", "))
+end
+
+function show(io::IO, model::Model)
     println(io)
-    section(io, "Prediction: $id:")
-    (length(pred.cevals) == 0)  &&  (return nothing)
+    section(io, "Components:")
+    (length(model.cevals) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, ceval) in pred.cevals
+    for (cname, ceval) in model.cevals
         comp = ceval.comp
         (t, f, e) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
@@ -188,8 +194,8 @@ function show(io::IO, pred::PredRef)
     i = 1
     error = Vector{Bool}()
     table = Matrix{Union{String,Int,Float64}}(undef,
-                                              length(pred.cevals) + length(pred.revals), 6)
-    for (cname, ceval) in pred.cevals
+                                              length(model.cevals) + length(model.revals), 6)
+    for (cname, ceval) in model.cevals
         result = ceval.buffer
         v = view(result, findall(isfinite.(result)))
         (length(v) == 0)  &&  (v = [NaN])
@@ -203,7 +209,7 @@ function show(io::IO, pred::PredRef)
         i += 1
     end
 
-    for (rname, reval) in pred.revals
+    for (rname, reval) in model.revals
         result = reval.buffer
         v = view(result, findall(isfinite.(result)))
         (length(v) == 0)  &&  (v = [NaN])
@@ -217,47 +223,45 @@ function show(io::IO, pred::PredRef)
         i += 1
     end
 
-    section(io, "Prediction patch expressions:")
+    section(io, "Patch expressions:")
     for pf in model.patchfuncts
-        if pf.id == id
-            println(io, string(pf.exfunc.expr))
-        end
+        println(io, string(pf.expr))
     end
 
     println(io)
     section(io, "Reducers:")
-    for (rname, reval) in pred.revals
-        println(io, "$rname (" * join(string.(reval.source.exfunc.args), ", ") * "):")
-        println(io, reval.source.exfunc.expr)
+    for (rname, reval) in model.revals
+        print(rname, ": ")
+        show(io, reval.red)
         println(io)
     end
 
     section(io, "Evaluations:")
     printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-               hlines=[0,1, length(pred.cevals)+1,  length(pred.cevals)+length(pred.revals)+1],
+               hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+length(model.revals)+1],
                formatters=ft_printf(showsettings.floatformat, 3:5),
                highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
 end
 
 
-function show(io::IO, model::Model)
-    for id in 1:length(model.preds)
-        show(io, model[id])
+function show(io::IO, multi::MultiModel)
+    for id in 1:length(multi.models)
+        section(io, "\n=====================================================================")
+        section(io, "Model $id:")
+        show(io, multi.models[id])
     end
     println(io)
 
     section(io, "Global patch expressions:")
-    for pf in model.patchfuncts
-        if pf.id == 0
-            println(io, string(pf.exfunc.expr))
-        end
+    for pf in multi.patchfuncts
+        println(io, string(pf.expr))
     end
 end
 
 
-show(io::IO, par::BestFitPar) = println(io, par.val, " ± ", par.unc,
-                                        (par.val == par.patched  ?  ""  :
-                                         " (patched value: " * string(par.patched) * ")"))
+show(io::IO, par::BestFitParam) = println(io, par.val, " ± ", par.unc,
+                                          (par.val == par.patched  ?  ""  :
+                                           " (patched value: " * string(par.patched) * ")"))
 
 
 function preparetable(cname::Symbol, comp::BestFitComp)
@@ -305,17 +309,14 @@ function show(io::IO, comp::BestFitComp)
 end
 
 
-function show(io::IO, pred::BestFitPredRef)
-    println(io)
-    section(io, "Prediction: $(pred ⋄ :id):")
-
+function show(io::IO, comps::OrderedDict{Symbol, BestFitComp})
     table = Matrix{Union{String,Float64}}(undef, 0, 5)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, comp) in pred
+    for (cname, comp) in comps
         (t, f, e, w) = preparetable(cname, comp)
         (length(t) > 0)  ||  continue
         table = vcat(table, t)
@@ -331,17 +332,18 @@ function show(io::IO, pred::BestFitPredRef)
                              Highlighter((data,i,j) -> (error[i]  &&  (!fixed[i])  &&  (j==4)), showsettings.error)))
 end
 
-function show(io::IO, res::BestFitResult)
+
+function show(io::IO, res::Union{BestFitResult, BestFitMultiResult})
     section(io, "Best Fit results:")
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 6)
-    fixed = Vector{Bool}()
-    error = Vector{Bool}()
-    watch = Vector{Bool}()
-    hrule = Vector{Int}()
-    push!(hrule, 0, 1)
-    for id in 1:length(res.preds)
-        show(io, res[id])
+    if isa(res, BestFitMultiResult)
+        for id in 1:length(res.models)
+            section(io, "\n=====================================================================")
+            section(io, "Model $id:")
+            show(io, res.models[id])
+        end
+    else
+        show(io, res.comps)
     end
 
     println(io)

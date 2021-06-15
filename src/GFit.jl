@@ -15,170 +15,21 @@ import Base.length
 import Base.haskey
 import Base.keys
 import Base.getindex
+import Base.setindex!
 import Base.reshape
 import Base.propertynames
 import Base.getproperty
 import Base.setproperty!
 import Base.iterate
-
-⋄ = getfield
-
+import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
-    Prediction, @reducer, reducer_sum, add!, domain,
-    Model, @patch!, evaluate!, isfixed, thaw, freeze, fit!
+    Model, @expr, SumReducer, domain,
+    MultiModel, @patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
 include("domain.jl")
-
-# ====================================================================
-# Parameter
-#
-mutable struct Parameter
-    val::Float64
-    low::Float64              # lower limit value
-    high::Float64             # upper limit value
-    step::Float64
-    fixed::Bool
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
-end
-
-# ====================================================================
-# A *component* is a generic implementation of a constituent part of a
-# model.
-#
-# A component must inherit `AbstractComponent` and implement the
-# `evaluate!` method (optionally also `prepare!`)
-abstract type AbstractComponent end
-
-
-# ====================================================================
-struct ParamID
-    name::Symbol
-    index::Int
-    ParamID(pname::Symbol) = new(pname, 0)                  # scalar param
-    ParamID(pname::Symbol, index::Int) = new(pname, index)  # vector of params
-end
-
-struct CompID
-    id::Int
-    name::Symbol
-    CompID(cname::Symbol) = new(1, cname)  # default on first prediction
-    CompID(id::Int, cname::Symbol) = new(id, cname)
-end
-
-struct CompParamID
-    comp::CompID
-    param::ParamID
-end
-
-
-
-# ====================================================================
-function getparams(comp::AbstractComponent)
-    params = OrderedDict{ParamID, Parameter}()
-    for pname in fieldnames(typeof(comp))
-        par = getfield(comp, pname)
-        if isa(par, Parameter)
-            params[ParamID(pname)] = par
-        elseif isa(par, Vector{Parameter})
-            for i in 1:length(par)
-                params[ParamID(pname, i)] = par[i]
-            end
-        end
-    end
-    params
-end
-
-# ====================================================================
-# CompEval: a wrapper for a component evaluated on a specific domain
-#
-mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
-    comp::TComp
-    domain::TDomain
-    params::OrderedDict{ParamID, Parameter}
-    counter::Int
-    lastvalues::Vector{Float64}
-    buffer::Vector{Float64}
-    cfixed::Int8
-
-    function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
-        # Components internal state may be affected by `prepare!`
-        # call.  Avoid overwriting input state with a deep copy.
-        comp = deepcopy(_comp)
-        params = getparams(comp)
-        buffer = prepare!(comp, domain)
-        return new{typeof(comp), typeof(domain)}(
-            comp, domain, params, 0,
-            fill(NaN, length(params)),
-            buffer, false)
-    end
-end
-
-
-evaluate_cached(c::CompEval) = evaluate_cached(c, [par.val for par in values(c.params)])
-function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
-    @assert length(c.params) == length(pvalues)
-
-    # Do we actually need a new evaluation?
-    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0))
-        c.lastvalues .= pvalues
-        c.counter += 1
-        if !all(.!isnan.(pvalues))
-            println("One or more parameter values are NaN:")
-            println(pvalues)
-            @assert all(.!isnan.(pvalues))
-        end
-        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
-    end
-    return c.buffer
-end
-
-
-# ====================================================================
-# Component fall back methods
-prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
-
-
-# ====================================================================
-# Built-in components
-#
-include("components/utils.jl")
-include("components/CDomain.jl")
-include("components/SimplePar.jl")
-include("components/FuncWrap.jl")
-include("components/OffsetSlope.jl")
-include("components/Gaussian.jl")
-include("components/Lorentzian.jl")
-
-
-# ====================================================================
-# Parse a dictionary or a collection of `Pair`s to extract all
-# components
-function extract_components(comp_iterable::AbstractDict)
-    out = OrderedDict{Symbol, AbstractComponent}()
-    for (name, comp) in comp_iterable
-        isa(comp, Number)  &&  (comp = SimplePar(comp))
-        @assert isa(name, Symbol)
-        @assert isa(comp, AbstractComponent)
-        out[name] = comp
-    end
-    return out
-end
-
-function extract_components(comp_iterable::Vararg{Pair})
-    out = OrderedDict{Symbol, AbstractComponent}()
-    for thing in comp_iterable
-        name = thing[1]
-        comp = thing[2]
-        isa(comp, Number)  &&  (comp = SimplePar(comp))
-        @assert isa(name, Symbol)
-        @assert isa(comp, AbstractComponent)
-        out[name] = comp
-    end
-    return out
-end
-
+include("HashVector.jl")
 
 # ====================================================================
 mutable struct ExprFunction
@@ -196,331 +47,327 @@ end
 
 
 # ====================================================================
-mutable struct Reducer
-    exfunc::ExprFunction
+# Parameter and component identifiers
+struct ParamID
+    name::Symbol
+    index::Int
+    ParamID(pname::Symbol) = new(pname, 0)                  # scalar param
+    ParamID(pname::Symbol, index::Int) = new(pname, index)  # vector of params
 end
 
-macro reducer(expr)
-     return esc(:(GFit.Reducer(GFit.@exprfunc $expr)))
+struct CompParamID
+    cname::Symbol
+    param::ParamID
 end
 
-function reducer_sum(args=Symbol[])
-    return Reducer(ExprFunction(prettify(:((argv...) -> .+(args...))),
-                                (args...) -> .+(args...),
-                                args))
+mutable struct Parameter
+    val::Float64
+    low::Float64              # lower limit value
+    high::Float64             # upper limit value
+    step::Float64
+    fixed::Bool
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
 end
 
 
 # ====================================================================
-mutable struct ReducerEval
-    source::Reducer
-    args::Vector{Vector{Float64}}
+# Components:
+#
+# A *component* is a generic implementation of a building block for a
+# model. It must inherit `AbstractComponent` and implement the
+# `evaluate!` method (optionally also `prepare!`).  The structure may
+# contain zero or more field of type Parameter (see above)
+abstract type AbstractComponent end
+
+function getparams(comp::AbstractComponent)
+    params = OrderedDict{ParamID, Parameter}()
+        for pname in fieldnames(typeof(comp))
+            par = getfield(comp, pname)
+            if isa(par, Parameter)
+                params[ParamID(pname)] = par
+            elseif isa(par, Vector{Parameter})
+                for i in 1:length(par)
+                    params[ParamID(pname, i)] = par[i]
+                end
+            end
+        end
+    return params
+end
+
+# CompEval: a wrapper for a component evaluated on a specific domain
+mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
+    comp::TComp
+    domain::TDomain
+    params::OrderedDict{ParamID, Parameter}
+    counter::Int
+    lastvalues::Vector{Float64}
+    buffer::Vector{Float64}
+    cfixed::Bool
+
+    function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
+        # Components internal state may be affected by `prepare!`
+        # call.  Avoid overwriting input state with a deep copy.
+        comp = deepcopy(_comp)
+
+        params = getparams(comp)
+        buffer = prepare!(comp, domain)
+        return new{typeof(comp), typeof(domain)}(
+            comp, domain, params, 0,
+            fill(NaN, length(params)),
+            buffer, false)
+    end
+end
+
+
+# Fall back method
+prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
+#evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T =
+#    error("No evaluate! method implemented for $T")
+
+function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
+    @assert length(c.params) == length(pvalues)
+
+    # Do we actually need a new evaluation?
+    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0))
+        c.lastvalues .= pvalues
+        c.counter += 1
+        if !all(.!isnan.(pvalues))
+            println("One or more parameter value(s) are NaN:")
+            println(pvalues)
+            @assert all(.!isnan.(pvalues))
+        end
+        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
+    end
+    return c.buffer
+end
+
+# Built-in components
+#
+include("components/utils.jl")
+include("components/CDomain.jl")
+include("components/SimplePar.jl")
+include("components/FuncWrap.jl")
+include("components/OffsetSlope.jl")
+include("components/Gaussian.jl")
+include("components/Lorentzian.jl")
+
+
+# ====================================================================
+# Reducer
+#
+
+abstract type AbstractReducer end
+
+prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) = 
+    fill(NaN, length(domain))
+
+
+struct ExprReducer <: AbstractReducer
+    ef::ExprFunction
+    function ExprReducer(ef::ExprFunction)
+        @assert length(ef.args) == 1
+        new(ef)
+    end
+end
+
+prepare!(red::ExprReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) = 
+    fill(NaN, length(red.ef.funct(args)))
+
+function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
+    buffer .= red.ef.funct(args)
+    nothing
+end
+
+macro expr(expr)
+    return esc(:(GFit.ExprReducer(GFit.@exprfunc $expr)))
+end
+
+
+struct SumReducer <: AbstractReducer
+    list::Vector{Symbol}
+end
+
+function evaluate!(buffer::Vector{Float64}, red::SumReducer,
+                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
+    buffer .= 0.
+    for name in red.list
+        buffer .+= args[name]
+    end
+    nothing
+end
+
+
+mutable struct ReducerEval{T <: AbstractReducer}
+    red::T
     counter::Int
     buffer::Vector{Float64}
 end
 
 
 # ====================================================================
-# A model prediction suitable to be compared to experimental data
-mutable struct Prediction
+# Model
+#
+
+const PatchComp = HashVector{Float64}
+
+struct ModelEval
+    pvalues::Vector{Float64}
+    patched::Vector{Float64}
+    patchcomps::OrderedDict{Symbol, PatchComp}
+    reducer_args::OrderedDict{Symbol, Vector{Float64}}
+    folded::Vector{Float64}
+    residuals::Vector{Float64}
+
+    ModelEval() =
+        new(Vector{Float64}(), Vector{Float64}(),
+            OrderedDict{Symbol, PatchComp}(),
+            OrderedDict{Symbol, Vector{Float64}}(),
+            Vector{Float64}(), Vector{Float64}())
+end
+
+# A model prediction suitable to be compared to a single empirical dataset
+mutable struct Model
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
-    counter::Int
-    instr_response::Function
-    folded::Vector{Float64}
+    patchfuncts::Vector{ExprFunction}
+    peval::ModelEval
 
-    function Prediction(domain::AbstractDomain, comp_iterable...)
-        @assert length(comp_iterable) > 0
-        pred = new(domain,
-                   OrderedDict{Symbol, CompEval}(),
-                   OrderedDict{Symbol, ReducerEval}(),
-                   Symbol(""), 0,
-                   identity, Vector{Float64}())
-        add_comps!(pred, comp_iterable...)
-        add_reducer!(pred, :sum1 => reducer_sum(collect(keys(pred.cevals))))
-        return pred
-    end
-
-    function Prediction(domain::AbstractDomain,
-                        redpair::Pair{Symbol, Reducer}, comp_iterable...)
-        @assert length(comp_iterable) > 0
-        pred = new(domain,
-                   OrderedDict{Symbol, CompEval}(),
-                   OrderedDict{Symbol, ReducerEval}(),
-                   Symbol(""), 0,
-                   identity, Vector{Float64}())
-        add_comps!(pred, comp_iterable...)
-        add_reducer!(pred, redpair)
-        return pred
-    end
-
-    Prediction(domain::AbstractDomain, reducer::Reducer, comp_iterable...) =
-        Prediction(domain, :reducer1 => reducer, comp_iterable...)
-end
-
-function add_comps!(pred::Prediction, comp_iterable...)
-    for (cname, comp) in extract_components(comp_iterable...)
-        @assert !haskey(pred.cevals, cname)  "Name $cname already exists"
-        @assert !haskey(pred.revals, cname)  "Name $cname already exists"
-        pred.cevals[cname] = CompEval(deepcopy(comp), pred.domain)
-    end
-end
-
-function set_instr_response!(pred::Prediction, funct::Function)
-    pred.instr_response = funct
-    empty!(pred.folded)
-    append!(pred.folded, pred.instr_response(pred.domain, geteval(pred, pred.rsel)))
-    nothing
-end
-
-
-add_reducer!(pred::Prediction, reducer::Reducer) =
-    add_reducer!(pred, Symbol(:reducer, length(pred.revals)+1) => reducer)
-
-function add_reducer!(pred::Prediction, redpair::Pair{Symbol, Reducer})
-    rname = redpair[1]
-    reducer = redpair[2]
-    @assert !haskey(pred.cevals, rname)  "Name $rname already exists"
-    haskey(pred.revals, rname)  &&  delete!(pred.revals, rname)
-
-    args = Vector{Vector{Float64}}()
-    for arg in reducer.exfunc.args
-        if haskey(pred.cevals, arg)
-            push!(args, pred.cevals[arg].buffer)
-        else
-            push!(args, pred.revals[arg].buffer)
+    function Model(domain::AbstractDomain, args...)
+        function parse_args(args::AbstractDict)
+            out = OrderedDict{Symbol, Union{AbstractComponent, AbstractReducer}}()
+            for (name, item) in args
+                isa(item, Number)  &&  (item = SimplePar(item))
+                @assert isa(name, Symbol)
+                @assert isa(item, AbstractComponent) || isa(item, AbstractReducer)
+                out[name] = item
+            end
+            return out
         end
-    end
 
-    eval = reducer.exfunc.funct(args...)
-    pred.revals[rname] = ReducerEval(reducer, args, 1, eval)
-    pred.rsel = rname
-    evaluate!(pred)
-    return pred
-end
-
-
-function evaluate!(pred::Prediction)
-    for (cname, ceval) in pred.cevals
-        evaluate_cached(ceval)
-    end
-    reduce(pred)
-    return pred
-end
-
-
-function reduce(pred::Prediction)
-    for (rname, reval) in pred.revals
-        reval.counter += 1
-        reval.buffer .= reval.source.exfunc.funct(reval.args...)
-    end
-    if pred.instr_response == identity
-        if length(pred.folded) != length(geteval(pred, pred.rsel))
-            empty!(pred.folded)
-            append!(pred.folded, geteval(pred, pred.rsel))
+        function parse_args(args::Vararg{Pair})
+            out = OrderedDict{Symbol, Union{AbstractComponent, AbstractReducer}}()
+            for arg in args
+                out[arg[1]] = arg[2]
+            end
+            return parse_args(out)
         end
-        pred.folded .= geteval(pred, pred.rsel)
-    else
-        pred.folded .= pred.instr_response(pred.domain, geteval(pred, pred.rsel))
-    end
-    pred.counter += 1
-end
 
+        @assert length(args) > 0
+        model = new(domain,
+                    OrderedDict{Symbol, CompEval}(),
+                    OrderedDict{Symbol, ReducerEval}(),
+                    Symbol(""),
+                    Vector{ExprFunction}(),
+                    ModelEval())
+        for (name, item) in parse_args(args...)
+            model[name] = item
+        end
 
-geteval(pred::Prediction) = pred.folded
-function geteval(pred::Prediction, name::Symbol)
-    if haskey(pred.cevals, name)
-        return pred.cevals[name].buffer
-    else
-        return pred.revals[name].buffer
-    end
-end
-
-
-# ====================================================================
-include("HashVector.jl")
-
-# ====================================================================
-# Model and ModelInternals structures
-#
-const PatchComp = HashVector{Float64}
-
-struct ModelInternals
-    cevals::OrderedDict{CompID, CompEval}
-    params::OrderedDict{CompParamID, Parameter}
-    par_indices::OrderedDict{CompID, Vector{Int}}
-    pvalues::Vector{Float64}
-    patched::Vector{Float64}
-    patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
-    buffer::Vector{Float64}
-    pred2buffer::Vector{NTuple{2, Int}}
-end
-ModelInternals() = ModelInternals(OrderedDict{CompID, CompEval}(),
-                                  OrderedDict{CompParamID, Parameter}(),
-                                  OrderedDict{CompID, Vector{Int}}(),
-                                  Vector{Float64}(), Vector{Float64}(),
-                                  Vector{OrderedDict{Symbol, PatchComp}}(),
-                                  Vector{Float64}(), Vector{NTuple{2, Int}}())
-
-struct PatchFunction
-    exfunc::ExprFunction
-    id::Int
-end
-
-
-mutable struct Model
-    preds::Vector{Prediction}
-    priv::ModelInternals
-    patchfuncts::Vector{PatchFunction}
-
-    function Model(v::Vector{Prediction})
-        model = new(v, ModelInternals(), Vector{Function}())
-        evaluate!(model)
+        if length(model.revals) == 0
+            model[:default_sum] = SumReducer(collect(keys(model.cevals)))
+        end
         return model
     end
-    Model(p::Prediction) = Model([p])
-    Model(args...) = Model([Prediction(args...)])
 end
 
 
-struct PredRef
-    model::Model
-    id::Int
+function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
+    haskey(model.cevals, cname)  &&  delete!(model.cevals, cname) # replace component
+    @assert !haskey(model.revals, cname)  "Name $cname already exists as a reducer name"
+    ceval = CompEval(deepcopy(comp), model.domain)
+    model.cevals[cname] = ceval
+    evaluate!(model)
 end
-deref(p::PredRef) = (p ⋄ :model).preds[p ⋄ :id]
-Base.getproperty(p::PredRef, name::Symbol) = getproperty(deref(p), name)
+
+function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
+    @assert !haskey(model.cevals, rname) "Name $cname already exists as a component name"
+    haskey(model.revals, rname)  &&  delete!(model.revals, rname) # replace reducer
+
+    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.peval.reducer_args))
+    model.rsel = rname
+    evaluate!(model)
+    return model
+end
 
 
-
-function ModelInternals(model::Model)
-    cevals = OrderedDict{CompID, CompEval}()
-    params = OrderedDict{CompParamID, Parameter}()
-    par_indices = OrderedDict{CompID, Vector{Int}}()
-
-    ndata = 0
-    i = 1
-    pred2buffer = Vector{NTuple{2, Int}}()
-    for id in 1:length(model.preds)
-        pred = model.preds[id]
-        for (cname, ceval) in pred.cevals
-            cid = CompID(id, cname)
-            cevals[cid] = ceval
-            par_indices[cid] = Vector{Int}()
-            for (pid, par) in ceval.params
-                params[CompParamID(cid, pid)] = par
-                push!(par_indices[cid], i)
-                i += 1
-            end
-            evaluate_cached(ceval)
+function geteval(model::Model, name::Symbol)
+    if haskey(model.cevals, name)
+        return model.cevals[name].buffer
+    else
+        if haskey(model.revals, name)
+            return model.revals[name].buffer
+        else
+            return Float64[]
         end
-        reduce(pred)
-
-        nn = length(geteval(pred))
-        push!(pred2buffer, (ndata+1, ndata+nn))
-        ndata += nn
     end
-
-    pvalues = getfield.(values(params), :val)
-    patched = deepcopy(pvalues)
-
-    patchcomps = [OrderedDict{Symbol, PatchComp}() for id in 1:length(model.preds)]
-    i = 1
-    for (cid, ceval) in cevals
-        ipar = OrderedDict{Symbol, Union{Int, Vector{Int}}}()
-        for (pid, par) in ceval.params
-            if pid.index == 0
-                ipar[pid.name] = i
-            elseif pid.index == 1
-                ipar[pid.name] = [i]
-            else
-                push!(ipar[pid.name], i)
-            end
-            i += 1
-        end
-        patchcomps[cid.id][cid.name] = HashVector(ipar, patched)
-    end
-
-    return ModelInternals(cevals, params, par_indices, pvalues, patched, patchcomps,
-                          fill(NaN, ndata), pred2buffer)
 end
+
+geteval(model::Model) = geteval(model, model.rsel)
 
 
 function evaluate!(model::Model)
-    @assert length(model.preds) >= 1
-    model.priv = ModelInternals(model)
+    # Update peval structure
+    empty!(model.peval.pvalues)
+    empty!(model.peval.patched)
+    empty!(model.peval.patchcomps)
+    for (cname, ceval) in model.cevals
+        model.peval.patchcomps[cname] = HashVector{Float64}(model.peval.patched)
+        for (pid, par) in ceval.params
+            push!(model.peval.pvalues, par.val)
+            push!(model.peval.patchcomps[cname], pid.name, NaN)
+        end
+    end
+    @assert length(model.peval.patched) == length(model.peval.pvalues)
+
+    empty!(model.peval.reducer_args)
+    for (cname, ceval) in model.cevals
+        model.peval.reducer_args[cname] = ceval.buffer
+    end
+    for (rname, reval) in model.revals
+        model.peval.reducer_args[rname] = reval.buffer
+    end
+    
+    empty!(model.peval.folded)
+    patch_params(model)
     quick_evaluate(model)
+
+    empty!( model.peval.residuals)
+    append!(model.peval.residuals, fill(NaN, length(model())))
+
     return model
 end
 
-
-# This is supposed to be called from `fit!`, not by user
-function quick_evaluate(model::Model)
-    model.priv.patched .= model.priv.pvalues  # copy all values by default
+function patch_params(model::Model)
+    model.peval.patched .= model.peval.pvalues  # copy all values by default
     for pf in model.patchfuncts
-        if pf.id == 0
-            if length(model.preds) == 1
-                pf.exfunc.funct(model.priv.patchcomps[1])
-            else
-                pf.exfunc.funct(model.priv.patchcomps)
-            end
-        else
-            pf.exfunc.funct(model.priv.patchcomps[pf.id])
-        end
-    end
-
-    Threads.@threads for cid in collect(keys(model.priv.cevals))
-        ceval = model.priv.cevals[cid]
-        evaluate_cached(ceval, model.priv.patched[model.priv.par_indices[cid]])
-    end
-    Threads.@threads for pred in model.preds
-        reduce(pred)
+        pf.funct(model.peval.patchcomps)
     end
     nothing
 end
 
-
-function add!(model::Model, p::Prediction)
-    push!(model.preds, p)
-    evaluate!(model)
-end
-
-add!(model::Model, args...) = add!(model[1], args...)
-
-function add!(p::PredRef, comp_iterable...)
-    @assert length(comp_iterable) > 0
-    add_comps!(deref(p), comp_iterable...)
-    evaluate!(p ⋄ :model)
-end
-
-function add!(p::PredRef, reducer::Reducer, comp_iterable...)
-    if length(comp_iterable) > 0
-        add_comps!(deref(p), comp_iterable...)
+function quick_evaluate(model::Model)
+    i1 = 1
+    for (cname, ceval) in model.cevals
+        if length(ceval.params) > 0
+            i2 = i1 + length(ceval.params) - 1
+            evaluate_cached(ceval, model.peval.patched[i1:i2])
+            i1 += length(ceval.params)
+        else
+            evaluate_cached(ceval, Float64[])
+        end
     end
-    add_reducer!(deref(p), reducer)
-    evaluate!(p ⋄ :model)
-end
 
-function add!(p::PredRef, redpair::Pair{Symbol, Reducer}, comp_iterable...)
-    if length(comp_iterable) > 0
-        add_comps!(deref(p), comp_iterable...)
+    for (rname, reval) in model.revals
+        reval.counter += 1
+        evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
     end
-    add_reducer!(deref(p), redpair)
-    evaluate!(p ⋄ :model)
 end
 
-
-# ====================================================================
 function patch!(model::Model, exfunc::ExprFunction)
-    push!(model.patchfuncts, PatchFunction(exfunc, 0))
-    evaluate!(model)
-    return model
-end
-
-function patch!(pred::PredRef, exfunc::ExprFunction)
-    model = getfield(pred, :model)
-    push!(model.patchfuncts, PatchFunction(exfunc, getfield(pred, :id)))
+    push!(model.patchfuncts, exfunc)
     evaluate!(model)
     return model
 end
@@ -529,90 +376,48 @@ macro patch!(target, expr::Expr)
     return esc(:(GFit.patch!($target, GFit.@exprfunc $expr)))
 end
 
+function isfixed(model::Model, cname::Symbol)
+    @assert cname in keys(model.cevals) "Component $cname is not defined"
+    return model.cevals[cname].cfixed
+end
 
+function freeze(model::Model, cname::Symbol)
+    @assert cname in keys(model.cevals) "Component $cname is not defined"
+    model.cevals[cname].cfixed = true
+    evaluate!(model)
+    nothing
+end
 
-isfixed(pref::PredRef, cname::Symbol) = (pref.cevals[cname].cfixed >= 1)
-isfixed(model::Model, cname::Symbol) = isfixed(model[1], cname)
-
-freeze(model::Model, cname::Symbol) = freeze(model[1], cname)
-function freeze(pref::PredRef, cname::Symbol)
-    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
-    pref.cevals[cname].cfixed = 1
-    evaluate!(pref ⋄ :model)
+function thaw(model::Model, cname::Symbol)
+    @assert cname in keys(model.cevals) "Component $cname is not defined"
+    model.cevals[cname].cfixed = false
+    evaluate!(model)
     nothing
 end
 
 
-thaw(model::Model, cname::Symbol) = thaw(model[1], cname)
-function thaw(pref::PredRef, cname::Symbol)
-    @assert cname in keys(pref.cevals) "Component $cname is not defined on prediction $(pref ⋄ :id)"
-    pref.cevals[cname].cfixed = 0
-    evaluate!(pref ⋄ :model)
-    nothing
+Base.keys(p::Model) = collect(keys(p.cevals))
+Base.haskey(p::Model, name::Symbol) = haskey(p.cevals, name)
+function Base.getindex(model::Model, name::Symbol)
+    if name in keys(model.cevals)
+        return model.cevals[name].comp
+    elseif name in keys(model.revals)
+        return model.revals[name].red
+    end
+    error("Name $name not defined")
 end
+domain(model::Model) = model.domain
+(model::Model)() = geteval(model)
+(model::Model)(name::Symbol) = geteval(model, name)
 
 
 # ====================================================================
-# Fit results
+# Minimizers
 #
-struct BestFitPar
-    val::Float64
-    unc::Float64
-    fixed::Bool
-    patched::Float64  # value after transformation
-end
-
-const BestFitComp = HashVector{BestFitPar}
-
-
-struct BestFitResult
-    preds::Vector{OrderedDict{Symbol, BestFitComp}}
-    ndata::Int
-    dof::Int
-    cost::Float64
-    status::Symbol      #:OK, :Warn, :Error
-    log10testprob::Float64
-    timestamp::DateTime
-    elapsed::Float64
-end
-
-
-struct BestFitPredRef
-    result::BestFitResult
-    id::Int
-end
-deref(p::BestFitPredRef) = (p ⋄ :result).preds[p ⋄ :id]
-Base.getindex(p::BestFitPredRef, name::Symbol) = getindex(deref(p), name)
-Base.iterate(p::BestFitPredRef, args...) = iterate(deref(p), args...)
-
-
-# ====================================================================
-function data1D(model::Model, data::Vector{Measures{N}}) where N
-    out = Vector{Measures{1}}()
-    for i in 1:length(model.preds)
-        pred = model.preds[i]
-        push!(out, flatten(data[i], pred.domain))
-    end
-    return out
-end
-
-
-function residuals1d(model::Model, data1d::Vector{Measures{1}})
-    Threads.@threads for i in 1:length(model.preds)
-        pred = model.preds[i]
-        c1, c2 = model.priv.pred2buffer[i]
-        eval = geteval(pred)
-        model.priv.buffer[c1:c2] .= ((eval .- data1d[i].val) ./ data1d[i].unc)
-    end
-    return model.priv.buffer
-end
-
-
-# ====================================================================
 abstract type AbstractMinimizer end
 
 import LsqFit
-mutable struct lsqfit <: AbstractMinimizer
+struct lsqfit <: AbstractMinimizer
 end
 
 function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
@@ -654,146 +459,94 @@ end;
 
 
 # ====================================================================
-fit!(model::Model, data::Measures; kw...) =
-    fit!(model, [data]; kw...)
+# Fitting machinery
+#
 
-function fit!(model::Model, data::Vector{Measures{N}};
-              only_id::Int=0,
+include("results.jl")
+
+function fit!(model::Model, data::Measures{N};
               minimizer=lsqfit()) where N
     timestamp = now()
-    elapsedTime = Base.time_ns()
     evaluate!(model)
 
-    if only_id != 0
-        for id in 1:length(model.preds)
-            (id == only_id)  &&  continue
-            for (cname, ceval) in model.preds[id].cevals
-                @assert 0 <= ceval.cfixed <= 1
-                ceval.cfixed += 1
-            end
-        end
-    end
-
+    lparams = Vector{Parameter}()
     free = Vector{Bool}()
-    for (cpid, par) in model.priv.params
-        if !(par.low <= par.val <= par.high)
-            s = "Value outside limits for param $cpid\n" * string(par)
-            error(s)
+    for (cname, ceval) in model.cevals
+        for (pid, par) in ceval.params
+            if !(par.low <= par.val <= par.high)
+                s = "Value outside limits for param [$(cname)].$(pid.name):\n" * string(par)
+                error(s)
+            end
+            push!(lparams, par)
+            push!(free, (!par.fixed)  &&  (model.cevals[cname].cfixed == 0))
         end
-        push!(free, (!par.fixed)  &&  (model.priv.cevals[cpid.comp].cfixed == 0))
     end
     ifree = findall(free)
     @assert length(ifree) > 0 "No free parameter in the model"
 
     # Flatten empirical data
-    data1d = data1D(model, data)
+    data1d = flatten(data, model.domain)
 
     prog = ProgressUnknown("Minimizer iteration:", dt=0.5, showspeed=true)
-    dof = length(model.priv.buffer) - length(ifree)
+    ndata = length(model())
+    dof = ndata - length(ifree)
+    @assert dof >= 1
 
     # Evaluate normalized residuals starting from free parameter values
     function pval2resid(pvalues_free::Vector{Float64})
-        model.priv.pvalues[ifree] .= pvalues_free  # update parameter values
+        model.peval.pvalues[ifree] .= pvalues_free  # update parameter values
+        patch_params(model)
         quick_evaluate(model)
-        ret = residuals1d(model, data1d)
+        model.peval.residuals .= (model() .- data1d.val) ./ data1d.unc
+        ret = model.peval.residuals
         evaluate_showvalues(ret) = () -> [(:red_chisq, sum(abs2.(ret)) / dof)]
         ProgressMeter.next!(prog; showvalues = evaluate_showvalues(ret))
         return ret
     end
 
-    (status, best_val, best_unc) = minimize(minimizer, pval2resid,
-                                            collect(values(model.priv.params))[ifree])
+    (status, best_val, best_unc) = minimize(minimizer, pval2resid, lparams[ifree])
+    pval2resid(best_val)
     ProgressMeter.finish!(prog)
-    model.priv.pvalues[ifree] .= best_val
 
     # Copy best fit values back into components.  This is needed since
-    # the evaluated components are stored in the Model, not in
-    # BestFitResult, hence I do this to maintain a coherent status.
-    setfield!.(values(model.priv.params), :val, model.priv.pvalues)
-    uncerts = fill(NaN, length(model.priv.pvalues))
-    uncerts[ifree] .= best_unc
+    # the evaluated components are stored in the Model (rather than in
+    # BestFitResult), hence I do this to maintain a coherent status.
+    i = 1
+    for (cname, ceval) in model.cevals
+        for (pid, par) in ceval.params
+            par.val = model.peval.pvalues[i]
+            i += 1
+        end
+    end
 
     # Prepare output
-    quick_evaluate(model)  # ensure best fit values are used
-
-    bfpars = Vector{BestFitPar}()
+    comps = OrderedDict{Symbol, BestFitComp}()
     i = 1
-    for (cpid, par) in model.priv.params
-        push!(bfpars, BestFitPar(model.priv.pvalues[i], uncerts[i],
-                                 !(i in ifree), model.priv.patched[i]))
-        i += 1
-    end
-
-    preds = [OrderedDict{Symbol, BestFitComp}() for id in 1:length(model.preds)]
-    for (cid, ceval) in model.priv.cevals
-        preds[cid.id][cid.name] = BestFitComp(getfield(model.priv.patchcomps[cid.id][cid.name], :dict), bfpars)
-    end
-
-    cost = sum(abs2, model.priv.buffer)
-    dof = length(model.priv.buffer) - length(ifree)
-
-    result = BestFitResult(preds, length(model.priv.buffer), dof, cost, status,
-                           logccdf(Chisq(dof), cost) * log10(exp(1)),
-                           timestamp,
-                           float(Base.time_ns() - elapsedTime) / 1.e9)
-
-    if only_id != 0
-        for id in 1:length(model.preds)
-            (id == only_id)  &&  continue
-            for (cname, ceval) in model.preds[id].cevals
-                @assert 0<= ceval.cfixed <= 2
-                ceval.cfixed -= 1
+    for (cname, ceval) in model.cevals
+        comps[cname] = BestFitComp()
+        for (pid, par) in ceval.params
+            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
+                bfpar = BestFitParam(model.peval.pvalues[i], popfirst!(best_unc), false, model.peval.patched[i])
+            else
+                bfpar = BestFitParam(model.peval.pvalues[i], NaN                , true , model.peval.patched[i])
             end
+            push!(comps[cname], pid.name, bfpar)
+            i += 1
         end
-        evaluate!(model)
     end
+
+    cost = sum(abs2, model.peval.residuals)
+    elapsed = now() - timestamp
+    @assert isa(elapsed, Millisecond)
+    result = BestFitResult(comps, length(model.peval.residuals), dof, cost, status,
+                           logccdf(Chisq(dof), cost) * log10(exp(1)),
+                           timestamp, elapsed.value / 1.e3)
     return result
 end
 
 
 # ====================================================================
-# User interface
-
-##
-(p::PredRef)() = geteval(deref(p))
-(p::PredRef)(name::Symbol) = geteval(deref(p), name)
-function (m::Model)()
-    evaluate!(m)
-    m[1]()
-end
-function (m::Model)(name::Symbol)
-    evaluate!(m)
-    m[1](name)
-end
-
-##
-Base.keys(m::Model) = keys(m[1])
-Base.keys(p::PredRef) = keys(p.cevals)
-Base.keys(res::BestFitResult) = keys(res.preds[1])
-Base.keys(a::BestFitPredRef) = keys(a.result.preds[a.id])
-
-##
-Base.haskey(p::PredRef, name::Symbol) = haskey(p.cevals, name)
-Base.haskey(m::Model, name::Symbol) = haskey(m[1], name)
-Base.haskey(res::BestFitResult, name::Symbol) = haskey(res.preds[1], name)
-Base.haskey(a::BestFitPredRef, name::Symbol) =  haskey(a.result.preds[a.id], name)
-
-##
-Base.getindex(pred::Prediction, cname::Symbol) = pred.cevals[cname].comp
-Base.getindex(pref::PredRef, cname::Symbol) = pref.cevals[cname].comp
-Base.getindex(m::Model, id::Int) = PredRef(m, id)
-Base.getindex(m::Model, cname::Symbol) = m[1][cname]
-Base.getindex(res::BestFitResult, id::Int) = BestFitPredRef(res, id)
-Base.getindex(res::BestFitResult, cname::Symbol) = res[1][cname]
-
-##
-domain(pref::PredRef) = pref.domain
-domain(m::Model) = domain(m[1])
-
-set_instr_response!(p::PredRef, funct::Function) =
-    set_instr_response!(deref(p), funct)
-
-# ====================================================================
+include("multimodel.jl")
 include("show.jl")
 
 end
