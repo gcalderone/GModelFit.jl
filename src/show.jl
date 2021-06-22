@@ -333,6 +333,13 @@ function show(io::IO, comps::OrderedDict{Symbol, BestFitComp})
 end
 
 
+function show(io::IO, res::Union{MDComparison, MDMultiComparison})
+    println(io, @sprintf("    #Data  : %8d              Fit-stat: %-10.5g", res.ndata, res.fitstat))
+    println(io, @sprintf("    #Param : %8d              Red.    : %-10.4g", res.nfree, res.fitstat / res.dof))
+    println(io, @sprintf("    DOF    : %8d              Prob.   : %-10.4g", res.dof, 10^res.log10testprob))
+end
+
+
 function show(io::IO, res::Union{BestFitResult, BestFitMultiResult})
     section(io, "Best Fit results:")
 
@@ -345,28 +352,21 @@ function show(io::IO, res::Union{BestFitResult, BestFitMultiResult})
     else
         show(io, res.comps)
     end
-
     println(io)
-    println(io, @sprintf("    #Data  : %8d              Cost   : %-10.5g", res.ndata, res.cost))
-    println(io, @sprintf("    #Param : %8d              Red.   : %-10.4g", res.ndata-res.dof, res.cost / res.dof))
-    print(  io, @sprintf("    DOF    : %8d              ", res.dof))
-    println(io, @sprintf("Prob.  : %-10.4g", 10^res.log10testprob))
+
+    show(io, res.mdc)
     print(io, "    Status : ")
-    status = @sprintf("%8s", string(res.status))
+    (crayon, status, message) = as_string(res.mzer)
+
     if showsettings.plain
-        print(io, status)
+        print(io, @sprintf("%8s", status))
     else
-        if res.status == :OK
-            print(io, crayon"green", status, crayon"default")
-        elseif res.status == :Warn
-            print(io, crayon"bold yellow", status, crayon"default")
-        elseif res.status == :Error
-            print(io, crayon"bold red", status, crayon"default")
-        else
-            print(io, crayon"red", status, crayon"default")
-        end
+        print(io, crayon, @sprintf("%8s", status), crayon"default")
     end
     println(io, @sprintf("              Elapsed: %-10.4g s", res.elapsed))
+    if message != ""
+        println(io, crayon, message, crayon"default")        
+    end
 end
 
 #=

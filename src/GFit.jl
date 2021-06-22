@@ -158,7 +158,7 @@ include("components/Lorentzian.jl")
 
 abstract type AbstractReducer end
 
-prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) = 
+prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
     fill(NaN, length(domain))
 
 
@@ -170,7 +170,7 @@ struct ExprReducer <: AbstractReducer
     end
 end
 
-prepare!(red::ExprReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) = 
+prepare!(red::ExprReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
     fill(NaN, length(red.ef.funct(args)))
 
 function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
@@ -216,18 +216,18 @@ struct ModelEval
     patched::Vector{Float64}
     patchcomps::OrderedDict{Symbol, PatchComp}
     reducer_args::OrderedDict{Symbol, Vector{Float64}}
-    folded::Vector{Float64}
-    residuals::Vector{Float64}
 
     ModelEval() =
         new(Vector{Float64}(), Vector{Float64}(),
             OrderedDict{Symbol, PatchComp}(),
-            OrderedDict{Symbol, Vector{Float64}}(),
-            Vector{Float64}(), Vector{Float64}())
+            OrderedDict{Symbol, Vector{Float64}}())
 end
+
+abstract type AbstractMultiModel end
 
 # A model prediction suitable to be compared to a single empirical dataset
 mutable struct Model
+    parent::Union{Nothing, AbstractMultiModel}
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
@@ -256,7 +256,7 @@ mutable struct Model
         end
 
         @assert length(args) > 0
-        model = new(domain,
+        model = new(nothing, domain,
                     OrderedDict{Symbol, CompEval}(),
                     OrderedDict{Symbol, ReducerEval}(),
                     Symbol(""),
@@ -329,21 +329,21 @@ function evaluate!(model::Model)
     for (rname, reval) in model.revals
         model.peval.reducer_args[rname] = reval.buffer
     end
-    
-    empty!(model.peval.folded)
+
     patch_params(model)
     quick_evaluate(model)
-
-    empty!( model.peval.residuals)
-    append!(model.peval.residuals, fill(NaN, length(model())))
 
     return model
 end
 
 function patch_params(model::Model)
-    model.peval.patched .= model.peval.pvalues  # copy all values by default
-    for pf in model.patchfuncts
-        pf.funct(model.peval.patchcomps)
+    if !isnothing(model.parent)
+        patch_params(model.parent)
+    else
+        model.peval.patched .= model.peval.pvalues  # copy all values by default
+        for pf in model.patchfuncts
+            pf.funct(model.peval.patchcomps)
+        end
     end
     nothing
 end
@@ -411,142 +411,11 @@ domain(model::Model) = model.domain
 (model::Model)(name::Symbol) = geteval(model, name)
 
 
-# ====================================================================
-# Minimizers
-#
-abstract type AbstractMinimizer end
-
-import LsqFit
-struct lsqfit <: AbstractMinimizer
-end
-
-function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
-    ndata = length(func(getfield.(params, :val)))
-    bestfit = LsqFit.curve_fit((dummy, pvalues) -> func(pvalues),
-                               1.:ndata, fill(0., ndata),
-                               getfield.(params, :val),
-                               lower=getfield.(params, :low),
-                               upper=getfield.(params, :high))
-    status = :Error
-    (bestfit.converged)  &&  (status = :OK)
-    error = LsqFit.stderror(bestfit)
-    return (status, getfield.(Ref(bestfit), :param), error)
-end
-
-
-import CMPFit;
-
-mutable struct cmpfit <: AbstractMinimizer;
-    config::CMPFit.Config;
-    cmpfit() = new(CMPFit.Config());
-end;
-
-function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter});
-    guess = getfield.(params, :val);
-    low   = getfield.(params, :low);
-    high  = getfield.(params, :high);
-    parinfo = CMPFit.Parinfo(length(guess));
-    for i in 1:length(guess);
-        llow  = isfinite(low[i])   ?  1  :  0;
-        lhigh = isfinite(high[i])  ?  1  :  0;
-        parinfo[i].limited = (llow, lhigh);
-        parinfo[i].limits  = (low[i], high[i]);
-    end;
-    bestfit = CMPFit.cmpfit((pvalues) -> func(pvalues),
-                            guess, parinfo=parinfo, config=minimizer.config);
-    return (:OK, getfield.(Ref(bestfit), :param), getfield.(Ref(bestfit), :perror));
-end;
-
-
-# ====================================================================
-# Fitting machinery
-#
-
-include("results.jl")
-
-function fit!(model::Model, data::Measures{N};
-              minimizer=lsqfit()) where N
-    timestamp = now()
-    evaluate!(model)
-
-    lparams = Vector{Parameter}()
-    free = Vector{Bool}()
-    for (cname, ceval) in model.cevals
-        for (pid, par) in ceval.params
-            if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pid.name):\n" * string(par)
-                error(s)
-            end
-            push!(lparams, par)
-            push!(free, (!par.fixed)  &&  (model.cevals[cname].cfixed == 0))
-        end
-    end
-    ifree = findall(free)
-    @assert length(ifree) > 0 "No free parameter in the model"
-
-    # Flatten empirical data
-    data1d = flatten(data, model.domain)
-
-    prog = ProgressUnknown("Minimizer iteration:", dt=0.5, showspeed=true)
-    ndata = length(model())
-    dof = ndata - length(ifree)
-    @assert dof >= 1
-
-    # Evaluate normalized residuals starting from free parameter values
-    function pval2resid(pvalues_free::Vector{Float64})
-        model.peval.pvalues[ifree] .= pvalues_free  # update parameter values
-        patch_params(model)
-        quick_evaluate(model)
-        model.peval.residuals .= (model() .- data1d.val) ./ data1d.unc
-        ret = model.peval.residuals
-        evaluate_showvalues(ret) = () -> [(:red_chisq, sum(abs2.(ret)) / dof)]
-        ProgressMeter.next!(prog; showvalues = evaluate_showvalues(ret))
-        return ret
-    end
-
-    (status, best_val, best_unc) = minimize(minimizer, pval2resid, lparams[ifree])
-    pval2resid(best_val)
-    ProgressMeter.finish!(prog)
-
-    # Copy best fit values back into components.  This is needed since
-    # the evaluated components are stored in the Model (rather than in
-    # BestFitResult), hence I do this to maintain a coherent status.
-    i = 1
-    for (cname, ceval) in model.cevals
-        for (pid, par) in ceval.params
-            par.val = model.peval.pvalues[i]
-            i += 1
-        end
-    end
-
-    # Prepare output
-    comps = OrderedDict{Symbol, BestFitComp}()
-    i = 1
-    for (cname, ceval) in model.cevals
-        comps[cname] = BestFitComp()
-        for (pid, par) in ceval.params
-            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
-                bfpar = BestFitParam(model.peval.pvalues[i], popfirst!(best_unc), false, model.peval.patched[i])
-            else
-                bfpar = BestFitParam(model.peval.pvalues[i], NaN                , true , model.peval.patched[i])
-            end
-            push!(comps[cname], pid.name, bfpar)
-            i += 1
-        end
-    end
-
-    cost = sum(abs2, model.peval.residuals)
-    elapsed = now() - timestamp
-    @assert isa(elapsed, Millisecond)
-    result = BestFitResult(comps, length(model.peval.residuals), dof, cost, status,
-                           logccdf(Chisq(dof), cost) * log10(exp(1)),
-                           timestamp, elapsed.value / 1.e3)
-    return result
-end
-
-
-# ====================================================================
 include("multimodel.jl")
+include("minimizers.jl")
+include("comparison.jl")
+include("results.jl")
+include("fit.jl")
 include("show.jl")
 
 end

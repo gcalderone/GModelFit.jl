@@ -90,7 +90,7 @@ roi(d::CartesianDomain) = d.roi
 # ====================================================================
 # Measures and Counts types
 #
-abstract type AbstractData{T,N} <: AbstractArray{T,N} end
+abstract type AbstractData{T,N} end
 
 struct Measures{N} <: AbstractData{Float64,N}
     val::Array{Float64,N}
@@ -118,14 +118,10 @@ end
 ndims(d::Measures{N}) where N = N
 size(d::Measures) = size(d.val)
 length(d::Measures) = length(d.val)
-getindex(d::Measures, args...) where N = getindex(d.val, args...)
-iterate(d::Measures, args...) = iterate(d.val, args...)
 uncerts(d::Measures) = d.uncerts
 
 ndims(d::Counts{N}) where N = N
 size(d::Counts) = size(d.val)
-length(d::Counts) = length(d.val)
-getindex(d::Counts, args...) where N = getindex(d.val, args...)
 iterate(d::Counts, args...) = iterate(d.val, args...)
 
 

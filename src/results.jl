@@ -13,14 +13,11 @@ const BestFitComp = HashVector{BestFitParam}
 
 
 struct BestFitResult
-    comps::OrderedDict{Symbol, BestFitComp}
-    ndata::Int
-    dof::Int
-    cost::Float64
-    status::Symbol      #:OK, :Warn, :Error
-    log10testprob::Float64
     timestamp::DateTime
     elapsed::Float64
+    mzer::AbstractMinimizerStatus
+    comps::OrderedDict{Symbol, BestFitComp}
+    mdc::MDComparison
 end
 
 
@@ -30,14 +27,11 @@ Base.haskey(res::BestFitResult, name::Symbol) = haskey(res.comps, name)
 
 
 struct BestFitMultiResult
-    models::Vector{OrderedDict{Symbol, BestFitComp}}
-    ndata::Int
-    dof::Int
-    cost::Float64
-    status::Symbol      #:OK, :Warn, :Error
-    log10testprob::Float64
     timestamp::DateTime
     elapsed::Float64
+    mzer::AbstractMinimizerStatus
+    models::Vector{OrderedDict{Symbol, BestFitComp}}
+    mdc::MDMultiComparison
 end
 
 Base.getindex(res::BestFitMultiResult, id::Int) = res.models[id]
