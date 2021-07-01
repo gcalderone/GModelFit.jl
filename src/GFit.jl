@@ -372,9 +372,7 @@ function patch!(model::Model, exfunc::ExprFunction)
     return model
 end
 
-macro patch!(target, expr::Expr)
-    return esc(:(GFit.patch!($target, GFit.@exprfunc $expr)))
-end
+include("macro_patch.jl")
 
 function isfixed(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"
