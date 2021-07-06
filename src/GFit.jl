@@ -255,7 +255,6 @@ mutable struct Model
             return parse_args(out)
         end
 
-        @assert length(args) > 0
         model = new(nothing, domain,
                     OrderedDict{Symbol, CompEval}(),
                     OrderedDict{Symbol, ReducerEval}(),
@@ -283,13 +282,22 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
 end
 
 function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
-    @assert !haskey(model.cevals, rname) "Name $cname already exists as a component name"
-    haskey(model.revals, rname)  &&  delete!(model.revals, rname) # replace reducer
-
+    @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
+    update_rsel = true
+    if haskey(model.revals, rname)
+        update_rsel = false
+        delete!(model.revals, rname) # replace reducer
+    end
     model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.peval.reducer_args))
-    model.rsel = rname
+    update_rsel  &&  (model.rsel = rname)
     evaluate!(model)
     return model
+end
+
+
+function select_reducer(model::Model, rname::Symbol)
+    @assert haskey(model.revals, rname) "$rname is not a reducer name"
+    model.rsel = rname
 end
 
 
