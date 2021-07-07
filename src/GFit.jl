@@ -24,7 +24,7 @@ import Base.iterate
 import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
-    Model, @expr, SumReducer, domain,
+    Model, @expr, SumReducer, select_reducer!, domain,
     MultiModel, @patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
@@ -283,19 +283,15 @@ end
 
 function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
     @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
-    update_rsel = true
-    if haskey(model.revals, rname)
-        update_rsel = false
-        delete!(model.revals, rname) # replace reducer
-    end
+    haskey(model.revals, rname)  &&  delete!(model.revals, rname) # replace reducer
     model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.peval.reducer_args))
-    update_rsel  &&  (model.rsel = rname)
+    (model.rsel == Symbol(""))  &&  (model.rsel = rname)
     evaluate!(model)
     return model
 end
 
 
-function select_reducer(model::Model, rname::Symbol)
+function select_reducer!(model::Model, rname::Symbol)
     @assert haskey(model.revals, rname) "$rname is not a reducer name"
     model.rsel = rname
 end
