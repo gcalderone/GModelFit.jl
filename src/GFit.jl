@@ -274,7 +274,6 @@ end
 
 
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
-    haskey(model.cevals, cname)  &&  delete!(model.cevals, cname) # replace component
     @assert !haskey(model.revals, cname)  "Name $cname already exists as a reducer name"
     ceval = CompEval(deepcopy(comp), model.domain)
     model.cevals[cname] = ceval
@@ -283,7 +282,6 @@ end
 
 function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
     @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
-    haskey(model.revals, rname)  &&  delete!(model.revals, rname) # replace reducer
     model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.peval.reducer_args))
     (model.rsel == Symbol(""))  &&  (model.rsel = rname)
     evaluate!(model)
@@ -365,9 +363,13 @@ function quick_evaluate(model::Model)
     end
 
     for (rname, reval) in model.revals
+        (rname == model.rsel)  &&  continue  # this should be evaluated as last one
         reval.counter += 1
         evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
     end
+    reval = model.revals[model.rsel]
+    reval.counter += 1
+    evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
 end
 
 function patch!(model::Model, exfunc::ExprFunction)
