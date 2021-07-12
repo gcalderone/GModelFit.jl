@@ -93,25 +93,42 @@ roi(d::CartesianDomain) = d.roi
 abstract type AbstractData{T,N} end
 
 struct Measures{N} <: AbstractData{Float64,N}
+    domain::AbstractDomain{N}
     val::Array{Float64,N}
     unc::Array{Float64,N}
 
-    Measures(val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N} =
-        new{N}(deepcopy(val), deepcopy(unc))
+    function Measures(domain::Domain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
+        @assert length(domain) == length(val) "Domain and dataset have incompatible lengths"
+        @assert length(unc) == length(val) "Dataset values and uncertainties have incompatible lengths"
+        return new{N}(deepcopy(domain), deepcopy(val), deepcopy(unc))
+    end
+
+    function Measures(domain::CartesianDomain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
+        @assert prod(orig_size(domain)) == length(val) "Domain and dataset have incompatible lengths"
+        return new{N}(deepcopy(domain), deepcopy(val), deepcopy(unc))
+    end
 end
 
-Measures(val::AbstractArray{T, N}, unc::T) where {T <: Real, N} =
-    Measures(val, fill(unc, size(val)))
+Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, unc::T) where {T <: Real, N} =
+    Measures(domain, val, fill(unc, size(val)))
 
-Measures(val::AbstractArray{T, N}) where {T <: Real, N} =
-    Measures(val, one(Float64))
+Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}) where {T <: Real, N} =
+    Measures(domain, val, one(Float64))
 
 
 struct Counts{N} <: AbstractData{Int,N}
+    domain::AbstractDomain{N}
     val::Array{Int,N}
 
-    Counts(val::AbstractArray{T, N}) where {T <: Integer, N} =
-        new{N}(deepcopy(val))
+    function Counts(domain::Domain{N}, val::AbstractArray{T, N}) where {T <: Integer, N}
+        @assert length(domain) == length(val) "Domain and dataset have incompatible lengths"
+        new{N}(deepcopy(domain), deepcopy(val))
+    end
+
+    function Counts(domain::CartesianDomain{N}, val::AbstractArray{T, N}) where {T <: Real, N}
+        @assert prod(orig_size(domain)) == length(val) "Domain and dataset have incompatible lengths"
+        return new{N}(deepcopy(domain), deepcopy(val))
+    end
 end
 
 
@@ -128,40 +145,18 @@ iterate(d::Counts, args...) = iterate(d.val, args...)
 # ====================================================================
 # Methods to "flatten" a multidimensional object into a 1D one
 #
-function flatten(data::Measures{N}, dom::Domain{N}) where N
-    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
+function flatten(data::Measures{N}) where N
     (N == 1)  &&  return data
+    if isa(data.domain, CartesianDomain)
+        return Measures(data.val[roi(data.domain)], data.unc[roi(data.domain)])
+    end
     return Measures(data.val[:], data.unc[:])
 end
 
-function flatten(data::Counts{N}, dom::Domain{N}) where N
-    @assert length(dom) == length(data) "Domain and dataset have incompatible lengths"
+function flatten(data::Counts{N}) where N
     (N == 1)  &&  return data
-    return Counts(data.val)
+    if isa(data.domain, CartesianDomain)
+        return Counts(data.val[roi(data.domain)])
+    end
+    return Counts(data.val[:])
 end
-
-function flatten(data::Measures{N}, dom::CartesianDomain{N}) where N
-    @assert (length(dom) <= length(data)  &&  prod(orig_size(dom)) == length(data)) "Domain and dataset have incompatible lengths"
-    return Measures(data.val[roi(dom)], data.unc[roi(dom)])
-end
-
-function flatten(data::Counts{N}, dom::CartesianDomain{N}) where N
-    @assert (length(dom) <= length(data)  &&  prod(orig_size(dom)) == length(data)) "Domain and dataset have incompatible lengths"
-    return Counts(data.val[roi(dom)])
-end
-
-
-#=
-"""
-# reshape
-
-Reshape an array according to the size of a CartesianDomain object
-"""
-function reshape(array::AbstractArray, dom::AbstractCartesianDomain)
-    @assert length(array) == length(dom) "Domain and array must have the same length"
-    out = Array{Float64}(undef, size(dom)...)
-    out .= NaN
-    out[dom.index] .= array
-    return out
-end
-=#

@@ -29,7 +29,7 @@ mutable struct MDComparison
             end
         end
         
-        data1d = flatten(data, model.domain)
+        data1d = flatten(data)
         mdc = new(params, ifree, data1d, length(data1d), length(ifree),
                   length(data1d) - length(ifree),
                   fill(NaN, length(data1d)), NaN, NaN)
@@ -101,7 +101,7 @@ mutable struct MDMultiComparison
             end
         end
 
-        data1d = [flatten(data[id], multi[id].domain) for id in 1:length(multi)]
+        data1d = [flatten(data[id]) for id in 1:length(multi)]
         ndata = sum(length.(data1d))
         mdc = new(params, modelid, ifree, data1d, ndata, length(ifree),
                   ndata - length(ifree),

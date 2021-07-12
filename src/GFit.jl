@@ -264,7 +264,6 @@ mutable struct Model
         for (name, item) in parse_args(args...)
             model[name] = item
         end
-
         if length(model.revals) == 0
             model[:default_sum] = SumReducer(collect(keys(model.cevals)))
         end
@@ -367,9 +366,12 @@ function quick_evaluate(model::Model)
         reval.counter += 1
         evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
     end
-    reval = model.revals[model.rsel]
-    reval.counter += 1
-    evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
+
+    if length(model.revals) > 0
+        reval = model.revals[model.rsel]
+        reval.counter += 1
+        evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
+    end
 end
 
 function patch!(model::Model, exfunc::ExprFunction)
