@@ -81,16 +81,16 @@ abstract type AbstractComponent end
 
 function getparams(comp::AbstractComponent)
     params = OrderedDict{ParamID, Parameter}()
-        for pname in fieldnames(typeof(comp))
-            par = getfield(comp, pname)
-            if isa(par, Parameter)
-                params[ParamID(pname)] = par
-            elseif isa(par, Vector{Parameter})
-                for i in 1:length(par)
-                    params[ParamID(pname, i)] = par[i]
-                end
+    for pname in fieldnames(typeof(comp))
+        par = getfield(comp, pname)
+        if isa(par, Parameter)
+            params[ParamID(pname)] = par
+        elseif isa(par, Vector{Parameter})
+            for i in 1:length(par)
+                params[ParamID(pname, i)] = par[i]
             end
         end
+    end
     return params
 end
 
