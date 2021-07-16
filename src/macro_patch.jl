@@ -1,6 +1,6 @@
 using MacroTools
 
-macro patch!(_expr)
+macro internal_patch!(assert_existence, _expr)
     expr = prettify(_expr)
     mname = Symbol[]
     check = Expr[]
@@ -61,12 +61,31 @@ macro patch!(_expr)
     fixed = unique(fixed);  # for i in 1:length(fixed);  println(fixed[i]);  end
     check = Expr(:&&, check...)
     fixed = Expr(:block, fixed...)
-    out = prettify(:(
-        if $check
-        $fixed
-        GFit.patch!($mname, GFit.@exprfunc $mname -> $expr)
-        end
-    ))
+    if assert_existence
+        out = prettify(:(
+            @assert $check;
+            $fixed;
+            GFit.patch!($mname, GFit.@exprfunc $mname -> $expr)
+        ))
+    else
+        out = prettify(:(
+            if $check
+            $fixed;
+            GFit.patch!($mname, GFit.@exprfunc $mname -> $expr)
+            end
+        ))
+    end
     # println(out)
     return esc(out)
 end
+
+
+macro try_patch!(_expr)
+    return esc(:(GFit.@internal_patch!(false, $_expr)))
+end
+
+macro patch!(_expr)
+    return esc(:(GFit.@internal_patch!(true, $_expr)))
+end
+
+

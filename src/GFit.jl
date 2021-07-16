@@ -25,7 +25,7 @@ import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
     Model, @expr, SumReducer, select_reducer!, domain,
-    MultiModel, @patch!, evaluate!, isfixed, thaw, freeze, fit!
+    MultiModel, @patch!, @try_patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
 include("domain.jl")
