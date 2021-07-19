@@ -163,9 +163,9 @@ function show(io::IO, comp::AbstractComponent)
     (table, fixed, error, watch) = preparetable(comp)
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
-                             Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
-                             Highlighter((data,i,j) -> (error[i]  && (j in (3,4,5))), showsettings.error)))
+               highlighters=(Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
+                             Highlighter((data,i,j) -> (error[i]  && (j in (3,4,5))), showsettings.error),
+                             Highlighter((data,i,j) -> fixed[i], showsettings.fixed)))
 end
 
 
@@ -199,9 +199,9 @@ function show(io::IO, model::Model)
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
-                             Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
-                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4,5))), showsettings.error)))
+               highlighters=(Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
+                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4,5))), showsettings.error),
+                             Highlighter((data,i,j) -> fixed[i], showsettings.fixed)))
 
     i = 1
     error = Vector{Bool}()
