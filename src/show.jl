@@ -125,6 +125,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
+    watch = Vector{Bool}()
 
     ctype = split(string(typeof(comp)), ".")
     (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
@@ -143,6 +144,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
                      [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.patched])
         push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
+        push!(watch, param.val != param.patched)
         if !showsettings.plain
             cname = ""
             ctype = ""
@@ -153,15 +155,16 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         push!(fixed, false)
         push!(error, false)
     end
-    return (table, fixed, error)
+    return (table, fixed, error, watch)
 end
 
 
 function show(io::IO, comp::AbstractComponent)
-    (table, fixed, error) = preparetable(comp)
+    (table, fixed, error, watch) = preparetable(comp)
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
-               formatters=ft_printf(showsettings.floatformat, [4]),
+               formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
+                             Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i]  && (j in (3,4,5))), showsettings.error)))
 end
 
@@ -182,19 +185,22 @@ function show(io::IO, model::Model)
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
+    watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for (cname, ceval) in model.cevals
         comp = ceval.comp
-        (t, f, e) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
+        (t, f, e, w) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
         append!(fixed, f .| (ceval.cfixed >= 1))
         append!(error, e)
+        append!(watch, w)
         push!(hrule, length(error)+1)
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, [4]),
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> fixed[i], showsettings.fixed),
+                             Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i] &&  (j in (3,4,5))), showsettings.error)))
 
     i = 1
