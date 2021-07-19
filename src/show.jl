@@ -2,6 +2,8 @@ mutable struct ShowSettings
     plain::Bool
     tableformat::TextFormat
     floatformat::String
+    showfixed::Bool
+    showevals::Bool
     border::Crayon
     header::Crayon
     subheader::Crayon
@@ -9,12 +11,10 @@ mutable struct ShowSettings
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    showfixed::Bool
-    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g",
+    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true, true,
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
-                         crayon"light_red blink", crayon"negative", crayon"green bold",
-                         true)
+                         crayon"light_red blink", crayon"negative", crayon"green bold")
 end
 
 const showsettings = ShowSettings()
@@ -171,7 +171,7 @@ function show(io::IO, red::ExprReducer)
 end
 
 function show(io::IO, red::SumReducer)
-    println(io, "∑ " * join(string.(red.list), ", "))
+    println(io, join(string.(red.list), " + "))
 end
 
 function show(io::IO, model::Model)
@@ -229,9 +229,11 @@ function show(io::IO, model::Model)
         i += 1
     end
 
-    section(io, "Patch expressions:")
-    for pf in model.patchfuncts
-        println(io, string(pf.expr))
+    if length(model.patchfuncts) > 0
+        section(io, "Patch expressions:")
+        for pf in model.patchfuncts
+            println(io, string(pf.expr))
+        end
     end
 
     println(io)
@@ -242,11 +244,13 @@ function show(io::IO, model::Model)
         println(io)
     end
 
-    section(io, "Evaluations:")
-    printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-               hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+length(model.revals)+1],
-               formatters=ft_printf(showsettings.floatformat, 3:5),
-               highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
+    if showsettings.showevals
+        section(io, "Evaluations:")
+        printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+                   hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+length(model.revals)+1],
+                   formatters=ft_printf(showsettings.floatformat, 3:5),
+                   highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
+    end
 end
 
 
@@ -258,45 +262,33 @@ function show(io::IO, multi::MultiModel)
     end
     println(io)
 
-    section(io, "Global patch expressions:")
-    for pf in multi.patchfuncts
-        println(io, string(pf.expr))
+    if length(multi.patchfuncts) > 0
+        section(io, "Multi model patch expressions:")
+        for pf in multi.patchfuncts
+            println(io, string(pf.expr))
+        end
     end
 end
 
+
 function show(io::IO, res::FitResult)
-    section(io, "Best Fit results:")
+    section(io, "Fit results:")
 
     println(io, @sprintf("    #Data  : %8d              Fit-stat: %-10.5g", res.ndata, res.fitstat))
     println(io, @sprintf("    #Param : %8d              Red. GOF: %-10.4g", res.nfree, res.gofstat / res.dof))
     println(io, @sprintf("    DOF    : %8d              Prob.   : %-10.4g", res.dof, 10^res.log10testprob))
-    print(io, "    Status : ")
-    (crayon, status, message) = as_string(res.mzer)
 
+    print(io,            "    Status : ")
+    (crayon, status, message) = as_string(res.mzer)
     if showsettings.plain
         print(io, @sprintf("%8s", status))
     else
         print(io, crayon, @sprintf("%8s", status), crayon"default")
     end
-    println(io, @sprintf("              Elapsed: %-10.4g s", res.elapsed))
+
+    println(io, @sprintf("              Elapsed : %-10.4g s", res.elapsed))
+
     if message != ""
         println(io, crayon, message, crayon"default")        
     end
 end
-
-#=
-function savelog(filename::String, args...; plain=true)
-    orig = showsettings.plain
-    showsettings.plain = plain
-    try
-        f = open(filename, "w")
-        for arg in args
-            show(f, arg)
-            println(f)
-        end
-        close(f)
-    catch
-    end
-    showsettings.plain = orig
-end
-=#

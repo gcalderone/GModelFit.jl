@@ -414,8 +414,8 @@ function patch!(model::Model, exfunc::ExprFunction)
     evaluate!(model)
     return model
 end
-
 include("macro_patch.jl")
+
 
 function isfixed(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"

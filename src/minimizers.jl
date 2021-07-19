@@ -1,8 +1,11 @@
 # ====================================================================
 # Minimizers
 #
-
+abstract type AbstractMinimizer end
 abstract type AbstractMinimizerStatus end
+
+
+# --------------------------------------------------------------------
 struct MinimizerStatusOK <: AbstractMinimizerStatus
     best::Vector{Float64}
     unc::Vector{Float64}
@@ -10,9 +13,9 @@ struct MinimizerStatusOK <: AbstractMinimizerStatus
 end
 
 struct MinimizerStatusWarn <: AbstractMinimizerStatus
-    message::String
     best::Vector{Float64}
     unc::Vector{Float64}
+    message::String
     specific
 end
 
@@ -34,12 +37,11 @@ function as_string(status::AbstractMinimizerStatus)
 end
 
 
-# --------------------------------------------------------------------
-abstract type AbstractMinimizer end
 
+# --------------------------------------------------------------------
 import LsqFit
-struct lsqfit <: AbstractMinimizer
-end
+
+struct lsqfit <: AbstractMinimizer; end
 
 function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
     ndata = length(func(getfield.(params, :val)))
@@ -113,9 +115,9 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
 
         if res.status == 2
             return MinimizerStatusWarn(
-                "CMPFit status = 2 may imply one (or more) guess values are too far from optimum",
                 getfield.(Ref(res), :param),
                 getfield.(Ref(res), :perror),
+                "CMPFit status = 2 may imply one (or more) guess values are too far from optimum",
                 res)
         end
 
