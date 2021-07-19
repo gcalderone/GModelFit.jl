@@ -259,6 +259,7 @@ mutable struct Model
                     Symbol(""),
                     Vector{ExprFunction}(),
                     nothing)
+        evaluate!(model)  # populate meval
         for (name, item) in parse_args(args...)
             model[name] = item
         end
@@ -358,14 +359,21 @@ function update_params!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothi
     j = 1
     for (cname, ceval) in model.cevals
         for (pid, par) in ceval.params
-            par.val = model.meval.pvalues[i]
-            par.patched = model.meval.patched[i]
             if i in model.meval.ifree
-                par.unc = isnothing(unc)  ?  NaN  :  unc[j]
+                if !isnothing(unc)
+                    par.unc = unc[j]
+                elseif par.val != model.meval.pvalues[i]
+                    # overwrite only if param. value has changed
+                    # (i.e. avoid loosing uncertainty when invoking
+                    # evaluate!(model)
+                    par.unc = NaN
+                end
                 j += 1
             else
                 par.unc = NaN
             end
+            par.val = model.meval.pvalues[i]
+            par.patched = model.meval.patched[i]
             i += 1
         end
     end
