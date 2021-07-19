@@ -358,14 +358,14 @@ function update_params!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothi
     j = 1
     for (cname, ceval) in model.cevals
         for (pid, par) in ceval.params
+            par.val = model.meval.pvalues[i]
+            par.patched = model.meval.patched[i]
             if i in model.meval.ifree
-                par.val = model.meval.pvalues[j]
                 par.unc = isnothing(unc)  ?  NaN  :  unc[j]
                 j += 1
             else
                 par.unc = NaN
             end
-            par.patched = model.meval.patched[i]
             i += 1
         end
     end
