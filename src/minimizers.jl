@@ -6,19 +6,19 @@ abstract type AbstractMinimizerStatus end
 struct MinimizerStatusOK <: AbstractMinimizerStatus
     best::Vector{Float64}
     unc::Vector{Float64}
-    int_result
+    specific
 end
 
 struct MinimizerStatusWarn <: AbstractMinimizerStatus
     message::String
     best::Vector{Float64}
     unc::Vector{Float64}
-    int_result
+    specific
 end
 
 struct MinimizerStatusError <: AbstractMinimizerStatus
     message::String
-    int_result
+    specific
 end
 
 function as_string(status::AbstractMinimizerStatus)

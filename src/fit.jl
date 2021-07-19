@@ -1,91 +1,124 @@
+# --------------------------------------------------------------------
+struct FitResult
+    timestamp::DateTime
+    elapsed::Float64
+    ndata::Int
+    nfree::Int
+    dof::Int
+    fitstat::Float64
+    gofstat::Float64
+    log10testprob::Float64
+    resid::Vector{Float64}
+    mzer::Union{Nothing, AbstractMinimizerStatus}
+end
+
+
 function fit!(model::Model, data::Measures{N};
-              minimizer=lsqfit()) where N
+              minimizer=lsqfit(), dry=false) where N
     timestamp = now()
     evaluate!(model)
-    mdc = MDComparison(model, data)
-    @assert length(mdc.ifree) > 0 "No free parameter in the model"
-    @assert mdc.dof >= 1
 
-    prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
-    function pval2resid(pvalues::Vector{Float64})
-        out = try_pvalues(mdc, model, pvalues)
-        evaluate_showvalues(x) = () -> [(:red_chisq, sum(abs2.(x)) / mdc.dof)]
-        ProgressMeter.next!(prog; showvalues = evaluate_showvalues(out))
-        return out
+    data1d = flatten(data)
+    resid1d = fill(NaN, length(data1d))
+    params = model.meval.params[model.meval.ifree]
+    @assert length(params) > 0 "No free parameter in the model"
+
+    if !dry
+        prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
+        function private_func(pvalues::Vector{Float64})
+            model.meval.pvalues[model.meval.ifree] .= pvalues
+            patch_params(model)
+            quick_evaluate(model)
+            resid1d .= (model() .- data1d.val) ./ data1d.unc
+
+            evaluate_showvalues(x) = () -> [(:fit_stat, sum(abs2.(x)) / (length(resid1d) - length(pvalues)))]
+            ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
+            return resid1d
+        end
+        result = minimize(minimizer, private_func, model.meval.params[model.meval.ifree])
+        private_func(result.best)
+        update_params!(model, result.unc)
+        ProgressMeter.finish!(prog)
+    else
+        private_func(getfield.(params, :val))
     end
-    result = minimize(minimizer, pval2resid, mdc.params)
-    pval2resid(result.best)
-    ProgressMeter.finish!(prog)
-    save_bestfit!(mdc, model)
 
     # Prepare output
-    comps = OrderedDict{Symbol, BestFitComp}()
-    i = 1
-    unc = deepcopy(result.unc)
-    for (cname, ceval) in model.cevals
-        comps[cname] = BestFitComp()
-        for (pid, par) in ceval.params
-            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
-                bfpar = BestFitParam(model.peval.pvalues[i], popfirst!(unc), false, model.peval.patched[i])
-            else
-                bfpar = BestFitParam(model.peval.pvalues[i], NaN           , true , model.peval.patched[i])
-            end
-            push!(comps[cname], pid.name, bfpar)
-            i += 1
-        end
-    end
-
+    ndata = length(resid1d)
+    nfree = length(params)
+    dof = ndata - nfree
+    fitstat = sum(abs2, resid1d)
+    gofstat = sum(abs2, resid1d)
     elapsed = now() - timestamp
     @assert isa(elapsed, Millisecond)
-    return BestFitResult(timestamp, elapsed.value / 1.e3, result,
-                         comps, mdc)
+    return FitResult(timestamp, elapsed.value / 1.e3,
+                     ndata, nfree, dof, fitstat, gofstat,
+                     logccdf(Chisq(dof), gofstat) * log10(exp(1)),
+                     resid1d, (dry  ?  nothing  :  result))
 end
 
 
 function fit!(multi::MultiModel, data::Vector{Measures{N}};
-              minimizer=lsqfit()) where N
+              minimizer=lsqfit(), dry=false) where N
     timestamp = now()
     evaluate!(multi)
-    mdc = MDMultiComparison(multi, data)
-    @assert length(mdc.ifree) > 0 "No free parameter in the model"
-    @assert mdc.dof >= 1
 
-    prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
-    function pval2resid(pvalues::Vector{Float64})
-        out = try_pvalues(mdc, multi, pvalues)
-        evaluate_showvalues(x) = () -> [(:red_chisq, sum(abs2.(x)) / mdc.dof)]
-        ProgressMeter.next!(prog; showvalues = evaluate_showvalues(mdc.residuals))
-        return mdc.residuals
+    data1d = [flatten(data[id]) for id in 1:length(multi)]
+    resid1d = fill(NaN, sum(length.(data1d)))
+    params = Vector{Parameter}()
+    for id in 1:length(multi)
+        append!(params, multi[id].meval.params[multi[id].meval.ifree])
     end
-    result = minimize(minimizer, pval2resid, mdc.params)
-    pval2resid(result.best)
-    ProgressMeter.finish!(prog)
-    save_bestfit!(mdc, multi)
+    @assert length(params) > 0 "No free parameter in the model"
+
+    if !dry
+        prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
+        function private_func(pvalues::Vector{Float64})
+            i1 = 1
+            for id in 1:length(multi)
+                nn = length(multi[id].meval.ifree)
+                i2 = i1 + nn - 1
+                multi[id].meval.pvalues[multi[id].meval.ifree] = pvalues[i1:i2]
+                i1 += nn
+            end
+            patch_params(multi)
+            quick_evaluate(multi)
+
+            i1 = 1
+            for id in 1:length(multi)
+                nn = length(data1d[id])
+                i2 = i1 + nn - 1
+                resid1d[i1:i2] .= (multi[id]() .- data1d[id].val) ./ data1d[id].unc
+                i1 += nn
+            end
+            evaluate_showvalues(x) = () -> [(:fit_stat, sum(abs2.(x)) / (length(resid1d) - length(pvalues)))]
+            ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
+            return resid1d
+        end
+        result = minimize(minimizer, private_func, params)
+        private_func(result.best)
+        i1 = 1
+        for id in 1:length(multi)
+            nn = length(multi[id].meval.ifree)
+            i2 = i1 + nn - 1
+            update_params!(multi[id], result.unc[i1:i2])
+            i1 += nn
+        end
+        ProgressMeter.finish!(prog)        
+    else
+        private_func(getfield.(params, :val))
+    end
 
     # Prepare output
-    bfmodels = Vector{OrderedDict{Symbol, BestFitComp}}()
-    unc = deepcopy(result.unc)
-    for id in 1:length(multi)
-        model = multi[id]
-        comps = OrderedDict{Symbol, BestFitComp}()
-        i = 1
-        for (cname, ceval) in model.cevals
-            comps[cname] = BestFitComp()
-            for (pid, par) in ceval.params
-                if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
-                    bfpar = BestFitParam(model.peval.pvalues[i], popfirst!(unc), false, model.peval.patched[i])
-                else
-                    bfpar = BestFitParam(model.peval.pvalues[i], NaN           , true , model.peval.patched[i])
-                end
-                push!(comps[cname], pid.name, bfpar)
-                i += 1
-            end
-        end
-        push!(bfmodels, comps)
-    end
-
+    ndata = length(resid1d)
+    nfree = length(params)
+    dof = ndata - nfree
+    fitstat = sum(abs2, resid1d)
+    gofstat = sum(abs2, resid1d)
     elapsed = now() - timestamp
     @assert isa(elapsed, Millisecond)
-    return BestFitMultiResult(timestamp, elapsed.value / 1.e3, result,
-                              bfmodels, mdc)
+    return FitResult(timestamp, elapsed.value / 1.e3,
+                     ndata, nfree, dof, fitstat, gofstat,
+                     logccdf(Chisq(dof), gofstat) * log10(exp(1)),
+                     resid1d, (dry  ?  nothing  :  result))
 end

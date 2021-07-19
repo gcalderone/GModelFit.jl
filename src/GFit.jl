@@ -66,7 +66,9 @@ mutable struct Parameter
     high::Float64             # upper limit value
     step::Float64
     fixed::Bool
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false)
+    patched::Float64
+    unc::Float64
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, NaN, NaN)
 end
 
 
@@ -208,19 +210,15 @@ end
 # ====================================================================
 # Model
 #
-
 const PatchComp = HashVector{Float64}
 
 struct ModelEval
+    params::Vector{Parameter}
+    ifree::Vector{Int}
     pvalues::Vector{Float64}
     patched::Vector{Float64}
     patchcomps::OrderedDict{Symbol, PatchComp}
     reducer_args::OrderedDict{Symbol, Vector{Float64}}
-
-    ModelEval() =
-        new(Vector{Float64}(), Vector{Float64}(),
-            OrderedDict{Symbol, PatchComp}(),
-            OrderedDict{Symbol, Vector{Float64}}())
 end
 
 abstract type AbstractMultiModel end
@@ -233,7 +231,7 @@ mutable struct Model
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
     patchfuncts::Vector{ExprFunction}
-    peval::ModelEval
+    meval::Union{Nothing, ModelEval}
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
@@ -260,7 +258,7 @@ mutable struct Model
                     OrderedDict{Symbol, ReducerEval}(),
                     Symbol(""),
                     Vector{ExprFunction}(),
-                    ModelEval())
+                    nothing)
         for (name, item) in parse_args(args...)
             model[name] = item
         end
@@ -268,6 +266,108 @@ mutable struct Model
             model[:default_sum] = SumReducer(collect(keys(model.cevals)))
         end
         return model
+    end
+end
+
+
+function ModelEval(model::Model)
+    params = Vector{Parameter}()
+    ifree = Vector{Int}()
+    pvalues = Vector{Float64}()
+    patched = Vector{Float64}()
+    patchcomps = OrderedDict{Symbol, PatchComp}()
+    reducer_args = OrderedDict{Symbol, Vector{Float64}}()
+
+    i = 1
+    for (cname, ceval) in model.cevals
+        patchcomps[cname] = HashVector{Float64}(patched)
+        for (pid, par) in ceval.params
+            if !(par.low <= par.val <= par.high)
+                s = "Value outside limits for param [$(cname)].$(pid.name):\n" * string(par)
+                error(s)
+            end
+            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
+                push!(ifree, i)
+            end
+            push!(params, par)
+            push!(pvalues, par.val)
+            push!(patchcomps[cname], pid.name, NaN)
+            i += 1
+        end
+    end
+    @assert length(patched) == length(pvalues)
+
+    for (cname, ceval) in model.cevals
+        reducer_args[cname] = ceval.buffer
+    end
+    for (rname, reval) in model.revals
+        reducer_args[rname] = reval.buffer
+    end
+
+    return ModelEval(params, ifree, pvalues, patched, patchcomps, reducer_args)
+end
+
+
+function evaluate!(model::Model)
+    model.meval = ModelEval(model)
+    patch_params(model)
+    quick_evaluate(model)
+    update_params!(model)
+    return model
+end
+
+function patch_params(model::Model)
+    if !isnothing(model.parent)
+        patch_params(model.parent)
+    else
+        model.meval.patched .= model.meval.pvalues  # copy all values by default
+        for pf in model.patchfuncts
+            pf.funct(model.meval.patchcomps)
+        end
+    end
+    nothing
+end
+
+function quick_evaluate(model::Model)
+    i1 = 1
+    for (cname, ceval) in model.cevals
+        if length(ceval.params) > 0
+            i2 = i1 + length(ceval.params) - 1
+            evaluate_cached(ceval, model.meval.patched[i1:i2])
+            i1 += length(ceval.params)
+        else
+            evaluate_cached(ceval, Float64[])
+        end
+    end
+
+    for (rname, reval) in model.revals
+        (rname == model.rsel)  &&  continue  # this should be evaluated as last one
+        reval.counter += 1
+        evaluate!(reval.buffer, reval.red, model.domain, model.meval.reducer_args)
+    end
+
+    if length(model.revals) > 0
+        reval = model.revals[model.rsel]
+        reval.counter += 1
+        evaluate!(reval.buffer, reval.red, model.domain, model.meval.reducer_args)
+    end
+end
+
+function update_params!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
+    i = 1
+    j = 1
+    for (cname, ceval) in model.cevals
+        for (pid, par) in ceval.params
+            if i in model.meval.ifree
+                par.val = model.meval.pvalues[j]
+                par.unc = isnothing(unc)  ?  NaN  :  unc[j]
+                j += 1
+            else
+                par.unc = NaN
+            end
+            par.patched = model.meval.patched[i]
+            i += 1
+        end
     end
 end
 
@@ -281,7 +381,7 @@ end
 
 function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
     @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
-    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.peval.reducer_args))
+    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.meval.reducer_args))
     (model.rsel == Symbol(""))  &&  (model.rsel = rname)
     evaluate!(model)
     return model
@@ -308,71 +408,6 @@ end
 
 geteval(model::Model) = geteval(model, model.rsel)
 
-
-function evaluate!(model::Model)
-    # Update peval structure
-    empty!(model.peval.pvalues)
-    empty!(model.peval.patched)
-    empty!(model.peval.patchcomps)
-    for (cname, ceval) in model.cevals
-        model.peval.patchcomps[cname] = HashVector{Float64}(model.peval.patched)
-        for (pid, par) in ceval.params
-            push!(model.peval.pvalues, par.val)
-            push!(model.peval.patchcomps[cname], pid.name, NaN)
-        end
-    end
-    @assert length(model.peval.patched) == length(model.peval.pvalues)
-
-    empty!(model.peval.reducer_args)
-    for (cname, ceval) in model.cevals
-        model.peval.reducer_args[cname] = ceval.buffer
-    end
-    for (rname, reval) in model.revals
-        model.peval.reducer_args[rname] = reval.buffer
-    end
-
-    patch_params(model)
-    quick_evaluate(model)
-
-    return model
-end
-
-function patch_params(model::Model)
-    if !isnothing(model.parent)
-        patch_params(model.parent)
-    else
-        model.peval.patched .= model.peval.pvalues  # copy all values by default
-        for pf in model.patchfuncts
-            pf.funct(model.peval.patchcomps)
-        end
-    end
-    nothing
-end
-
-function quick_evaluate(model::Model)
-    i1 = 1
-    for (cname, ceval) in model.cevals
-        if length(ceval.params) > 0
-            i2 = i1 + length(ceval.params) - 1
-            evaluate_cached(ceval, model.peval.patched[i1:i2])
-            i1 += length(ceval.params)
-        else
-            evaluate_cached(ceval, Float64[])
-        end
-    end
-
-    for (rname, reval) in model.revals
-        (rname == model.rsel)  &&  continue  # this should be evaluated as last one
-        reval.counter += 1
-        evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
-    end
-
-    if length(model.revals) > 0
-        reval = model.revals[model.rsel]
-        reval.counter += 1
-        evaluate!(reval.buffer, reval.red, model.domain, model.peval.reducer_args)
-    end
-end
 
 function patch!(model::Model, exfunc::ExprFunction)
     push!(model.patchfuncts, exfunc)
@@ -419,8 +454,6 @@ domain(model::Model) = model.domain
 
 include("multimodel.jl")
 include("minimizers.jl")
-include("comparison.jl")
-include("results.jl")
 include("fit.jl")
 include("show.jl")
 

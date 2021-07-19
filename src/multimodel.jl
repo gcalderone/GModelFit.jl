@@ -27,18 +27,21 @@ function evaluate!(multi::MultiModel)
     end
     empty!(multi.patchcomps)
     for id in 1:length(multi.models)
-        push!(multi.patchcomps, multi.models[id].peval.patchcomps)
+        push!(multi.patchcomps, multi.models[id].meval.patchcomps)
     end
     patch_params(multi)
     quick_evaluate(multi)
+    for id in 1:length(multi.models)
+        update_params!(multi.models[id])
+    end
 end
 
 function patch_params(multi::MultiModel)
     for id in 1:length(multi.models)
         model = multi.models[id]
-        model.peval.patched .= model.peval.pvalues  # copy all values by default
+        model.meval.patched .= model.meval.pvalues  # copy all values by default
         for pf in model.patchfuncts
-            pf.funct(model.peval.patchcomps)
+            pf.funct(model.meval.patchcomps)
         end
     end
     for pf in multi.patchfuncts
