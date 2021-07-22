@@ -63,6 +63,8 @@ function push!(multi::MultiModel, model::Model)
 end
 
 function patch!(multi::MultiModel, exfunc::ExprFunction)
+    evaluate!(multi)  # ensure sub models are evaluated before adding
+                      # new patch functions
     push!(multi.patchfuncts, exfunc)
     evaluate!(multi)
     return multi
