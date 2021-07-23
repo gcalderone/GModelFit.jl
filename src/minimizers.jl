@@ -106,7 +106,7 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
         if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_theshold)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
             if Δfitstat > minimizer.Δfitstat_theshold
-                println("\n\nMax. number of iteration reached but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_theshold), continue minimization...\n\n")
+                println("\nReached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_theshold), continue minimization...\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue

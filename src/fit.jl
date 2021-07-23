@@ -24,7 +24,8 @@ function fit!(model::Model, data::Measures{N};
     @assert length(params) > 0 "No free parameter in the model"
 
     if !dry
-        prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
+        dof = length(resid1d) - length(params)
+        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
         function private_func(pvalues::Vector{Float64})
             model.meval.pvalues[model.meval.ifree] .= pvalues
             patch_params(model)
@@ -33,8 +34,7 @@ function fit!(model::Model, data::Measures{N};
 
             evaluate_showvalues(x) = () -> begin
                 dof = (length(resid1d) - length(pvalues))
-                [(:fit_stat, sum(abs2, x) / dof),
-                 (:dof     , dof)]
+                [(:fit_stat, sum(abs2, x) / dof)]
             end
             ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
             return resid1d
@@ -76,7 +76,8 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
     @assert length(params) > 0 "No free parameter in the model"
 
     if !dry
-        prog = ProgressUnknown("Model evaluations:", dt=0.5, showspeed=true)
+        dof = length(resid1d) - length(params)
+        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
         function private_func(pvalues::Vector{Float64})
             i1 = 1
             for id in 1:length(multi)
@@ -97,8 +98,7 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
             end
             evaluate_showvalues(x) = () -> begin
                 dof = (length(resid1d) - length(pvalues))
-                [(:fit_stat, sum(abs2, x) / dof),
-                 (:dof     , dof)]
+                [(:fit_stat, sum(abs2, x) / dof)]
             end
             ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
             return resid1d
