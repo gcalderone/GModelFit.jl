@@ -130,3 +130,62 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
                      logccdf(Chisq(dof), gofstat) * log10(exp(1)),
                      resid1d, (dry  ?  nothing  :  result))
 end
+
+
+
+function free_param_names(model::Model)
+    out = Vector{String}()
+    for (cname, ceval) in model.cevals
+        for (pid, par) in ceval.params
+            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
+                if pid.index == 0
+                    push!(out, "[:$(cname)].$(pid.name)")
+                else
+                    push!(out, "[:$(cname)].$(pid.name)[$(pid.index)]")
+                end
+            end
+        end
+    end
+    return out
+end
+
+function free_param_names(multi::MultiModel)
+    out = Vector{String}()
+    for id in 1:length(multi)
+        append!(out, "[$(string(id))]" .* free_param_names(multi[id]))
+    end
+    return out
+end
+
+
+function print_param_covariance(model::Union{Model, MultiModel}, fitres::FitResult;
+                                param::Union{Nothing, String}=nothing, sort=false, thresh=0.)
+    @assert isa(fitres.mzer.specific, CMPFit.Result)
+    if isa(model, Model)
+        @assert isnothing(model.parent)
+    end
+    names = free_param_names(model)
+    @assert length(names)^2 == length(fitres.mzer.specific.covar)
+    ii = Vector{Int}()
+    jj = Vector{Int}()
+    covar = Vector{Float64}()
+    for i in 1:length(names)
+        for j in i+1:length(names)
+            push!(covar, fitres.mzer.specific.covar[i, j])
+            push!(ii, i)
+            push!(jj, j)
+        end
+    end
+    if sort
+        ii    = ii[   sortperm(abs.(covar))]
+        jj    = jj[   sortperm(abs.(covar))]
+        covar = covar[sortperm(abs.(covar))]
+    end
+    for i in 1:length(ii)
+        if !isnothing(param)
+            (names[ii[i]] != param)  &&  continue
+        end
+        (abs(covar[i]) < thresh)  &&  continue
+        @printf "%-30s  %-30s  %10.4f\n" names[ii[i]] names[jj[i]] covar[i]
+    end
+end
