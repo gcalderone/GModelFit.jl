@@ -31,7 +31,11 @@ function fit!(model::Model, data::Measures{N};
             quick_evaluate(model)
             resid1d .= (model() .- data1d.val) ./ data1d.unc
 
-            evaluate_showvalues(x) = () -> [(:fit_stat, sum(abs2.(x)) / (length(resid1d) - length(pvalues)))]
+            evaluate_showvalues(x) = () -> begin
+                dof = (length(resid1d) - length(pvalues))
+                [(:fit_stat, sum(abs2, x) / dof),
+                 (:dof     , dof)]
+            end
             ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
             return resid1d
         end
@@ -91,7 +95,11 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
                 resid1d[i1:i2] .= (multi[id]() .- data1d[id].val) ./ data1d[id].unc
                 i1 += nn
             end
-            evaluate_showvalues(x) = () -> [(:fit_stat, sum(abs2.(x)) / (length(resid1d) - length(pvalues)))]
+            evaluate_showvalues(x) = () -> begin
+                dof = (length(resid1d) - length(pvalues))
+                [(:fit_stat, sum(abs2, x) / dof),
+                 (:dof     , dof)]
+            end
             ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
             return resid1d
         end
