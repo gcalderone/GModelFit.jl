@@ -106,7 +106,7 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
         if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_theshold)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
             if Δfitstat > minimizer.Δfitstat_theshold
-                println("\nMax. number of iteration reached but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_theshold), continue minimization...\n")
+                println("\n\nMax. number of iteration reached but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_theshold), continue minimization...\n\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue
@@ -124,5 +124,48 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
         return MinimizerStatusOK(getfield.(Ref(res), :param),
                                  getfield.(Ref(res), :perror),
                                  res)
+    end
+end
+
+
+function free_param_names(model::Model)
+    out = Vector{String}()
+    for (cname, ceval) in model.cevals
+        for (pid, par) in ceval.params
+            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
+                if pid.index == 0
+                    push!(out, "[:$(cname)].$(pid.name)")
+                else
+                    push!(out, "[:$(cname)].$(pid.name)[$(pid.index)]")
+                end
+            end
+        end
+    end
+    return out
+end
+
+function free_param_names(multi::MultiModel)
+    out = Vector{String}()
+    for id in 1:length(multi)
+        append!(out, "[$(string(id))]" .* seqid(multi[id]))
+    end
+    return out
+end
+
+
+function print_param_covariance(model::Union{Model, MultiModel}, fitres::FitResult, pname::String; sort=false)
+    @assert isa(fitres.mzer.specific, CMPFit.Result)
+    # if isa(model, Model)
+    #   @assert isnothing(model.parent)
+    # end
+    names = free_param_names(model)
+    covar = fitres.mzer.specific.covar[findall(names .== pname)[1], :]
+    @assert length(names) == length(covar)
+    if sort
+        names = names[sortperm(abs.(covar))]
+        covar = covar[sortperm(abs.(covar))]
+    end
+    for i in 1:length(s)
+        @printf "%-30s  %-30s  %10.4f\n" pname names[i] covar[i]
     end
 end
