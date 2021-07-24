@@ -23,29 +23,31 @@ function fit!(model::Model, data::Measures{N};
     params = model.meval.params[model.meval.ifree]
     @assert length(params) > 0 "No free parameter in the model"
 
-    if !dry
-        dof = length(resid1d) - length(params)
-        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
-        function private_func(pvalues::Vector{Float64})
-            model.meval.pvalues[model.meval.ifree] .= pvalues
-            patch_params(model)
-            quick_evaluate(model)
-            resid1d .= (model() .- data1d.val) ./ data1d.unc
+    function private_func(pvalues::Vector{Float64})
+        model.meval.pvalues[model.meval.ifree] .= pvalues
+        patch_params(model)
+        quick_evaluate(model)
+        resid1d .= (model() .- data1d.val) ./ data1d.unc
 
-            evaluate_showvalues(x) = () -> begin
-                dof = (length(resid1d) - length(pvalues))
-                [(:fit_stat, sum(abs2, x) / dof)]
-            end
-            ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
-            return resid1d
+        evaluate_showvalues(x) = () -> begin
+            dof = (length(resid1d) - length(pvalues))
+            [(:fit_stat, sum(abs2, x) / dof)]
         end
+        ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
+        return resid1d
+    end
+
+    dof = length(resid1d) - length(params)
+    prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
+    if !dry
         result = minimize(minimizer, private_func, model.meval.params[model.meval.ifree])
         private_func(result.best)
         update_params!(model, result.unc)
-        ProgressMeter.finish!(prog)
     else
         private_func(getfield.(params, :val))
+        update_params!(model, fill(NaN, length(model.meval.ifree)))
     end
+    ProgressMeter.finish!(prog)
 
     # Prepare output
     ndata = length(resid1d)
@@ -75,34 +77,35 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
     end
     @assert length(params) > 0 "No free parameter in the model"
 
-    if !dry
-        dof = length(resid1d) - length(params)
-        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
-        function private_func(pvalues::Vector{Float64})
-            i1 = 1
-            for id in 1:length(multi)
-                nn = length(multi[id].meval.ifree)
-                i2 = i1 + nn - 1
-                multi[id].meval.pvalues[multi[id].meval.ifree] = pvalues[i1:i2]
-                i1 += nn
-            end
-            patch_params(multi)
-            quick_evaluate(multi)
-
-            i1 = 1
-            for id in 1:length(multi)
-                nn = length(data1d[id])
-                i2 = i1 + nn - 1
-                resid1d[i1:i2] .= (multi[id]() .- data1d[id].val) ./ data1d[id].unc
-                i1 += nn
-            end
-            evaluate_showvalues(x) = () -> begin
-                dof = (length(resid1d) - length(pvalues))
-                [(:fit_stat, sum(abs2, x) / dof)]
-            end
-            ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
-            return resid1d
+    function private_func(pvalues::Vector{Float64})
+        i1 = 1
+        for id in 1:length(multi)
+            nn = length(multi[id].meval.ifree)
+            i2 = i1 + nn - 1
+            multi[id].meval.pvalues[multi[id].meval.ifree] = pvalues[i1:i2]
+            i1 += nn
         end
+        patch_params(multi)
+        quick_evaluate(multi)
+
+        i1 = 1
+        for id in 1:length(multi)
+            nn = length(data1d[id])
+            i2 = i1 + nn - 1
+            resid1d[i1:i2] .= (multi[id]() .- data1d[id].val) ./ data1d[id].unc
+            i1 += nn
+        end
+        evaluate_showvalues(x) = () -> begin
+            dof = (length(resid1d) - length(pvalues))
+            [(:fit_stat, sum(abs2, x) / dof)]
+        end
+        ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
+        return resid1d
+    end
+
+    dof = length(resid1d) - length(params)
+    prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
+    if !dry
         result = minimize(minimizer, private_func, params)
         private_func(result.best)
         i1 = 1
@@ -112,10 +115,17 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
             update_params!(multi[id], result.unc[i1:i2])
             i1 += nn
         end
-        ProgressMeter.finish!(prog)        
     else
         private_func(getfield.(params, :val))
+        i1 = 1
+        for id in 1:length(multi)
+            nn = length(multi[id].meval.ifree)
+            i2 = i1 + nn - 1
+            update_params!(multi[id], fill(NaN, i2-i1+1))
+            i1 += nn
+        end
     end
+    ProgressMeter.finish!(prog)
 
     # Prepare output
     ndata = length(resid1d)

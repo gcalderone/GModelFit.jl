@@ -24,6 +24,7 @@ struct MinimizerStatusError <: AbstractMinimizerStatus
     specific
 end
 
+as_string(::Nothing) = (crayon"bold red", "DRY", "")
 function as_string(status::AbstractMinimizerStatus)
     if isa(status, MinimizerStatusOK)
         return (crayon"green", "OK", "")
