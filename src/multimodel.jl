@@ -22,27 +22,25 @@ Base.length(m::MultiModel) = length(m.models)
 
 
 function evaluate!(multi::MultiModel)
+    eval1!(multi)
+    eval2!(multi)
+    eval3!(multi)
+    eval4!(multi)
+end
+
+function eval1!(multi::MultiModel)
     for id in 1:length(multi.models)
-        evaluate!(multi.models[id])
+        eval1!(multi.models[id])
     end
     empty!(multi.patchcomps)
     for id in 1:length(multi.models)
         push!(multi.patchcomps, multi.models[id].meval.patchcomps)
     end
-    patch_params(multi)
-    quick_evaluate(multi)
-    for id in 1:length(multi.models)
-        update_params!(multi.models[id])
-    end
 end
 
-function patch_params(multi::MultiModel)
+function eval2!(multi::MultiModel)
     for id in 1:length(multi.models)
-        model = multi.models[id]
-        model.meval.patched .= model.meval.pvalues  # copy all values by default
-        for pf in model.patchfuncts
-            pf.funct(model.meval.patchcomps)
-        end
+        eval2!(multi.models[id], fromparent=true)
     end
     for pf in multi.patchfuncts
         pf.funct(multi.patchcomps)
@@ -50,9 +48,15 @@ function patch_params(multi::MultiModel)
     nothing
 end
 
-function quick_evaluate(multi::MultiModel)
+function eval3!(multi::MultiModel)
     for id in 1:length(multi.models)
-        quick_evaluate(multi.models[id])
+        eval3!(multi.models[id])
+    end
+end
+
+function eval4!(multi::MultiModel)
+    for id in 1:length(multi.models)
+        eval4!(multi.models[id])
     end
 end
 

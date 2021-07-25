@@ -310,26 +310,36 @@ end
 
 
 function evaluate!(model::Model)
-    model.meval = ModelEval(model)
-    patch_params(model)
-    quick_evaluate(model)
-    update_params!(model)
+    if !isnothing(model.parent)
+        evaluate!(model.parent)
+    else
+        eval1!(model)
+        eval2!(model)
+        eval3!(model)
+        eval4!(model)
+    end
     return model
 end
 
-function patch_params(model::Model)
-    if !isnothing(model.parent)
-        patch_params(model.parent)
+function eval1!(model::Model)
+    # Update ModelEval structure
+    model.meval = ModelEval(model)
+end
+
+function eval2!(model::Model; fromparent=false)
+    # Evaluate patched parameters
+    if !isnothing(model.parent)  &&  !fromparent
+        eval2!(model.parent)
     else
         model.meval.patched .= model.meval.pvalues  # copy all values by default
         for pf in model.patchfuncts
             pf.funct(model.meval.patchcomps)
         end
     end
-    nothing
 end
 
-function quick_evaluate(model::Model)
+function eval3!(model::Model)
+    # Evaluate model
     i1 = 1
     for (cname, ceval) in model.cevals
         if length(ceval.params) > 0
@@ -354,7 +364,9 @@ function quick_evaluate(model::Model)
     end
 end
 
-function update_params!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
+function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
+    # Update values, uncertainties and patched params from ModelEval
+    # to the actual Model structure.
     i = 1
     j = 1
     for (cname, ceval) in model.cevals
