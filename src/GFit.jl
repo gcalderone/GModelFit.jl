@@ -126,7 +126,7 @@ prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(dom
 #evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T =
 #    error("No evaluate! method implemented for $T")
 
-function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
+function evaluate!(c::CompEval, pvalues::Vector{Float64})
     @assert length(c.params) == length(pvalues)
 
     # Do we actually need a new evaluation?
@@ -142,6 +142,7 @@ function evaluate_cached(c::CompEval, pvalues::Vector{Float64})
     end
     return c.buffer
 end
+evaluate!(c::CompEval) = evaluate!(c, getfield.(values(c.params), :val))
 
 # Built-in components
 #
@@ -167,17 +168,28 @@ prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol,
 struct ExprReducer <: AbstractReducer
     ef::ExprFunction
     function ExprReducer(ef::ExprFunction)
-        @assert length(ef.args) == 1
         new(ef)
     end
 end
 
 prepare!(red::ExprReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
-    fill(NaN, length(red.ef.funct(args)))
+    fill(NaN, length(red.ef.funct(args[red.ef.args])))
 
 function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= red.ef.funct(args)
+    buffer .= red.ef.funct(domain, args)
+    nothing
+end
+
+function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+                   domain::Domain{1}, args::OrderedDict{Symbol, Vector{Float64}})
+    buffer .= red.ef.funct(domain[1], args)
+    nothing
+end
+
+function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+                   domain::Union{Domain{2}, CartesianDomain{2}}, args::OrderedDict{Symbol, Vector{Float64}})
+    buffer .= red.ef.funct(domain[1], domain[2], args)
     nothing
 end
 
@@ -344,10 +356,10 @@ function eval3!(model::Model)
     for (cname, ceval) in model.cevals
         if length(ceval.params) > 0
             i2 = i1 + length(ceval.params) - 1
-            evaluate_cached(ceval, model.meval.patched[i1:i2])
+            evaluate!(ceval, model.meval.patched[i1:i2])
             i1 += length(ceval.params)
         else
-            evaluate_cached(ceval, Float64[])
+            evaluate!(ceval, Float64[])
         end
     end
 
