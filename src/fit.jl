@@ -57,9 +57,11 @@ function fit!(model::Model, data::Measures{N};
     gofstat = sum(abs2, resid1d)
     elapsed = now() - timestamp
     @assert isa(elapsed, Millisecond)
+    tp = NaN
+    try; tp = logccdf(Chisq(dof), gofstat) * log10(exp(1)); catch; end
     return FitResult(timestamp, elapsed.value / 1.e3,
                      ndata, nfree, dof, fitstat, gofstat,
-                     logccdf(Chisq(dof), gofstat) * log10(exp(1)),
+                     tp,
                      resid1d, (dry  ?  nothing  :  result))
 end
 
@@ -135,9 +137,11 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
     gofstat = sum(abs2, resid1d)
     elapsed = now() - timestamp
     @assert isa(elapsed, Millisecond)
+    tp = NaN
+    try; tp = logccdf(Chisq(dof), gofstat) * log10(exp(1)); catch; end
     return FitResult(timestamp, elapsed.value / 1.e3,
                      ndata, nfree, dof, fitstat, gofstat,
-                     logccdf(Chisq(dof), gofstat) * log10(exp(1)),
+                     tp,
                      resid1d, (dry  ?  nothing  :  result))
 end
 
