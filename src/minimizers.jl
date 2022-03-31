@@ -73,13 +73,13 @@ iteration the improvement is particularly small).
 The best approach is probably to use default tolerance values and
 either increase the maximum allowed number of iterations
 (config.maxiter) or set a threshold for relative fit statistic
-improvements (Δfitstat_theshold) to be checked after the minimizer
+improvements (Δfitstat_threshold) to be checked after the minimizer
 iterated for the maximum allowed number of times.
 =#
 
 mutable struct cmpfit <: AbstractMinimizer
     config::CMPFit.Config
-    Δfitstat_theshold::Float64
+    Δfitstat_threshold::Float64
     cmpfit() = new(CMPFit.Config(), NaN)
 end
 
@@ -104,10 +104,10 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
             return MinimizerStatusError("Status = $(res.status)", res)
         end
 
-        if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_theshold)
+        if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_threshold)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
-            if Δfitstat > minimizer.Δfitstat_theshold
-                println("\nReached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_theshold), continue minimization...\n")
+            if Δfitstat > minimizer.Δfitstat_threshold
+                println("\nReached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_threshold), continue minimization...\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue
