@@ -146,7 +146,7 @@ evaluate!(c::CompEval) = evaluate!(c, getfield.(values(c.params), :val))
 
 # Built-in components
 #
-include("components/utils.jl")
+include("utils.jl")
 include("components/CDomain.jl")
 include("components/SimplePar.jl")
 include("components/FuncWrap.jl")
