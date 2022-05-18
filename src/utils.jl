@@ -1,10 +1,9 @@
-using Dierckx, QuadGK
 
-
-function int_tabulated(λ, f; int_k=3)
-    @assert issorted(λ)
-    @assert all(isfinite.(λ))
-    @assert all(isfinite.(f))
-    itp = Spline1D(λ, f, k=int_k, bc="error")
-    return quadgk(itp, λ[1], λ[end])
+function int_tabulated(x, y)
+    @assert issorted(x)
+    @assert all(isfinite.(x))
+    @assert all(isfinite.(y))
+    b = x[2:end] .- x[1:end-1]
+    h = y[2:end] .+ y[1:end-1]
+    return sum(b .* h) / 2
 end
