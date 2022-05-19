@@ -24,25 +24,29 @@ import Base.iterate
 import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
-    Model, @expr, SumReducer, select_reducer!, domain,
-    MultiModel, @patch!, @try_patch!, evaluate!, isfixed, thaw, freeze, fit!
+    Model, @λ, SumReducer, select_reducer!, domain,
+    MultiModel, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
 include("domain.jl")
 include("HashVector.jl")
 
 # ====================================================================
-mutable struct ExprFunction
-    expr::Expr
+struct λFunct
     funct::Function
-    args::Vector{Symbol}
+    expr::String
+    args::Vector{Symbol}   # positional arguments
+    optargs::Vector{Expr}  # optional arguments with default values
 end
+(f::λFunct)(args...; kws...) = f.funct(args...; kws...)
 
-macro exprfunc(_expr)
+macro λ(_expr)
     @assert isexpr(longdef(_expr), :function)
     expr = prettify(_expr)
-    args = convert(Vector{Symbol}, splitdef(expr)[:args])
-    return esc(:(GFit.ExprFunction($(QuoteNode(expr)), $expr, $args)))
+    def  = splitdef(expr)
+    args    = convert(Vector{Symbol}, filter(x -> isa(x, Symbol), def[:args]))
+    optargs = convert(Vector{Expr}  , filter(x -> isa(x, Expr)  , def[:args]))
+    return esc(:(GFit.λFunct($expr, string($(QuoteNode(expr))), $args, $optargs)))
 end
 
 
@@ -164,42 +168,29 @@ abstract type AbstractReducer end
 prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
     fill(NaN, length(domain))
 
-
-struct ExprReducer <: AbstractReducer
-    ef::ExprFunction
-    function ExprReducer(ef::ExprFunction)
-        new(ef)
-    end
-end
-
-prepare!(red::ExprReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
+prepare!(red::λFunct, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
     fill(NaN, length(red.ef.funct(args[red.ef.args])))
 
-function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+function evaluate!(buffer::Vector{Float64}, red::λFunct,
                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
     buffer .= red.ef.funct(domain, args)
     nothing
 end
 
-function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+function evaluate!(buffer::Vector{Float64}, red::λFunct,
                    domain::Domain{1}, args::OrderedDict{Symbol, Vector{Float64}})
     buffer .= red.ef.funct(domain[1], args)
     nothing
 end
 
-function evaluate!(buffer::Vector{Float64}, red::ExprReducer,
+function evaluate!(buffer::Vector{Float64}, red::λFunct,
                    domain::Union{Domain{2}, CartesianDomain{2}}, args::OrderedDict{Symbol, Vector{Float64}})
     buffer .= red.ef.funct(domain[1], domain[2], args)
     nothing
 end
 
-macro expr(expr)
-    return esc(:(GFit.ExprReducer(GFit.@exprfunc $expr)))
-end
-
-
-struct SumReducer <: AbstractReducer
-    list::Vector{Symbol}
+function SumReducer
+    # TODO
 end
 
 function evaluate!(buffer::Vector{Float64}, red::SumReducer,
@@ -242,7 +233,7 @@ mutable struct Model
     cevals::OrderedDict{Symbol, CompEval}
     revals::OrderedDict{Symbol, ReducerEval}
     rsel::Symbol
-    patchfuncts::Vector{ExprFunction}
+    patchfuncts::Vector{λFunct}
     meval::Union{Nothing, ModelEval}
 
     function Model(domain::AbstractDomain, args...)
@@ -269,7 +260,7 @@ mutable struct Model
                     OrderedDict{Symbol, CompEval}(),
                     OrderedDict{Symbol, ReducerEval}(),
                     Symbol(""),
-                    Vector{ExprFunction}(),
+                    Vector{λFunct}(),
                     nothing)
         evaluate!(model)  # populate meval
         for (name, item) in parse_args(args...)
@@ -441,12 +432,11 @@ end
 geteval(model::Model) = geteval(model, model.rsel)
 
 
-function patch!(model::Model, exfunc::ExprFunction)
-    push!(model.patchfuncts, exfunc)
+function patch!(func::λFunct, model::Model)
+    push!(model.patchfuncts, func)
     evaluate!(model)
     return model
 end
-include("macro_patch.jl")
 
 
 function isfixed(model::Model, cname::Symbol)
