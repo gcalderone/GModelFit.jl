@@ -169,12 +169,8 @@ function show(io::IO, comp::AbstractComponent)
 end
 
 
-function show(io::IO, red::ExprReducer)
-    println(io, red.ef.expr)
-end
-
-function show(io::IO, red::SumReducer)
-    println(io, join(string.(red.list), " + "))
+function show(io::IO, red::λFunct)
+    println(io, red.display)
 end
 
 function show(io::IO, model::Model)
@@ -238,7 +234,7 @@ function show(io::IO, model::Model)
     if length(model.patchfuncts) > 0
         section(io, "Patch expressions:")
         for pf in model.patchfuncts
-            println(io, string(pf.expr))
+            println(io, string(pf.display))
         end
     end
 
@@ -271,7 +267,7 @@ function show(io::IO, multi::MultiModel)
     if length(multi.patchfuncts) > 0
         section(io, "Multi model patch expressions:")
         for pf in multi.patchfuncts
-            println(io, string(pf.expr))
+            println(io, string(pf.display))
         end
     end
 end

@@ -34,7 +34,7 @@ include("HashVector.jl")
 # ====================================================================
 struct λFunct
     funct::Function
-    expr::String
+    display::String
     args::Vector{Symbol}   # positional arguments
     optargs::Vector{Expr}  # optional arguments with default values
 end
