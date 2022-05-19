@@ -3,11 +3,11 @@
 #
 mutable struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
-    patchfuncts::Vector{λFunction}
+    patchfuncts::Vector{λFunct}
     patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
 
     function MultiModel(v::Vararg{Model})
-        multi = new([v...], Vector{λFunction}(),
+        multi = new([v...], Vector{λFunct}(),
                     Vector{OrderedDict{Symbol, PatchComp}}())
         for m in v
             m.parent = multi
@@ -66,7 +66,7 @@ function push!(multi::MultiModel, model::Model)
     evaluate!(multi)
 end
 
-function patch!(func::λFunction, multi::MultiModel)
+function patch!(func::λFunct, multi::MultiModel)
     evaluate!(multi)  # ensure sub models are evaluated before adding
                       # new patch functions
     push!(multi.patchfuncts, func)

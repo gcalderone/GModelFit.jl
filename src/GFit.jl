@@ -189,18 +189,18 @@ function evaluate!(buffer::Vector{Float64}, red::λFunct,
     nothing
 end
 
-function SumReducer
-    # TODO
-end
-
-function evaluate!(buffer::Vector{Float64}, red::SumReducer,
-                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= 0.
-    for name in red.list
-        buffer .+= args[name]
-    end
-    nothing
-end
+# TODO function SumReducer
+# TODO 
+# TODO end
+# TODO 
+# TODO function evaluate!(buffer::Vector{Float64}, red::SumReducerFunct,
+# TODO                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
+# TODO     buffer .= 0.
+# TODO     for name in red.list
+# TODO         buffer .+= args[name]
+# TODO     end
+# TODO     nothing
+# TODO end
 
 
 mutable struct ReducerEval{T <: AbstractReducer}
