@@ -30,7 +30,6 @@ export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
 
 include("HashVector.jl")
 include("domain.jl")
-include("utils.jl")
 
 # ====================================================================
 struct λFunct
