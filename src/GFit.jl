@@ -191,14 +191,12 @@ end
 # ====================================================================
 # Model
 #
-const PatchComp = HashVector{Float64}
-
 struct ModelEval
     params::Vector{Parameter}
     ifree::Vector{Int}
     pvalues::Vector{Float64}
     patched::Vector{Float64}
-    patchcomps::OrderedDict{Symbol, PatchComp}
+    patchcomps::OrderedDict{Symbol, HashVector{Float64}}
     reducer_args::OrderedDict{Symbol, Vector{Float64}}
 end
 
@@ -257,7 +255,7 @@ function ModelEval(model::Model)
     ifree = Vector{Int}()
     pvalues = Vector{Float64}()
     patched = Vector{Float64}()
-    patchcomps = OrderedDict{Symbol, PatchComp}()
+    patchcomps = OrderedDict{Symbol, HashVector{Float64}}()
     reducer_args = OrderedDict{Symbol, Vector{Float64}}()
 
     i = 1

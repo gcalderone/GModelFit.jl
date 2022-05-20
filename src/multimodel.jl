@@ -4,11 +4,11 @@
 mutable struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
     patchfuncts::Vector{λFunct}
-    patchcomps::Vector{OrderedDict{Symbol, PatchComp}}
+    patchcomps::Vector{OrderedDict{Symbol, HashVector{Float64}}}
 
     function MultiModel(v::Vararg{Model})
         multi = new([v...], Vector{λFunct}(),
-                    Vector{OrderedDict{Symbol, PatchComp}}())
+                    Vector{OrderedDict{Symbol, HashVector{Float64}}}())
         for m in v
             m.parent = multi
         end
