@@ -94,7 +94,7 @@ end
 prepare!(comp::AbstractComponent, domain::AbstractDomain) =
     fill(NaN, length(domain))
 
-# dependencies(comp::AbstractComponent) = Symbol[]
+dependencies(comp::AbstractComponent) = Symbol[]
 
 evaluate!(buffer::Vector{Float64}, comp::AbstractComponent, domain::AbstractDomain, pars...) =
     error("No evaluate!() method implemented for $T")
@@ -115,7 +115,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     domain::TDomain
     params::OrderedDict{Symbol, Parameter}
     counter::Int
-    # dependencies::Vector{Vector{Float64}}
+    dependencies::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
@@ -129,6 +129,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain, params, 0,
+            Vector{Vector{Float64}}(),
             fill(NaN, length(params)),
             buffer, false)
     end
@@ -139,7 +140,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
     @assert length(c.params) == length(pvalues)
 
     # Do we actually need a new evaluation?
-    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0))
+    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.dependencies) > 0))
         c.lastvalues .= pvalues
         c.counter += 1
         if !all(.!isnan.(pvalues))
@@ -147,7 +148,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
             println(pvalues)
             @assert all(.!isnan.(pvalues))
         end
-        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
+        evaluate!(c.buffer, c.comp, c.domain, c.dependencies..., pvalues...)
     end
     return c.buffer
 end
