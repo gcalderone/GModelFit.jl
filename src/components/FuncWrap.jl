@@ -17,13 +17,22 @@ end
 
 getproperty(comp::FuncWrap, key::Symbol) = getproperty(getfield(comp, :hash), key)
 
+function getparams(comp::FuncWrap)
+    out = OrderedDict{Symbol, Parameter}()
+    for (key, val) in getfield(comp, :hash)
+        out[key] = val
+    end
+    return out
+end
+
+
 function prepare!(comp::FuncWrap, domain::AbstractDomain)
     @assert length(getfield(comp, :func).args) == ndims(domain)
     fill(NaN, length(domain))
 end
 
 
-function evaluate!(buffer, comp::FuncWrap, domain::AbstractDomain,
+function evaluate!(buffer::Vector{Float64}, comp::FuncWrap, domain::AbstractDomain,
                    params...)
     buffer .= getfield(comp, :func)(coords(domain)..., params...)
 end

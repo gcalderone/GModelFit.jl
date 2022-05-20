@@ -7,7 +7,7 @@ mutable struct Polynomial <: AbstractComponent
     end
 end
 
-function evaluate!(buffer, comp::Polynomial, x::AbstractDomain{1},
+function evaluate!(buffer::Vector{Float64}, comp::Polynomial, x::AbstractDomain{1},
                    coeffs...)
     buffer .= coeffs[1]
     for deg in 1:length(coeffs)-1

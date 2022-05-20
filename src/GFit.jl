@@ -79,30 +79,25 @@ end
 # contain zero or more field of type Parameter (see above)
 abstract type AbstractComponent end
 
+# Fall back methods
 function getparams(comp::AbstractComponent)
     out = OrderedDict{Symbol, Parameter}()
     for name in fieldnames(typeof(comp))
         par = getfield(comp, name)
         if isa(par, Parameter)
             out[name] = par
-        elseif isa(par, HashVector{Parameter})
-            @assert length(out) == 0 "Mixing `Parameter`s and `HashVector{Parameter}`s is not allowed"
-            for (key, val) in par
-                out[key] = val
-            end
         end
     end
     return out
 end
 
-# Fall back methods
 prepare!(comp::AbstractComponent, domain::AbstractDomain) =
     fill(NaN, length(domain))
 
 # dependencies(comp::AbstractComponent) = Symbol[]
 
-# evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent =
-#    error("No evaluate!() method implemented for $T")
+evaluate!(buffer::Vector{Float64}, comp::AbstractComponent, domain::AbstractDomain, pars...) =
+    error("No evaluate!() method implemented for $T")
 
 # Built-in components
 include("components/SimplePar.jl")

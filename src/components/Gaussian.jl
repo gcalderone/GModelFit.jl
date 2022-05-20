@@ -53,14 +53,14 @@ end
 
 # ====================================================================
 # Evaluate component
-function evaluate!(buffer, comp::Gaussian_1D, x::AbstractDomain{1},
+function evaluate!(buffer::Vector{Float64}, comp::Gaussian_1D, x::AbstractDomain{1},
                    norm, center, sigma)
     @. (buffer = exp( ((x - center) / sigma)^2. / (-2.)) /
         2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
 end
 
 
-function evaluate!(buffer, comp::Gaussian_2D, domain::AbstractDomain{2},
+function evaluate!(buffer::Vector{Float64}, comp::Gaussian_2D, domain::AbstractDomain{2},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2

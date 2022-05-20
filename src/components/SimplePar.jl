@@ -5,7 +5,7 @@ end
 
 prepare!(comp::SimplePar, domain::AbstractDomain) = [NaN]
 
-function evaluate!(buffer, comp::SimplePar, domain::AbstractDomain,
+function evaluate!(buffer::Vector{Float64}, comp::SimplePar, domain::AbstractDomain,
                    par)
     buffer[1] = par
 end
