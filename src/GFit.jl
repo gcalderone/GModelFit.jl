@@ -51,12 +51,7 @@ end
 
 
 # ====================================================================
-# Parameter and component identifiers
-struct CompParamID
-    cname::Symbol
-    param::Symbol
-end
-
+# Parameter
 mutable struct Parameter
     val::Float64
     low::Float64              # lower limit value
@@ -112,7 +107,6 @@ include("components/Lorentzian.jl")
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
-    params::OrderedDict{Symbol, Parameter}
     counter::Int
     dependencies::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
@@ -124,19 +118,18 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         # call.  Avoid overwriting input state with a deep copy.
         comp = deepcopy(_comp)
 
-        params = getparams(comp)
         buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
-            comp, domain, params, 0,
+            comp, domain, 0,
             Vector{Vector{Float64}}(),
-            fill(NaN, length(params)),
+            fill(NaN, length(getparams(comp))),
             buffer, false)
     end
 end
 
 
 function evaluate!(c::CompEval, pvalues::Vector{Float64})
-    @assert length(c.params) == length(pvalues)
+    @assert length(getparams(c.comp)) == length(pvalues)
 
     # Do we actually need a new evaluation?
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.dependencies) > 0))
@@ -151,7 +144,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
     end
     return c.buffer
 end
-evaluate!(c::CompEval) = evaluate!(c, getfield.(values(c.params), :val))
+evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
 
 
 
@@ -270,7 +263,7 @@ function ModelEval(model::Model)
     i = 1
     for (cname, ceval) in model.cevals
         patchcomps[cname] = HashVector{Float64}(patched)
-        for (pname, par) in ceval.params
+        for (pname, par) in getparams(ceval.comp)
             if !(par.low <= par.val <= par.high)
                 s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
@@ -330,10 +323,10 @@ function eval3!(model::Model)
     # Evaluate model
     i1 = 1
     for (cname, ceval) in model.cevals
-        if length(ceval.params) > 0
-            i2 = i1 + length(ceval.params) - 1
+        if length(getparams(ceval.comp)) > 0
+            i2 = i1 + length(getparams(ceval.comp)) - 1
             evaluate!(ceval, model.meval.patched[i1:i2])
-            i1 += length(ceval.params)
+            i1 += length(getparams(ceval.comp))
         else
             evaluate!(ceval, Float64[])
         end
@@ -358,7 +351,7 @@ function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
     i = 1
     j = 1
     for (cname, ceval) in model.cevals
-        for (pname, par) in ceval.params
+        for (pname, par) in getparams(ceval.comp)
             if i in model.meval.ifree
                 if !isnothing(unc)
                     par.unc = unc[j]
