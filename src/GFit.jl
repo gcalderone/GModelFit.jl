@@ -165,43 +165,32 @@ include("components/Lorentzian.jl")
 
 abstract type AbstractReducer end
 
-prepare!(red::AbstractReducer, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
+struct λReducer <: AbstractReducer
+    f::λFunct
+    λReducer(f::λFunct) = new(f)
+end
+
+struct SumReducer <: AbstractReducer
+    list::Vector{Symbol}
+end
+
+prepare!(red::AbstractReducer, domain::AbstractDomain) =
     fill(NaN, length(domain))
 
-prepare!(red::λFunct, domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}}) =
-    fill(NaN, length(red.ef.funct(args[red.ef.args])))
-
-function evaluate!(buffer::Vector{Float64}, red::λFunct,
+function evaluate!(buffer::Vector{Float64}, red::λReducer,
                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= red.ef.funct(domain, args)
+    buffer .= red.f.funct(domain, args)
     nothing
 end
 
-function evaluate!(buffer::Vector{Float64}, red::λFunct,
-                   domain::Domain{1}, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= red.ef.funct(domain[1], args)
+function evaluate!(buffer::Vector{Float64}, red::SumReducer,
+                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
+    buffer .= 0.
+    for name in red.list
+        buffer .+= args[name]
+    end
     nothing
 end
-
-function evaluate!(buffer::Vector{Float64}, red::λFunct,
-                   domain::Union{Domain{2}, CartesianDomain{2}}, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= red.ef.funct(domain[1], domain[2], args)
-    nothing
-end
-
-# TODO function SumReducer
-# TODO 
-# TODO end
-# TODO 
-# TODO function evaluate!(buffer::Vector{Float64}, red::SumReducerFunct,
-# TODO                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-# TODO     buffer .= 0.
-# TODO     for name in red.list
-# TODO         buffer .+= args[name]
-# TODO     end
-# TODO     nothing
-# TODO end
-
 
 mutable struct ReducerEval{T <: AbstractReducer}
     red::T
@@ -404,7 +393,7 @@ end
 
 function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
     @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
-    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain, model.meval.reducer_args))
+    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain))
     (model.rsel == Symbol(""))  &&  (model.rsel = rname)
     evaluate!(model)
     return model

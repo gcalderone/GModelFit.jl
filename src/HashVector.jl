@@ -64,7 +64,7 @@ end
 
 
 #=
-hv = HashVector{Int}()
+hv = GFit.HashVector{Int}()
 push!(hv, :a, 1)
 push!(hv, :b, 2)
 push!(hv, :b, 3)
