@@ -131,11 +131,8 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
     ctype = join(ctype, ".")
 
-    for (pid, param) in getparams(comp)
-        parname = string(pid.name)
-        if pid.index >= 1
-            parname *= "[" * string(pid.index) * "]"
-        end
+    for (pname, param) in getparams(comp)
+        parname = string(pname)
         parname *= (param.fixed  ?  " (FIXED)"  :  "")
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))

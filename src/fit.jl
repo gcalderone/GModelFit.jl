@@ -150,13 +150,9 @@ end
 function free_param_names(model::Model)
     out = Vector{String}()
     for (cname, ceval) in model.cevals
-        for (pid, par) in ceval.params
+        for (pname, par) in ceval.params
             if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
-                if pid.index == 0
-                    push!(out, "[:$(cname)].$(pid.name)")
-                else
-                    push!(out, "[:$(cname)].$(pid.name)[$(pid.index)]")
-                end
+                push!(out, "[:$(cname)].$(pname)")
             end
         end
     end

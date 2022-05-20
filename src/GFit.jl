@@ -28,8 +28,9 @@ export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
     MultiModel, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
 
-include("domain.jl")
 include("HashVector.jl")
+include("domain.jl")
+include("utils.jl")
 
 # ====================================================================
 struct λFunct
@@ -52,16 +53,9 @@ end
 
 # ====================================================================
 # Parameter and component identifiers
-struct ParamID
-    name::Symbol
-    index::Int
-    ParamID(pname::Symbol) = new(pname, 0)                  # scalar param
-    ParamID(pname::Symbol, index::Int) = new(pname, index)  # vector of params
-end
-
 struct CompParamID
     cname::Symbol
-    param::ParamID
+    param::Symbol
 end
 
 mutable struct Parameter
@@ -86,26 +80,47 @@ end
 abstract type AbstractComponent end
 
 function getparams(comp::AbstractComponent)
-    params = OrderedDict{ParamID, Parameter}()
-    for pname in fieldnames(typeof(comp))
-        par = getfield(comp, pname)
+    out = OrderedDict{Symbol, Parameter}()
+    for name in fieldnames(typeof(comp))
+        par = getfield(comp, name)
         if isa(par, Parameter)
-            params[ParamID(pname)] = par
-        elseif isa(par, Vector{Parameter})
-            for i in 1:length(par)
-                params[ParamID(pname, i)] = par[i]
+            out[name] = par
+        elseif isa(par, HashVector{Parameter})
+            @assert length(out) == 0 "Mixing `Parameter`s and `HashVector{Parameter}`s is not allowed"
+            for (key, val) in par
+                out[key] = val
             end
         end
     end
-    return params
+    return out
 end
 
+# Fall back methods
+prepare!(comp::AbstractComponent, domain::AbstractDomain) =
+    fill(NaN, length(domain))
+
+# dependencies(comp::AbstractComponent) = Symbol[]
+
+# evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent =
+#    error("No evaluate!() method implemented for $T")
+
+# Built-in components
+include("components/SimplePar.jl")
+include("components/FuncWrap.jl")
+include("components/OffsetSlope.jl")
+include("components/Gaussian.jl")
+include("components/Lorentzian.jl")
+
+
+# ====================================================================
 # CompEval: a wrapper for a component evaluated on a specific domain
+#
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
-    params::OrderedDict{ParamID, Parameter}
+    params::OrderedDict{Symbol, Parameter}
     counter::Int
+    # dependencies::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
@@ -125,11 +140,6 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-# Fall back method
-prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
-#evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T =
-#    error("No evaluate! method implemented for $T")
-
 function evaluate!(c::CompEval, pvalues::Vector{Float64})
     @assert length(c.params) == length(pvalues)
 
@@ -148,15 +158,6 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(c.params), :val))
 
-# Built-in components
-#
-include("utils.jl")
-include("components/CDomain.jl")
-include("components/SimplePar.jl")
-include("components/FuncWrap.jl")
-include("components/OffsetSlope.jl")
-include("components/Gaussian.jl")
-include("components/Lorentzian.jl")
 
 
 # ====================================================================
@@ -165,23 +166,23 @@ include("components/Lorentzian.jl")
 
 abstract type AbstractReducer end
 
+prepare!(comp::AbstractReducer, domain::AbstractDomain) = fill(NaN, length(domain))
+
 struct λReducer <: AbstractReducer
     f::λFunct
     λReducer(f::λFunct) = new(f)
+end
+
+function evaluate!(buffer::Vector{Float64}, red::λReducer,
+                   domain::AbstractDomain, m::OrderedDict{Symbol, Vector{Float64}}, pars...)
+    buffer .= red.f.funct(domain, m, pars...)
+    nothing
 end
 
 struct SumReducer <: AbstractReducer
     list::Vector{Symbol}
 end
 
-prepare!(red::AbstractReducer, domain::AbstractDomain) =
-    fill(NaN, length(domain))
-
-function evaluate!(buffer::Vector{Float64}, red::λReducer,
-                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= red.f.funct(domain, args)
-    nothing
-end
 
 function evaluate!(buffer::Vector{Float64}, red::SumReducer,
                    domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
@@ -274,9 +275,9 @@ function ModelEval(model::Model)
     i = 1
     for (cname, ceval) in model.cevals
         patchcomps[cname] = HashVector{Float64}(patched)
-        for (pid, par) in ceval.params
+        for (pname, par) in ceval.params
             if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pid.name):\n" * string(par)
+                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
             end
             if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
@@ -284,7 +285,7 @@ function ModelEval(model::Model)
             end
             push!(params, par)
             push!(pvalues, par.val)
-            push!(patchcomps[cname], pid.name, NaN)
+            push!(patchcomps[cname], pname, NaN)
             i += 1
         end
     end
@@ -362,7 +363,7 @@ function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
     i = 1
     j = 1
     for (cname, ceval) in model.cevals
-        for (pid, par) in ceval.params
+        for (pname, par) in ceval.params
             if i in model.meval.ifree
                 if !isnothing(unc)
                     par.unc = unc[j]
