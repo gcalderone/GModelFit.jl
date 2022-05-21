@@ -2,7 +2,7 @@ import Base.length
 import Base.propertynames
 import Base.getproperty
 import Base.setproperty!
-import Base.push!
+import Base.empty!
 import Base.iterate
 using DataStructures
 
@@ -45,3 +45,9 @@ function iterate(hv::HashVector{V}, state...) where V
     return (out[1][1] => getproperty(hv, out[1][1]), out[2])
 end
 
+
+function empty!(hv::HashVector{V}) where V
+    empty!(getfield(hv, :dict))
+    empty!(getfield(hv, :data))
+    nothing
+end
