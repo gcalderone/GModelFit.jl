@@ -13,10 +13,8 @@ struct HashVector{V}
     HashVector{V}() where V =
         new{V}(OrderedDict{Symbol, Int}(), Vector{V}())
 
-    function HashVector{V}(data::Vector{V}) where V
-        @assert length(data) == 0
+    HashVector{V}(data::Vector{V}) where V =
         new{V}(OrderedDict{Symbol, Int}(), data)
-    end
 end
 
 length(hv::HashVector) = length(getfield(hv, :dict))
