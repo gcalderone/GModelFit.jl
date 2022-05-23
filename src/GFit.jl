@@ -145,6 +145,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
         end
         evaluate!(c.buffer, c.comp, c.domain, c.dependencies..., pvalues...)
     end
+    c.done = true
     return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
@@ -236,7 +237,6 @@ function eval1!(model::Model)
             end
         end
 
-        ceval.done = false
         empty!(ceval.dependencies)
         for d in dependencies(ceval.comp)
             push!(ceval.dependencies, model.buffers[d])
@@ -245,12 +245,13 @@ function eval1!(model::Model)
 end
 
 function eval2!(model::Model; fromparent=false)
-    # Evaluate patched parameters
     if !isnothing(model.parent)  &&  !fromparent
         eval2!(model.parent)
     else
+        # Copy pvalues into patched
         internal_data(model.patched) .= internal_data(model.pvalues)
         for (cname, hv) in model.params
+            model.cevals[cname].done = false
             for (pname, par) in hv
                 if !isnothing(par.patch)
                     if isa(par.patch, Symbol)
@@ -266,11 +267,15 @@ function eval2!(model::Model; fromparent=false)
     end
 end
 
-function eval3!(model::Model)
-    # Evaluate model
-    for (cname, ceval) in model.cevals
-        evaluate!(ceval, values(model.patched[cname]))
+eval3!(model::Model) = eval3!(model, model.maincomp[1])
+
+function eval3!(model::Model, cname::Symbol)
+    @info "Evaluating $cname ..."
+    model.cevals[cname].done  &&  return
+    for d in model.cevals[cname].dependencies
+        eval3!(model, d)
     end
+    evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
 
 function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
