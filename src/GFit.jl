@@ -110,7 +110,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     counter::Int
-    dependencies::Vector{Vector{Float64}}
+    dependencies::Vector{Vector{Float64}}  # TODO
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
@@ -141,7 +141,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
             println(pvalues)
             @assert all(.!isnan.(pvalues))
         end
-        evaluate!(c.buffer, c.comp, c.domain, c.dependencies..., pvalues...)
+        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
     end
     return c.buffer
 end
@@ -242,6 +242,7 @@ function eval2!(model::Model; fromparent=false)
     if !isnothing(model.parent)  &&  !fromparent
         eval2!(model.parent)
     else
+        internal_data(model.patched) .= internal_data(model.pvalues)
         for (cname, hv) in model.params
             for (pname, par) in hv
                 if !isnothing(par.patch)
