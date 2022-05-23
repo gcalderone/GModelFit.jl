@@ -101,6 +101,7 @@ include("components/FuncWrap.jl")
 include("components/OffsetSlope.jl")
 include("components/Gaussian.jl")
 include("components/Lorentzian.jl")
+include("components/SumReducer.jl")
 
 
 # ====================================================================
@@ -110,10 +111,11 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     counter::Int
-    dependencies::Vector{Vector{Float64}}  # TODO
+    dependencies::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
+    done::Bool
 
     function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
         # Components internal state may be affected by `prepare!`
@@ -124,7 +126,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
             comp, domain, 0,
             Vector{Vector{Float64}}(),
             fill(NaN, length(getparams(comp))),
-            buffer, false)
+            buffer, false, false)
     end
 end
 
@@ -141,7 +143,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
             println(pvalues)
             @assert all(.!isnan.(pvalues))
         end
-        evaluate!(c.buffer, c.comp, c.domain, pvalues...)
+        evaluate!(c.buffer, c.comp, c.domain, c.dependencies..., pvalues...)
     end
     return c.buffer
 end
@@ -196,6 +198,7 @@ struct Model
         for (name, item) in parse_args(args...)
             model[name] = item
         end
+        model.maincomp[1] = collect(keys(model.cevals))[end]
         return model
     end
 end
@@ -218,7 +221,6 @@ function eval1!(model::Model)
     empty!(model.pvalues)
     empty!(model.patched)
     empty!(model.ifree)
-    empty!(model.buffers)
 
     for (cname, ceval) in model.cevals
         for (pname, par) in getparams(ceval.comp)
@@ -233,7 +235,12 @@ function eval1!(model::Model)
                 push!(model.ifree, length(internal_data(model.params)))
             end
         end
-        model.buffers[cname] = ceval.buffer
+
+        ceval.done = false
+        empty!(ceval.dependencies)
+        for d in dependencies(ceval.comp)
+            push!(ceval.dependencies, model.buffers[d])
+        end
     end
 end
 
@@ -286,6 +293,7 @@ end
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
+    model.buffers[cname] = ceval.buffer
     (length(model.maincomp) == 0)  &&  push!(model.maincomp, cname)
     evaluate!(model)
 end

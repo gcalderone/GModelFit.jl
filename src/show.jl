@@ -147,11 +147,6 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
             ctype = ""
         end
     end
-    if length(table) == 0
-        table = vcat(table, [cname ctype "" NaN ""])
-        push!(fixed, false)
-        push!(error, false)
-    end
     return (table, fixed, error, watch)
 end
 

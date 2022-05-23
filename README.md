@@ -131,7 +131,7 @@ model = Model(dom, :f => GFit.FuncWrap(f, true_vals...))
 # Create mock data set by evaluating the model and adding some
 # random noise.  All uncertainties are equal to 1.
 rng = MersenneTwister(0)
-data = Measures(model() .+ randn(rng, length(dom)), 1.)
+data = Measures(dom, model() .+ randn(rng, length(dom)), 1.)
 
 # Fit the model against the data
 bestfit = fit!(model, data)
