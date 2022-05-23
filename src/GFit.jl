@@ -92,7 +92,7 @@ prepare!(comp::AbstractComponent, domain::AbstractDomain) =
 
 dependencies(comp::AbstractComponent) = Symbol[]
 
-evaluate!(buffer::Vector{Float64}, comp::AbstractComponent, domain::AbstractDomain, pars...) =
+evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent=
     error("No evaluate!() method implemented for $T")
 
 # Built-in components
@@ -143,7 +143,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
             println(pvalues)
             @assert all(.!isnan.(pvalues))
         end
-        evaluate!(c.buffer, c.comp, c.domain, c.dependencies..., pvalues...)
+        evaluate!(c.buffer, c.comp, c.domain, c.dependencies, pvalues...)
     end
     c.done = true
     return c.buffer
@@ -271,8 +271,8 @@ eval3!(model::Model) = eval3!(model, model.maincomp[1])
 
 function eval3!(model::Model, cname::Symbol)
     @info "Evaluating $cname ..."
-    model.cevals[cname].done  &&  return
-    for d in model.cevals[cname].dependencies
+    # model.cevals[cname].done  &&  return
+    for d in dependencies(model.cevals[cname].comp)
         eval3!(model, d)
     end
     evaluate!(model.cevals[cname], values(model.patched[cname]))
