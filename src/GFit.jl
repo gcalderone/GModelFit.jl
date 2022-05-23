@@ -163,7 +163,7 @@ struct Model
     patched::HashHashVector{Float64}
     ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
-    maincomp::Vector{Symbol}  # is a vector to avoid making Model mutable
+    maincomp::Vector{Symbol}  # it is a vector to avoid making Model mutable
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
@@ -230,7 +230,7 @@ function eval1!(model::Model)
             model.pvalues[cname][pname] = par.val
             model.patched[cname][pname] = par.val
             if !par.fixed  &&  (ceval.cfixed == 0)  &&  !isa(par.patch, Symbol)
-                push!(model.ifree, length(values(model.params)))
+                push!(model.ifree, length(internal_data(model.params)))
             end
         end
         model.buffers[cname] = ceval.buffer

@@ -21,10 +21,10 @@ function fit!(model::Model, data::Measures{N};
     data1d = flatten(data)
     resid1d = fill(NaN, length(data1d))
     @assert length(model.ifree) > 0 "No free parameter in the model"
-    params = values(model.params)[model.ifree]
+    params  = internal_data(model.params)[model.ifree]
 
     function private_func(pvalues::Vector{Float64})
-        values(model.pvalues)[model.ifree] .= pvalues
+        internal_data(model.pvalues)[model.ifree] .= pvalues
         eval2!(model)
         eval3!(model)
         resid1d .= (model() .- data1d.val) ./ data1d.unc
@@ -40,7 +40,7 @@ function fit!(model::Model, data::Measures{N};
     dof = length(resid1d) - length(params)
     prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
     if !dry
-        result = minimize(minimizer, private_func, values(model.params)[model.ifree])
+        result = minimize(minimizer, private_func, params[model.ifree])
         private_func(result.best)
         eval4!(model, result.unc)
     else

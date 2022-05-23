@@ -79,7 +79,7 @@ struct HashHashVector{V}
 end
 
 
-values(hhv::HashHashVector) = hhv.data
+internal_data(hhv::HashHashVector) = hhv.data
 
 
 function getindex(hhv::HashHashVector{V}, key::Symbol) where V
