@@ -20,11 +20,11 @@ function fit!(model::Model, data::Measures{N};
 
     data1d = flatten(data)
     resid1d = fill(NaN, length(data1d))
-    params = internal_vector(model.params[collect(keys(model.params))[1]])[model.ifree]
-    @assert length(params) > 0 "No free parameter in the model"
+    @assert length(model.ifree) > 0 "No free parameter in the model"
+    params = values(model.params)[model.ifree]
 
     function private_func(pvalues::Vector{Float64})
-        model.meval.pvalues[model.meval.ifree] .= pvalues
+        values(model.pvalues)[model.ifree] .= pvalues
         eval2!(model)
         eval3!(model)
         resid1d .= (model() .- data1d.val) ./ data1d.unc
@@ -40,12 +40,12 @@ function fit!(model::Model, data::Measures{N};
     dof = length(resid1d) - length(params)
     prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
     if !dry
-        result = minimize(minimizer, private_func, model.meval.params[model.meval.ifree])
+        result = minimize(minimizer, private_func, values(model.params)[model.ifree])
         private_func(result.best)
         eval4!(model, result.unc)
     else
-        private_func(getfield.(params, :val))
-        eval4!(model, fill(NaN, length(model.meval.ifree)))
+        private_func(values(model.pvalues))
+        eval4!(model, fill(NaN, length(model.ifree)))
     end
     ProgressMeter.finish!(prog)
 

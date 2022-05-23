@@ -163,6 +163,7 @@ struct Model
     patched::HashHashVector{Float64}
     ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
+    maincomp::Vector{Symbol}  # is a vector to avoid making Model mutable
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
@@ -189,7 +190,8 @@ struct Model
                     HashHashVector{Float64}(),
                     HashHashVector{Float64}(),
                     Vector{Int}(),
-                    OrderedDict{Symbol, Vector{Float64}}())
+                    OrderedDict{Symbol, Vector{Float64}}(),
+                    Vector{Symbol}())
 
         for (name, item) in parse_args(args...)
             model[name] = item
@@ -283,6 +285,7 @@ end
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
+    (length(model.maincomp) == 0)  &&  push!(model.maincomp, cname)
     evaluate!(model)
 end
 
@@ -318,8 +321,8 @@ function Base.getindex(model::Model, name::Symbol)
     error("Name $name not defined")
 end
 domain(model::Model) = model.domain
-(model::Model)() = model.cevals[keys(model.cevals)[end]].buffer
-(model::Model)(name::Symbol) =  model.cevals[name].buffer
+(model::Model)() = model.cevals[model.maincomp[1]].buffer
+(model::Model)(name::Symbol) = model.cevals[name].buffer
 
 
 include("multimodel.jl")
