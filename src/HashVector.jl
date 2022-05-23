@@ -1,9 +1,12 @@
 import Base.length
 import Base.propertynames
+import Base.getindex
+import Base.setindex!
 import Base.getproperty
 import Base.setproperty!
 import Base.empty!
 import Base.iterate
+import Base.values
 using DataStructures
 
 struct HashVector{V}
@@ -20,11 +23,16 @@ end
 length(hv::HashVector) = length(getfield(hv, :dict))
 propertynames(hv::HashVector) = keys(getfield(hv, :dict))
 
+internal_vector(hv::HashVector{V}) where V = getfield(hv, :data)
+values(hv::HashVector{V}) where V = getfield(hv, :data)[collect(values(getfield(hv, :dict)))]
+
+getindex(hv::HashVector{V}, key::Symbol) where V = getproperty(hv, key)
 function getproperty(hv::HashVector{V}, key::Symbol) where V
     id = getfield(hv, :dict)[key]
     return getfield(hv, :data)[id]
 end
 
+setindex!(hv::HashVector{V}, value::V, key::Symbol) where V = setproperty!(hv, key, value)
 function setproperty!(hv::HashVector{V}, key::Symbol, value::V) where V
     if haskey(getfield(hv, :dict), key)
         id = getfield(hv, :dict)[key]
