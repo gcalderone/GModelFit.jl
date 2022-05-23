@@ -9,9 +9,9 @@ struct FuncWrap <: AbstractComponent
             @assert f.optargs[i].head == :(=)
             @assert isa(f.optargs[i].args[1], Symbol)
             @assert isa(f.optargs[i].args[2], Number)
-            push!(params, f.optargs[i].args[1], Parameter(f.optargs[i].args[2]))
+            params[f.optargs[i].args[1]] = Parameter(f.optargs[i].args[2])
         end
-        return new(f, getfield(params, :data), params)
+        return new(f, internal_data(params), params)
     end
 end
 

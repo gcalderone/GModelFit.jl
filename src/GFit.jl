@@ -58,9 +58,11 @@ mutable struct Parameter
     high::Float64             # upper limit value
     step::Float64
     fixed::Bool
-    patched::Float64
+    patch::Union{Nothing, Symbol, λFunct}
+    superpatch::Union{Nothing, λFunct}
+    pval::Float64
     unc::Float64
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, NaN, NaN)
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, nothing, NaN, NaN)
 end
 
 
@@ -117,7 +119,6 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         # Components internal state may be affected by `prepare!`
         # call.  Avoid overwriting input state with a deep copy.
         comp = deepcopy(_comp)
-
         buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain, 0,
@@ -147,144 +148,54 @@ end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
 
 
-
-# ====================================================================
-# Reducer
-#
-
-abstract type AbstractReducer end
-
-prepare!(comp::AbstractReducer, domain::AbstractDomain) = fill(NaN, length(domain))
-
-struct λReducer <: AbstractReducer
-    f::λFunct
-    λReducer(f::λFunct) = new(f)
-end
-
-function evaluate!(buffer::Vector{Float64}, red::λReducer,
-                   domain::AbstractDomain, m::OrderedDict{Symbol, Vector{Float64}}, pars...)
-    buffer .= red.f.funct(domain, m, pars...)
-    nothing
-end
-
-struct SumReducer <: AbstractReducer
-    list::Vector{Symbol}
-end
-
-
-function evaluate!(buffer::Vector{Float64}, red::SumReducer,
-                   domain::AbstractDomain, args::OrderedDict{Symbol, Vector{Float64}})
-    buffer .= 0.
-    for name in red.list
-        buffer .+= args[name]
-    end
-    nothing
-end
-
-mutable struct ReducerEval{T <: AbstractReducer}
-    red::T
-    counter::Int
-    buffer::Vector{Float64}
-end
-
-
 # ====================================================================
 # Model
 #
-struct ModelEval
-    params::Vector{Parameter}
-    ifree::Vector{Int}
-    pvalues::Vector{Float64}
-    patched::Vector{Float64}
-    patchcomps::OrderedDict{Symbol, HashVector{Float64}}
-    reducer_args::OrderedDict{Symbol, Vector{Float64}}
-end
-
 abstract type AbstractMultiModel end
 
 # A model prediction suitable to be compared to a single empirical dataset
-mutable struct Model
+struct Model
     parent::Union{Nothing, AbstractMultiModel}
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    revals::OrderedDict{Symbol, ReducerEval}
-    rsel::Symbol
-    patchfuncts::Vector{λFunct}
-    meval::Union{Nothing, ModelEval}
+    params::HashHashVector{Parameter}
+    pvalues::HashHashVector{Float64}
+    patched::HashHashVector{Float64}
+    ifree::Vector{Int}
+    buffers::OrderedDict{Symbol, Vector{Float64}}
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
-            out = OrderedDict{Symbol, Union{AbstractComponent, AbstractReducer}}()
+            out = OrderedDict{Symbol, AbstractComponent}()
             for (name, item) in args
                 isa(item, Number)  &&  (item = SimplePar(item))
                 @assert isa(name, Symbol)
-                @assert isa(item, AbstractComponent) || isa(item, AbstractReducer)
+                @assert isa(item, AbstractComponent)
                 out[name] = item
             end
             return out
         end
 
         function parse_args(args::Vararg{Pair})
-            out = OrderedDict{Symbol, Union{AbstractComponent, AbstractReducer}}()
+            out = OrderedDict{Symbol, AbstractComponent}()
             for arg in args
                 out[arg[1]] = arg[2]
             end
             return parse_args(out)
         end
 
-        model = new(nothing, domain,
-                    OrderedDict{Symbol, CompEval}(),
-                    OrderedDict{Symbol, ReducerEval}(),
-                    Symbol(""),
-                    Vector{λFunct}(),
-                    nothing)
-        evaluate!(model)  # populate meval
+        model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
+                    HashHashVector{Parameter}(),
+                    HashHashVector{Float64}(),
+                    HashHashVector{Float64}(),
+                    Vector{Int}(),
+                    OrderedDict{Symbol, Vector{Float64}}())
+
         for (name, item) in parse_args(args...)
             model[name] = item
         end
-        if length(model.revals) == 0
-            model[:default_sum] = SumReducer(collect(keys(model.cevals)))
-        end
         return model
     end
-end
-
-
-function ModelEval(model::Model)
-    params = Vector{Parameter}()
-    ifree = Vector{Int}()
-    pvalues = Vector{Float64}()
-    patched = Vector{Float64}()
-    patchcomps = OrderedDict{Symbol, HashVector{Float64}}()
-    reducer_args = OrderedDict{Symbol, Vector{Float64}}()
-
-    i = 1
-    for (cname, ceval) in model.cevals
-        patchcomps[cname] = HashVector{Float64}(patched)
-        for (pname, par) in getparams(ceval.comp)
-            if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-            if (!par.fixed)  &&  (model.cevals[cname].cfixed == 0)
-                push!(ifree, i)
-            end
-            push!(params, par)
-            push!(pvalues, par.val)
-            push!(patchcomps[cname], pname, NaN)
-            i += 1
-        end
-    end
-    @assert length(patched) == length(pvalues)
-
-    for (cname, ceval) in model.cevals
-        reducer_args[cname] = ceval.buffer
-    end
-    for (rname, reval) in model.revals
-        reducer_args[rname] = reval.buffer
-    end
-
-    return ModelEval(params, ifree, pvalues, patched, patchcomps, reducer_args)
 end
 
 
@@ -301,8 +212,27 @@ function evaluate!(model::Model)
 end
 
 function eval1!(model::Model)
-    # Update ModelEval structure
-    model.meval = ModelEval(model)
+    empty!(model.params)
+    empty!(model.pvalues)
+    empty!(model.patched)
+    empty!(model.ifree)
+    empty!(model.buffers)
+
+    for (cname, ceval) in model.cevals
+        for (pname, par) in getparams(ceval.comp)
+            if !(par.low <= par.val <= par.high)
+                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
+                error(s)
+            end
+            model.params[ cname][pname] = par
+            model.pvalues[cname][pname] = par.val
+            model.patched[cname][pname] = par.val
+            if !par.fixed  &&  (ceval.cfixed == 0)  &&  !isa(par.patch, Symbol)
+                push!(model.ifree, length(values(model.params)))
+            end
+        end
+        model.buffers[cname] = ceval.buffer
+    end
 end
 
 function eval2!(model::Model; fromparent=false)
@@ -310,36 +240,26 @@ function eval2!(model::Model; fromparent=false)
     if !isnothing(model.parent)  &&  !fromparent
         eval2!(model.parent)
     else
-        model.meval.patched .= model.meval.pvalues  # copy all values by default
-        for pf in model.patchfuncts
-            pf.funct(model.meval.patchcomps)
+        for (cname, hv) in model.params
+            for (pname, par) in hv
+                if !isnothing(par.patch)
+                    if isa(par.patch, Symbol)
+                        # Use same parameter from a different component
+                        model.patched[cname][pname] = model.pvalues[par.patch][pname]
+                    else
+                        # Evaluate a patch function
+                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                    end
+                end
+            end
         end
     end
 end
 
 function eval3!(model::Model)
     # Evaluate model
-    i1 = 1
     for (cname, ceval) in model.cevals
-        if length(getparams(ceval.comp)) > 0
-            i2 = i1 + length(getparams(ceval.comp)) - 1
-            evaluate!(ceval, model.meval.patched[i1:i2])
-            i1 += length(getparams(ceval.comp))
-        else
-            evaluate!(ceval, Float64[])
-        end
-    end
-
-    for (rname, reval) in model.revals
-        (rname == model.rsel)  &&  continue  # this should be evaluated as last one
-        reval.counter += 1
-        evaluate!(reval.buffer, reval.red, model.domain, model.meval.reducer_args)
-    end
-
-    if length(model.revals) > 0
-        reval = model.revals[model.rsel]
-        reval.counter += 1
-        evaluate!(reval.buffer, reval.red, model.domain, model.meval.reducer_args)
+        evaluate!(ceval, values(model.patched[cname]))
     end
 end
 
@@ -347,24 +267,13 @@ function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
     # Update values, uncertainties and patched params from ModelEval
     # to the actual Model structure.
     i = 1
-    j = 1
-    for (cname, ceval) in model.cevals
-        for (pname, par) in getparams(ceval.comp)
-            if i in model.meval.ifree
-                if !isnothing(unc)
-                    par.unc = unc[j]
-                elseif par.val != model.meval.pvalues[i]
-                    # overwrite only if param. value has changed
-                    # (i.e. avoid loosing uncertainty when invoking
-                    # evaluate!(model)
-                    par.unc = NaN
-                end
-                j += 1
-            else
-                par.unc = NaN
+    for (cname, hv) in model.params
+        for (pname, par) in hv
+            par.val  = model.pvalues[cname][pname]
+            par.pval = model.patched[cname][pname]
+            if !isnothing(unc)  &&  (i in model.ifree)
+                par.unc = unc[i]
             end
-            par.val = model.meval.pvalues[i]
-            par.patched = model.meval.patched[i]
             i += 1
         end
     end
@@ -372,46 +281,9 @@ end
 
 
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
-    @assert !haskey(model.revals, cname)  "Name $cname already exists as a reducer name"
-    ceval = CompEval(deepcopy(comp), model.domain)
+    ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
     evaluate!(model)
-end
-
-function setindex!(model::Model, reducer::T, rname::Symbol) where T <: AbstractReducer
-    @assert !haskey(model.cevals, rname) "Name $rname already exists as a component name"
-    model.revals[rname] = ReducerEval{T}(reducer, 1, prepare!(reducer, model.domain))
-    (model.rsel == Symbol(""))  &&  (model.rsel = rname)
-    evaluate!(model)
-    return model
-end
-
-
-function select_reducer!(model::Model, rname::Symbol)
-    @assert haskey(model.revals, rname) "$rname is not a reducer name"
-    model.rsel = rname
-end
-
-
-function geteval(model::Model, name::Symbol)
-    if haskey(model.cevals, name)
-        return model.cevals[name].buffer
-    else
-        if haskey(model.revals, name)
-            return model.revals[name].buffer
-        else
-            return Float64[]
-        end
-    end
-end
-
-geteval(model::Model) = geteval(model, model.rsel)
-
-
-function patch!(func::λFunct, model::Model)
-    push!(model.patchfuncts, func)
-    evaluate!(model)
-    return model
 end
 
 
@@ -446,8 +318,8 @@ function Base.getindex(model::Model, name::Symbol)
     error("Name $name not defined")
 end
 domain(model::Model) = model.domain
-(model::Model)() = geteval(model)
-(model::Model)(name::Symbol) = geteval(model, name)
+(model::Model)() = model.cevals[keys(model.cevals)[end]].buffer
+(model::Model)(name::Symbol) =  model.cevals[name].buffer
 
 
 include("multimodel.jl")

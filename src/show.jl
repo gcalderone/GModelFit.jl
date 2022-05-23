@@ -112,10 +112,10 @@ function show(io::IO, par::Parameter)
     elseif isnan(par.unc)
         println(io, "Value : ", par.val, "  [", par.low , " : ", par.high, "]")
     else
-        if par.val == par.patched
+        if par.val == par.pval
             println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "] ")
         else
-            println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "], patched: " , par.patched)
+            println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "], patched: " , par.pval)
         end
     end
 end
@@ -138,10 +138,10 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.patched])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval])
         push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
-        push!(watch, param.val != param.patched)
+        push!(watch, param.val != param.pval)
         if !showsettings.plain
             cname = ""
             ctype = ""
@@ -199,7 +199,7 @@ function show(io::IO, model::Model)
     i = 1
     error = Vector{Bool}()
     table = Matrix{Union{String,Int,Float64}}(undef,
-                                              length(model.cevals) + length(model.revals), 6)
+                                              length(model.cevals), 6)
     for (cname, ceval) in model.cevals
         result = ceval.buffer
         v = view(result, findall(isfinite.(result)))
@@ -214,39 +214,10 @@ function show(io::IO, model::Model)
         i += 1
     end
 
-    for (rname, reval) in model.revals
-        result = reval.buffer
-        v = view(result, findall(isfinite.(result)))
-        (length(v) == 0)  &&  (v = [NaN])
-        nan = length(findall(isnan.(result)))
-        inf = length(findall(isinf.(result)))
-        table[i, 1] = string(rname)
-        table[i, 2] = reval.counter
-        table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
-        table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
-        push!(error, (nan+inf > 0))
-        i += 1
-    end
-
-    if length(model.patchfuncts) > 0
-        section(io, "Patch expressions:")
-        for pf in model.patchfuncts
-            println(io, string(pf.display))
-        end
-    end
-
-    println(io)
-    section(io, "Reducers:")
-    for (rname, reval) in model.revals
-        print(rname, ": ")
-        show(io, reval.red)
-        println(io)
-    end
-
     if showsettings.showevals
         section(io, "Evaluations:")
         printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-                   hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+length(model.revals)+1],
+                   hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+1],
                    formatters=ft_printf(showsettings.floatformat, 3:5),
                    highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
     end

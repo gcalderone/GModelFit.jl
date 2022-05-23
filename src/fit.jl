@@ -20,7 +20,7 @@ function fit!(model::Model, data::Measures{N};
 
     data1d = flatten(data)
     resid1d = fill(NaN, length(data1d))
-    params = model.meval.params[model.meval.ifree]
+    params = internal_vector(model.params[collect(keys(model.params))[1]])[model.ifree]
     @assert length(params) > 0 "No free parameter in the model"
 
     function private_func(pvalues::Vector{Float64})

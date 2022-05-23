@@ -1,4 +1,5 @@
 import Base.length
+import Base.keys
 import Base.propertynames
 import Base.getindex
 import Base.setindex!
@@ -20,23 +21,22 @@ struct HashVector{V}
         new{V}(OrderedDict{Symbol, Int}(), data)
 end
 
-internal_dict(hv::HashVector{V}) where V = getfield(hv, :dict)
-internal_data(hv::HashVector{V}) where V = getfield(hv, :data)
-
+internal_dict(hv::HashVector) = getfield(hv, :dict)
+internal_data(hv::HashVector) = getfield(hv, :data)
+indices(hv::HashVector) = collect(values(internal_dict(hv)))
 
 length(hv::HashVector) = length(internal_dict(hv))
+keys(hv::HashVector{V}) where V = keys(internal_dict(hv))
+values(hv::HashVector{V}) where V = internal_data(hv)[indices(hv)]  # view(internal_data(hv), indices(hv))
 propertynames(hv::HashVector) = keys(internal_dict(hv))
 
-values(hv::HashVector{V}) where V = internal_data(hv)[collect(values(internal_dict(hv)))]
 
-getindex(hv::HashVector{V}, key::Symbol) where V = getproperty(hv, key)
-function getproperty(hv::HashVector{V}, key::Symbol) where V
+function getindex(hv::HashVector, key::Symbol)
     id = internal_dict(hv)[key]
     return internal_data(hv)[id]
 end
 
-setindex!(hv::HashVector{V}, value::V, key::Symbol) where V = setproperty!(hv, key, value)
-function setproperty!(hv::HashVector{V}, key::Symbol, value::V) where V
+function setindex!(hv::HashVector{V}, value::V, key::Symbol) where V
     if haskey(internal_dict(hv), key)
         id = internal_dict(hv)[key]
         internal_data(hv)[id] = value
@@ -48,15 +48,56 @@ function setproperty!(hv::HashVector{V}, key::Symbol, value::V) where V
     return value
 end
 
-function iterate(hv::HashVector{V}, state...) where V
+getproperty(hv::HashVector, key::Symbol) = getindex(hv, key)
+setproperty!(hv::HashVector{V}, key::Symbol, value::V) where V = setindex!(hv, value, key)
+
+function iterate(hv::HashVector, state...)
     out = iterate(internal_dict(hv), state...)
     isnothing(out)  &&  (return nothing)
-    return (out[1][1] => getproperty(hv, out[1][1]), out[2])
+    return (out[1][1] => internal_data(hv)[out[1][2]], out[2])
 end
 
 
-function empty!(hv::HashVector{V}) where V
+function empty!(hv::HashVector)
+    deleteat!(internal_data(hv), indices(hv))
     empty!(internal_dict(hv))
-    empty!(internal_data(hv))
+    nothing
+end
+
+
+
+# ====================================================================
+struct HashHashVector{V}
+    dict::OrderedDict{Symbol, HashVector{V}}
+    data::Vector{V}
+
+    HashHashVector{V}() where V =
+        new{V}(OrderedDict{Symbol, HashVector{V}}(), Vector{V}())
+
+    HashHashVector{V}(data::Vector{V}) where V =
+        new{V}(OrderedDict{Symbol, HashVector{V}}(), data)
+end
+
+
+values(hhv::HashHashVector) = hhv.data
+
+
+function getindex(hhv::HashHashVector{V}, key::Symbol) where V
+    if !haskey(hhv.dict, key)
+        hhv.dict[key] = HashVector{V}(hhv.data)
+    end
+    return hhv.dict[key]
+end
+
+
+iterate(hhv::HashHashVector, state...) = 
+    iterate(hhv.dict, state...)
+
+
+function empty!(hhv::HashHashVector)
+    for (key, hv) in hhv.dict
+        empty!(internal_dict(hv))
+    end
+    empty!(hhv.data)
     nothing
 end
