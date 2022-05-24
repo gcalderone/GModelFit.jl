@@ -132,24 +132,19 @@ end
 
 
 function evaluate!(c::CompEval, pvalues::Vector{Float64})
-    @assert length(getparams(c.comp)) == length(pvalues)
+    c.done  &&  (return c.buffer)
 
     # Do we actually need a new evaluation?
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
-        c.lastvalues .= pvalues
-        c.counter += 1
-        if !all(.!isnan.(pvalues))
-            println("One or more parameter value(s) are NaN:")
-            println(pvalues)
-            @assert all(.!isnan.(pvalues))
-        end
         if length(c.deps) > 0
             evaluate!(c.buffer, c.comp, c.domain, c.deps, pvalues...)
         else
             evaluate!(c.buffer, c.comp, c.domain, pvalues...)
         end
+        c.lastvalues .= pvalues
+        c.counter += 1
     end
-    c.done = true
+    # c.done = true
     return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
@@ -233,6 +228,10 @@ function eval1!(model::Model)
                 s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
             end
+            if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
+                s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
+                error(s)
+            end
             model.params[ cname][pname] = par
             model.pvalues[cname][pname] = par.val
             model.patched[cname][pname] = par.val
@@ -274,8 +273,6 @@ end
 eval3!(model::Model) = eval3!(model, model.maincomp[1])
 
 function eval3!(model::Model, cname::Symbol)
-    @info "Evaluating $cname ..."
-    # model.cevals[cname].done  &&  return
     for d in deps(model.cevals[cname].comp)
         eval3!(model, d)
     end
