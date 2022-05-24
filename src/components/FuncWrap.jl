@@ -42,6 +42,12 @@ function prepare!(comp::FuncWrap, domain::AbstractDomain)
 end
 
 
+# We need to implement two evaluate! methods, with/without deps argument respectively
+function evaluate!(buffer::Vector{Float64}, comp::FuncWrap, domain::AbstractDomain,
+                   params...)
+    buffer .= getfield(comp, :func)(coords(domain)..., params...)
+end
+
 function evaluate!(buffer::Vector{Float64}, comp::FuncWrap, domain::AbstractDomain,
                    deps, params...)
     buffer .= getfield(comp, :func)(coords(domain)..., deps..., params...)
