@@ -144,7 +144,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
         c.lastvalues .= pvalues
         c.counter += 1
     end
-    # c.done = true
+    c.done = true
     return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
@@ -253,8 +253,12 @@ function eval2!(model::Model; fromparent=false)
     else
         # Copy pvalues into patched
         internal_data(model.patched) .= internal_data(model.pvalues)
+        # Reset `done` flag
+        for (cname, ceval) in model.cevals
+            ceval.done = false
+        end
+        # Patch parameter values
         for (cname, hv) in model.params
-            model.cevals[cname].done = false
             for (pname, par) in hv
                 if !isnothing(par.patch)
                     if isa(par.patch, Symbol)

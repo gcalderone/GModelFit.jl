@@ -34,7 +34,6 @@ end
 function prepare!(comp::FuncWrap, domain::AbstractDomain)
     # Discard as many argumnts as the number of dimensions in the domain
     list = getfield(comp, :list)
-    @info typeof(list)
     for i in 1:ndims(domain)
         deleteat!(list, 1)
     end
