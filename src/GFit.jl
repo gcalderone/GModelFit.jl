@@ -87,10 +87,10 @@ function getparams(comp::AbstractComponent)
     return out
 end
 
+deps(comp::AbstractComponent) = Symbol[]
+
 prepare!(comp::AbstractComponent, domain::AbstractDomain) =
     fill(NaN, length(domain))
-
-dependencies(comp::AbstractComponent) = Symbol[]
 
 evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent=
     error("No evaluate!() method implemented for $T")
@@ -111,7 +111,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     counter::Int
-    dependencies::Vector{Vector{Float64}}
+    deps::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
@@ -135,7 +135,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
     @assert length(getparams(c.comp)) == length(pvalues)
 
     # Do we actually need a new evaluation?
-    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.dependencies) > 0))
+    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
         c.lastvalues .= pvalues
         c.counter += 1
         if !all(.!isnan.(pvalues))
@@ -143,7 +143,11 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
             println(pvalues)
             @assert all(.!isnan.(pvalues))
         end
-        evaluate!(c.buffer, c.comp, c.domain, c.dependencies, pvalues...)
+        if length(c.deps) > 0
+            evaluate!(c.buffer, c.comp, c.domain, c.deps, pvalues...)
+        else
+            evaluate!(c.buffer, c.comp, c.domain, pvalues...)
+        end
     end
     c.done = true
     return c.buffer
@@ -237,9 +241,9 @@ function eval1!(model::Model)
             end
         end
 
-        empty!(ceval.dependencies)
-        for d in dependencies(ceval.comp)
-            push!(ceval.dependencies, model.buffers[d])
+        empty!(ceval.deps)
+        for d in deps(ceval.comp)
+            push!(ceval.deps, model.buffers[d])
         end
     end
 end
@@ -272,7 +276,7 @@ eval3!(model::Model) = eval3!(model, model.maincomp[1])
 function eval3!(model::Model, cname::Symbol)
     @info "Evaluating $cname ..."
     # model.cevals[cname].done  &&  return
-    for d in dependencies(model.cevals[cname].comp)
+    for d in deps(model.cevals[cname].comp)
         eval3!(model, d)
     end
     evaluate!(model.cevals[cname], values(model.patched[cname]))

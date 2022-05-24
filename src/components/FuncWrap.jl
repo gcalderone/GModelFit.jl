@@ -16,9 +16,11 @@ struct FuncWrap <: AbstractComponent
     end
 end
 
-dependencies(comp::FuncWrap) = getfield(comp, :list)
-
+# Allow access to parameters as `comp.parname`
 getproperty(comp::FuncWrap, key::Symbol) = getproperty(getfield(comp, :hash), key)
+
+deps(comp::FuncWrap) = getfield(comp, :list)
+
 
 function getparams(comp::FuncWrap)
     out = OrderedDict{Symbol, Parameter}()
