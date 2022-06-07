@@ -3,9 +3,9 @@
 #
 mutable struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
-
+    pvalues::Vector{HashHashVector{Float64}}
     function MultiModel(v::Vararg{Model})
-        multi = new([v...])
+        multi = new([v...], Vector{HashHashVector{Float64}})
         for m in v
             m.parent = multi
         end
@@ -29,26 +29,23 @@ function evaluate(multi::MultiModel)
     eval_step2(multi)
     eval_step3(multi)
     eval_step4(multi)
+    return multi
 end
 
 function eval_step1(multi::MultiModel)
     for id in 1:length(multi.models)
         eval_step1(multi.models[id])
     end
-    empty!(multi.patchcomps)
+    empty!(multi.pvalues)
     for id in 1:length(multi.models)
-        push!(multi.patchcomps, multi.models[id].meval.patchcomps)
+        push!(multi.pvalues, multi.models[id].pvalues)
     end
 end
 
 function eval_step2(multi::MultiModel)
     for id in 1:length(multi.models)
-        eval_step2(multi.models[id], fromparent=true)
+        eval_step2(multi.models[id])
     end
-    for pf in multi.patchfuncts
-        pf.funct(multi.patchcomps)
-    end
-    nothing
 end
 
 function eval_step3(multi::MultiModel)

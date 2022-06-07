@@ -222,14 +222,10 @@ end
 
 
 function evaluate(model::Model)
-    if !isnothing(model.parent)
-        evaluate(model.parent)
-    else
-        eval_step1(model)
-        eval_step2(model)
-        eval_step3(model)
-        eval_step4(model)
-    end
+    eval_step1(model)
+    eval_step2(model)
+    eval_step3(model)
+    eval_step4(model)
     return model
 end
 
@@ -266,26 +262,26 @@ end
 
 # Evaluation step 2: copy all fit values into patched, update the
 # latter by invoking the user functions
-function eval_step2(model::Model; fromparent=false)
-    if !isnothing(model.parent)  &&  !fromparent
-        eval_step2(model.parent)
-    else
-        # Reset `done` flag
-        for (cname, ceval) in model.cevals
-            ceval.done = false
-        end
-        # Copy pvalues into patched
-        internal_data(model.patched) .= internal_data(model.pvalues)
-        # Patch parameter values
-        for (cname, hv) in model.params
-            for (pname, par) in hv
-                if !isnothing(par.patch)
-                    if isa(par.patch, Symbol)
-                        # Use same parameter from a different component
-                        model.patched[cname][pname] = model.pvalues[par.patch][pname]
-                    else
-                        # Invoke a patch function
+function eval_step2(model::Model)
+    # Reset `done` flag
+    for (cname, ceval) in model.cevals
+        ceval.done = false
+    end
+    # Copy pvalues into patched
+    internal_data(model.patched) .= internal_data(model.pvalues)
+    # Patch parameter values
+    for (cname, hv) in model.params
+        for (pname, par) in hv
+            if !isnothing(par.patch)
+                if isa(par.patch, Symbol)
+                    # Use same parameter from a different component
+                    model.patched[cname][pname] = model.pvalues[par.patch][pname]
+                else
+                    # Invoke a patch function
+                    if isnothing(model.parent)
                         model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                    else
+                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.parent.pvalues)
                     end
                 end
             end
