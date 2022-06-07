@@ -162,8 +162,8 @@ end
 #
 abstract type AbstractMultiModel end
 
-# A model prediction suitable to be compared to a single empirical dataset
-struct Model
+# A model prediction suitable to be compared to a single empirical dataset.
+mutable struct Model   # mutable because of parent and maincomp
     parent::Union{Nothing, AbstractMultiModel}
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
@@ -171,7 +171,7 @@ struct Model
     pvalues::HashHashVector{Float64}
     patched::HashHashVector{Float64}
     buffers::OrderedDict{Symbol, Vector{Float64}}
-    maincomp::Vector{Symbol}  # it is a vector to avoid making Model mutable
+    maincomp::Symbol
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
@@ -211,7 +211,7 @@ struct Model
                     HashHashVector{Float64}(),
                     HashHashVector{Float64}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
-                    Vector{Symbol}())
+                    Symbol(""))
 
         for (name, item) in parse_args(args...)
             model[name] = item
@@ -290,8 +290,8 @@ function eval_step2(model::Model)
 end
 
 # Evaluation step 3: actual evaluation of model components, starting
-# from model.maincomp[1]
-eval_step3(model::Model) = eval_step3(model, model.maincomp[1])
+# from model.maincomp
+eval_step3(model::Model) = eval_step3(model, model.maincomp)
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
     for d in deps(model.cevals[cname].comp)
@@ -325,11 +325,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     model.buffers[cname] = ceval.buffer
 
     # Last added component is the one to be used as main model
-    if length(model.maincomp) == 0
-        push!(model.maincomp, cname)
-    else
-        model.maincomp[1] = cname
-    end
+    model.maincomp = cname
     evaluate(model)
 end
 
@@ -365,7 +361,7 @@ function Base.getindex(model::Model, name::Symbol)
     error("Name $name not defined")
 end
 domain(model::Model) = model.domain
-(model::Model)() = model.cevals[model.maincomp[1]].buffer
+(model::Model)() = model.cevals[model.maincomp].buffer
 (model::Model)(name::Symbol) = model.cevals[name].buffer
 
 

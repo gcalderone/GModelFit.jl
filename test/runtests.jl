@@ -132,3 +132,21 @@ res = fit!(model, data)
 model[:l2].norm.fixed = false
 model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)
+
+
+
+# ====================================================================
+x = 0:0.05:6
+model1 = Model(Domain(x),
+               :l1  => GFit.Gaussian(1, 2, 0.2),
+               :l2  => GFit.Gaussian(1, 3, 0.5),
+               :bkg => GFit.OffsetSlope(0.5, 1, 0.1),
+               :main => SumReducer(:l1, :l2, :bkg));
+
+model2 = Model(Domain(x),
+               :l1  => GFit.Gaussian(0.8, 2.1, 0.1),
+               :l2  => GFit.Gaussian(1.2, 2.5, 0.4),
+               :bkg => GFit.OffsetSlope(0.5, 1, 0.1),
+               :main => SumReducer(:l1, :l2, :bkg));
+
+model = MultiModel(model1, model2)

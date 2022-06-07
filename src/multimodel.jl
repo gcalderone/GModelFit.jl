@@ -1,11 +1,11 @@
 # ====================================================================
 # MultiModel
 #
-mutable struct MultiModel <: AbstractMultiModel
+struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
     pvalues::Vector{HashHashVector{Float64}}
     function MultiModel(v::Vararg{Model})
-        multi = new([v...], Vector{HashHashVector{Float64}})
+        multi = new([v...], Vector{HashHashVector{Float64}}())
         for m in v
             m.parent = multi
         end
