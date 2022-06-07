@@ -206,6 +206,7 @@ struct Model
 
         parse_args(arg::AbstractComponent) = parse_args(:main => arg)
         parse_args(arg::λFunct) = parse_args(:main => λComp(arg))
+        parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
                     HashHashVector{Parameter}(),
