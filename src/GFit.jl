@@ -23,7 +23,7 @@ import Base.setproperty!
 import Base.iterate
 import Base.push!
 
-export Domain, CartesianDomain, coords, axis, roi, int_tabulated, Measures,
+export Domain, CartesianDomain, coords, axis, roi, Measures,
     Model, @λ, SumReducer, select_reducer!, domain,
     MultiModel, patch!, evaluate!, isfixed, thaw, freeze, fit!
 
@@ -148,6 +148,14 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
     return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
+
+
+# Facility to easily evaluate a component
+function evaluate!(domain::AbstractDomain, comp::AbstractComponent)
+    ceval = CompEval(comp, domain)
+    evaluate!(ceval)
+    return ceval.buffer
+end
 
 
 # ====================================================================
