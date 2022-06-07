@@ -24,7 +24,7 @@ import Base.iterate
 import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, Measures,
-    Model, @λ, SumReducer, select_reducer!, domain,
+    Model, @λ, SumReducer, domain,
     MultiModel, patch!, evaluate, isfixed, thaw, freeze, fit!
 
 
@@ -195,6 +195,8 @@ struct Model
             return parse_args(out)
         end
 
+        parse_args(arg::AbstractComponent) = parse_args(:main => arg)
+
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
                     HashHashVector{Parameter}(),
                     HashHashVector{Float64}(),
@@ -206,7 +208,6 @@ struct Model
         for (name, item) in parse_args(args...)
             model[name] = item
         end
-        model.maincomp[1] = collect(keys(model.cevals))[end]
         return model
     end
 end
@@ -315,7 +316,13 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
     model.buffers[cname] = ceval.buffer
-    (length(model.maincomp) == 0)  &&  push!(model.maincomp, cname)
+
+    # Last added component is the one to be used as main model
+    if length(model.maincomp) == 0
+        push!(model.maincomp, cname)
+    else
+        model.maincomp[1] = cname
+    end
     evaluate(model)
 end
 
