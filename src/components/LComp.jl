@@ -1,9 +1,9 @@
-struct FuncWrap <: AbstractComponent
+struct λComp <: AbstractComponent
     func::λFunct
     list::Vector{Symbol}
     hash::HashVector{Parameter}
 
-    function FuncWrap(f::λFunct, args...)
+    function λComp(f::λFunct, args...)
         list = deepcopy(f.args)
         params = HashVector{Parameter}()
         for i in 1:length(f.optargs)
@@ -17,12 +17,12 @@ struct FuncWrap <: AbstractComponent
 end
 
 # Allow access to parameters as `comp.parname`
-getproperty(comp::FuncWrap, key::Symbol) = getproperty(getfield(comp, :hash), key)
+getproperty(comp::λComp, key::Symbol) = getproperty(getfield(comp, :hash), key)
 
-deps(comp::FuncWrap) = getfield(comp, :list)
+deps(comp::λComp) = getfield(comp, :list)
 
 
-function getparams(comp::FuncWrap)
+function getparams(comp::λComp)
     out = OrderedDict{Symbol, Parameter}()
     for (key, val) in getfield(comp, :hash)
         out[key] = val
@@ -31,7 +31,7 @@ function getparams(comp::FuncWrap)
 end
 
 
-function prepare!(comp::FuncWrap, domain::AbstractDomain)
+function prepare!(comp::λComp, domain::AbstractDomain)
     # Discard as many argumnts as the number of dimensions in the domain
     list = getfield(comp, :list)
     for i in 1:ndims(domain)
@@ -42,12 +42,12 @@ end
 
 
 # We need to implement two evaluate! methods, with/without deps argument respectively
-function evaluate!(buffer::Vector{Float64}, comp::FuncWrap, domain::AbstractDomain,
+function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    params...)
     buffer .= getfield(comp, :func)(coords(domain)..., params...)
 end
 
-function evaluate!(buffer::Vector{Float64}, comp::FuncWrap, domain::AbstractDomain,
+function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    deps, params...)
     buffer .= getfield(comp, :func)(coords(domain)..., deps..., params...)
 end

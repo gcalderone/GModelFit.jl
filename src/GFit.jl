@@ -25,7 +25,7 @@ import Base.push!
 
 export Domain, CartesianDomain, coords, axis, roi, Measures,
     Model, @λ, SumReducer, select_reducer!, domain,
-    MultiModel, patch!, evaluate!, isfixed, thaw, freeze, fit!
+    MultiModel, patch!, evaluate, isfixed, thaw, freeze, fit!
 
 
 include("HashVector.jl")
@@ -97,7 +97,7 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
 
 # Built-in components
 include("components/SimplePar.jl")
-include("components/FuncWrap.jl")
+include("components/LComp.jl")
 include("components/OffsetSlope.jl")
 include("components/Gaussian.jl")
 include("components/Lorentzian.jl")
@@ -151,9 +151,9 @@ evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val)
 
 
 # Facility to easily evaluate a component
-function evaluate!(domain::AbstractDomain, comp::AbstractComponent)
+function evaluate(domain::AbstractDomain, comp::AbstractComponent)
     ceval = CompEval(comp, domain)
-    evaluate!(ceval)
+    evaluate(ceval)
     return ceval.buffer
 end
 
@@ -212,19 +212,19 @@ struct Model
 end
 
 
-function evaluate!(model::Model)
+function evaluate(model::Model)
     if !isnothing(model.parent)
-        evaluate!(model.parent)
+        evaluate(model.parent)
     else
-        eval1!(model)
-        eval2!(model)
-        eval3!(model)
-        eval4!(model)
+        eval_step1(model)
+        eval_step2(model)
+        eval_step3(model)
+        eval_step4(model)
     end
     return model
 end
 
-function eval1!(model::Model)
+function eval_step1(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
     empty!(model.patched)
@@ -255,9 +255,9 @@ function eval1!(model::Model)
     end
 end
 
-function eval2!(model::Model; fromparent=false)
+function eval_step2(model::Model; fromparent=false)
     if !isnothing(model.parent)  &&  !fromparent
-        eval2!(model.parent)
+        eval_step2(model.parent)
     else
         # Copy pvalues into patched
         internal_data(model.patched) .= internal_data(model.pvalues)
@@ -282,16 +282,19 @@ function eval2!(model::Model; fromparent=false)
     end
 end
 
-eval3!(model::Model) = eval3!(model, model.maincomp[1])
+# Evaluation of model component, starting from model.maincomp[1]
+eval_step3(model::Model) = eval_step3(model, model.maincomp[1])
 
-function eval3!(model::Model, cname::Symbol)
+function eval_step3(model::Model, cname::Symbol)
+    # Recursive evaluation of dependencies
     for d in deps(model.cevals[cname].comp)
-        eval3!(model, d)
+        eval_step3(model, d)
     end
+    # Evaluate current component
     evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
 
-function eval4!(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
+function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
     # Update values, uncertainties and patched params from ModelEval
     # to the actual Model structure.
     i = 1
@@ -313,7 +316,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     model.cevals[cname] = ceval
     model.buffers[cname] = ceval.buffer
     (length(model.maincomp) == 0)  &&  push!(model.maincomp, cname)
-    evaluate!(model)
+    evaluate(model)
 end
 
 
@@ -325,14 +328,14 @@ end
 function freeze(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"
     model.cevals[cname].cfixed = true
-    evaluate!(model)
+    evaluate(model)
     nothing
 end
 
 function thaw(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"
     model.cevals[cname].cfixed = false
-    evaluate!(model)
+    evaluate(model)
     nothing
 end
 

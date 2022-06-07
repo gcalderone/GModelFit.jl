@@ -16,7 +16,7 @@ end
 function fit!(model::Model, data::Measures{N};
               minimizer=lsqfit(), dry=false) where N
     timestamp = now()
-    evaluate!(model)
+    evaluate(model)
 
     data1d = flatten(data)
     resid1d = fill(NaN, length(data1d))
@@ -24,8 +24,8 @@ function fit!(model::Model, data::Measures{N};
 
     function private_func(pvalues::Vector{Float64})
         internal_data(model.pvalues)[model.ifree] .= pvalues
-        eval2!(model)
-        eval3!(model)
+        eval_step2(model)
+        eval_step3(model)
         resid1d .= (model() .- data1d.val) ./ data1d.unc
 
         evaluate_showvalues(x) = () -> begin
@@ -41,7 +41,7 @@ function fit!(model::Model, data::Measures{N};
     if !dry
         result = minimize(minimizer, private_func, internal_data(model.params)[model.ifree])
         private_func(result.best)
-        eval4!(model, result.unc)
+        eval_step4(model, result.unc)
     else
         resid1d .= (model() .- data1d.val) ./ data1d.unc
     end
@@ -67,7 +67,7 @@ end
 function fit!(multi::MultiModel, data::Vector{Measures{N}};
               minimizer=lsqfit(), dry=false) where N
     timestamp = now()
-    evaluate!(multi)
+    evaluate(multi)
 
     data1d = [flatten(data[id]) for id in 1:length(multi)]
     resid1d = fill(NaN, sum(length.(data1d)))
@@ -85,8 +85,8 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
             multi[id].meval.pvalues[multi[id].meval.ifree] = pvalues[i1:i2]
             i1 += nn
         end
-        eval2!(multi)
-        eval3!(multi)
+        eval_step2(multi)
+        eval_step3(multi)
 
         i1 = 1
         for id in 1:length(multi)
@@ -112,7 +112,7 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
         for id in 1:length(multi)
             nn = length(multi[id].meval.ifree)
             i2 = i1 + nn - 1
-            eval4!(multi[id], result.unc[i1:i2])
+            eval_step4(multi[id], result.unc[i1:i2])
             i1 += nn
         end
     else
@@ -121,7 +121,7 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}};
         for id in 1:length(multi)
             nn = length(multi[id].meval.ifree)
             i2 = i1 + nn - 1
-            eval4!(multi[id], fill(NaN, i2-i1+1))
+            eval_step4(multi[id], fill(NaN, i2-i1+1))
             i1 += nn
         end
     end
