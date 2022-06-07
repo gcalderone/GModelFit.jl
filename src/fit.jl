@@ -10,14 +10,14 @@ struct FitResult
     log10testprob::Float64
     status::AbstractMinimizerStatus
 
-    function FitResult(fd::FitData, status::AbstractMinimizerStatus)
+    function FitResult(fd::AbstractFitData, status::AbstractMinimizerStatus)
         gof_stat = sum(abs2, residuals(fd))
         tp = NaN
         try
             tp = logccdf(Chisq(fd.dof), gof_stat) * log10(exp(1))
         catch; end
         new(fd.timestamp, (now() - fd.timestamp).value / 1e3,
-            length(residuals(fd)), length(fd.ifree), fd.dof,
+            length(residuals(fd)), length(residuals(fd)) - fd.dof, fd.dof,
             gof_stat, gof_stat, tp, status)
     end
 end
@@ -34,11 +34,11 @@ function fit!(mzer::AbstractMinimizer, model::Model, data::Measures)
 end
 
 
-fit!(multi::MultiModel, data::Vector{Measures}) =
+fit!(multi::MultiModel, data::Vector{Measures{N}}) where N =
     fit!(lsqfit(), multi, data)
 
 function fit!(mzer::AbstractMinimizer, multi::MultiModel, data::Vector{Measures{N}}) where N
-    fd = MultiFitData(model, data)
+    fd = MultiFitData(multi, data)
     status = fit!(mzer, fd)
     return FitResult(fd, status)
 end
