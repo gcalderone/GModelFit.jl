@@ -316,8 +316,8 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
             par.pval = model.patched[cname][pname]
             if !isnothing(unc)  &&  (i in model.ifree)
                 par.unc = unc[i]
+                i += 1
             end
-            i += 1
         end
     end
 end
