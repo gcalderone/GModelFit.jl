@@ -128,7 +128,7 @@ res = fit!(model, data)
 model[:l2].norm.patch = :l1
 res = fit!(model, data)
 
-# Pacth one parameter to another via a λ function
+# Patch one parameter to another via a λ function
 model[:l2].norm.fixed = false
 model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)

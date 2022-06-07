@@ -124,7 +124,6 @@ end
 function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
-    error = Vector{Bool}()
     watch = Vector{Bool}()
 
     ctype = split(string(typeof(comp)), ".")
@@ -143,24 +142,22 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         table = vcat(table,
                      [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval patch])
         push!(fixed, param.fixed)
-        push!(error, !(param.low <= param.val <= param.high))
         push!(watch, !isnothing(param.patch))
         if !showsettings.plain
-            cname = ""
+            cname = ""  # delete from following lines within the same component box
             ctype = ""
         end
     end
-    return (table, fixed, error, watch)
+    return (table, fixed, watch)
 end
 
 
 function show(io::IO, comp::AbstractComponent)
-    (table, fixed, error, watch) = preparetable(comp)
+    (table, fixed, watch) = preparetable(comp)
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (!watch[i]  &&  (j==7)), showsettings.fixed),
-                             Highlighter((data,i,j) -> (error[i]  && (j in (3,4,5))), showsettings.error),
-                             Highlighter((data,i,j) -> fixed[i], showsettings.fixed)))
+               highlighters=(Highlighter((data,i,j) -> (!(watch[i])  &&  (j in (7,8))), showsettings.fixed),
+                             Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed)))
 end
 
 
@@ -175,44 +172,42 @@ function show(io::IO, model::Model)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
-    error = Vector{Bool}()
     watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for (cname, ceval) in model.cevals
         comp = ceval.comp
-        (t, f, e, w) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
+        (t, f, w) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
         table = vcat(table, t)
         append!(fixed, f .| (ceval.cfixed >= 1))
-        append!(error, e)
         append!(watch, w)
-        push!(hrule, length(error)+1)
+        push!(hrule, length(watch)+1)
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (!watch[i]  &&  (j==7)), showsettings.fixed),
-                             Highlighter((data,i,j) -> (error[i] &&  (j in (3,4,5))), showsettings.error),
-                             Highlighter((data,i,j) -> fixed[i], showsettings.fixed)))
+               highlighters=(Highlighter((data,i,j) -> (!watch[i]  &&  (j in (7,8))), showsettings.fixed),
+                             Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed)))
 
-    i = 1
-    error = Vector{Bool}()
-    table = Matrix{Union{String,Int,Float64}}(undef,
-                                              length(model.cevals), 6)
-    for (cname, ceval) in model.cevals
-        result = ceval.buffer
-        v = view(result, findall(isfinite.(result)))
-        (length(v) == 0)  &&  (v = [NaN])
-        nan = length(findall(isnan.(result)))
-        inf = length(findall(isinf.(result)))
-        table[i, 1] = string(cname)
-        table[i, 2] = ceval.counter
-        table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
-        table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
-        push!(error, (nan+inf > 0))
-        i += 1
-    end
 
     if showsettings.showevals
+        i = 1
+        error = Vector{Bool}()
+        table = Matrix{Union{String,Int,Float64}}(undef,
+                                                  length(model.cevals), 6)
+        for (cname, ceval) in model.cevals
+            result = ceval.buffer
+            v = view(result, findall(isfinite.(result)))
+            (length(v) == 0)  &&  (v = [NaN])
+            nan = length(findall(isnan.(result)))
+            inf = length(findall(isinf.(result)))
+            table[i, 1] = string(cname)
+            table[i, 2] = ceval.counter
+            table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
+            table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
+            push!(error, (nan+inf > 0))
+            i += 1
+        end
+
         section(io, "Evaluations:")
         printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                    hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+1],
@@ -257,6 +252,6 @@ function show(io::IO, res::FitResult)
     println(io, @sprintf("              Elapsed : %-10.4g s", res.elapsed))
 
     if message != ""
-        println(io, crayon, message, crayon"default")        
+        println(io, crayon, message, crayon"default")
     end
 end

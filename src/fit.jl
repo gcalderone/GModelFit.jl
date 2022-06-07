@@ -20,10 +20,21 @@ function fit!(model::Model, data::Measures{N};
 
     data1d = flatten(data)
     resid1d = fill(NaN, length(data1d))
-    @assert length(model.ifree) > 0 "No free parameter in the model"
+
+    ifree = Vector{Int}()
+    i = 1
+    for (cname, hv) in model.params
+        for (pname, par) in hv
+            if !par.fixed  &&  (model.cevals[cname].cfixed == 0)
+                push!(ifree, i)
+            end
+            i += 1
+        end
+    end
+    @assert length(ifree) > 0 "No free parameter in the model"
 
     function private_func(pvalues::Vector{Float64})
-        internal_data(model.pvalues)[model.ifree] .= pvalues
+        internal_data(model.pvalues)[ifree] .= pvalues
         eval_step2(model)
         eval_step3(model)
         resid1d .= (model() .- data1d.val) ./ data1d.unc
@@ -36,13 +47,15 @@ function fit!(model::Model, data::Measures{N};
         return resid1d
     end
 
-    dof = length(resid1d) - length(model.ifree)
+    dof = length(resid1d) - length(ifree)
     prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
     if !dry
-        result = minimize(minimizer, private_func, internal_data(model.params)[model.ifree])
+        result = minimize(minimizer, private_func, internal_data(model.params)[ifree])
         if !isa(result, GFit.MinimizerStatusError)
             private_func(result.best)
-            eval_step4(model, result.unc)
+            unc = fill(NaN, length(model.params))
+            unc[ifree] = result.unc
+            eval_step4(model, unc)
         end
     else
         resid1d .= (model() .- data1d.val) ./ data1d.unc
@@ -51,7 +64,7 @@ function fit!(model::Model, data::Measures{N};
 
     # Prepare output
     ndata = length(resid1d)
-    nfree = length(model.ifree)
+    nfree = length(ifree)
     dof = ndata - nfree
     fitstat = sum(abs2, resid1d)
     gofstat = sum(abs2, resid1d)

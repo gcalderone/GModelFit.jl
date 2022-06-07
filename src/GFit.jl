@@ -171,7 +171,6 @@ struct Model
     params::HashHashVector{Parameter}
     pvalues::HashHashVector{Float64}
     patched::HashHashVector{Float64}
-    ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Vector{Symbol}  # it is a vector to avoid making Model mutable
 
@@ -212,7 +211,6 @@ struct Model
                     HashHashVector{Parameter}(),
                     HashHashVector{Float64}(),
                     HashHashVector{Float64}(),
-                    Vector{Int}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Vector{Symbol}())
 
@@ -240,7 +238,6 @@ function eval_step1(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
     empty!(model.patched)
-    empty!(model.ifree)
 
     for (cname, ceval) in model.cevals
         for (pname, par) in getparams(ceval.comp)
@@ -256,9 +253,6 @@ function eval_step1(model::Model)
             model.pvalues[cname][pname] = par.val
             model.patched[cname][pname] = par.val
             isa(par.patch, Symbol)  &&  (par.fixed = true)
-            if !par.fixed  &&  (ceval.cfixed == 0)
-                push!(model.ifree, length(internal_data(model.params)))
-            end
         end
 
         empty!(ceval.deps)
@@ -315,12 +309,12 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
         for (pname, par) in hv
             par.val  = model.pvalues[cname][pname]
             par.pval = model.patched[cname][pname]
-            if !isnothing(unc)  &&  (i in model.ifree)
+            if !isnothing(unc)
                 par.unc = unc[i]
-                i += 1
             else
                 par.unc = NaN
             end
+            i += 1
         end
     end
 end

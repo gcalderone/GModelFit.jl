@@ -25,7 +25,7 @@ internal_dict(hv::HashVector) = getfield(hv, :dict)
 internal_data(hv::HashVector) = getfield(hv, :data)
 indices(hv::HashVector) = collect(values(internal_dict(hv)))
 
-length(hv::HashVector) = length(internal_dict(hv))
+length(hv::HashVector) = length(internal_data(hv))
 keys(hv::HashVector{V}) where V = keys(internal_dict(hv))
 values(hv::HashVector{V}) where V = internal_data(hv)[indices(hv)]  # view(internal_data(hv), indices(hv))
 propertynames(hv::HashVector) = keys(internal_dict(hv))
@@ -80,6 +80,7 @@ end
 
 
 internal_data(hhv::HashHashVector) = hhv.data
+length(hv::HashHashVector) = length(internal_data(hv))
 
 
 function getindex(hhv::HashHashVector{V}, key::Symbol) where V
