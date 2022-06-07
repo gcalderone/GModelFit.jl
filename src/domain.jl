@@ -112,9 +112,6 @@ end
 Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, unc::T) where {T <: Real, N} =
     Measures(domain, val, fill(unc, size(val)))
 
-Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}) where {T <: Real, N} =
-    Measures(domain, val, one(Float64))
-
 
 struct Counts{N} <: AbstractData{Int,N}
     domain::AbstractDomain{N}
