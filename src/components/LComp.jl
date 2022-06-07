@@ -17,6 +17,7 @@ struct λComp <: AbstractComponent
 end
 
 # Allow access to parameters as `comp.parname`
+propertynames(comp::λComp) = collect(keys(getfield(getfield(comp, :hash), :dict)))
 getproperty(comp::λComp, key::Symbol) = getproperty(getfield(comp, :hash), key)
 
 deps(comp::λComp) = getfield(comp, :list)
