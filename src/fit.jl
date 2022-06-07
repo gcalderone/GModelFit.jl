@@ -40,8 +40,10 @@ function fit!(model::Model, data::Measures{N};
     prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
     if !dry
         result = minimize(minimizer, private_func, internal_data(model.params)[model.ifree])
-        private_func(result.best)
-        eval_step4(model, result.unc)
+        if !isa(result, GFit.MinimizerStatusError)
+            private_func(result.best)
+            eval_step4(model, result.unc)
+        end
     else
         resid1d .= (model() .- data1d.val) ./ data1d.unc
     end

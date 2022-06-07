@@ -30,7 +30,7 @@ function as_string(status::AbstractMinimizerStatus)
         return (crayon"green", "OK", "")
     elseif isa(status, MinimizerStatusWarn)
         return (crayon"bold yellow", "WARNING!", status.message)
-    elseif isa(status, MinimizerStatusWarn)
+    elseif isa(status, MinimizerStatusError)
         return (crayon"bold red", "ERROR!", status.message)
     else
         error("Unsupported type: $(typeof(status))")
