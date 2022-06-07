@@ -3,7 +3,6 @@ abstract type AbstractFitData end
 # ====================================================================
 struct FitData <: AbstractFitData
     timestamp::DateTime
-    progress::ProgressUnknown
     model::Model
     data::Vector{Float64}
     unc::Vector{Float64}
@@ -14,7 +13,7 @@ struct FitData <: AbstractFitData
     function FitData(model::Model, data::Measures{N}) where N
         evaluate(model)
         data1d = flatten(data)
-        resid = fill(NaN, length.(data1d))
+        resid = fill(NaN, length(data1d))
         ifree = Vector{Int}()
         i = 1
         for (cname, hv) in model.params
@@ -28,22 +27,19 @@ struct FitData <: AbstractFitData
         nfree = length(ifree)
         @assert nfree > 0 "No free parameter in the model"
         dof = length(resid) - nfree
-        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
-        return new(now(), prog, model, data1d.val, data1d.unc, resid, ifree, dof)
+        return new(now(), model, data1d.val, data1d.unc, resid, ifree, dof)
     end
 end
 
 free_params(fd::FitData) = internal_data(fd.model.params)[fd.ifree]
 residuals(fd::FitData) = fd.resid
+fit_stat(fd::FitData) = sum(abs2, fd.resid) / fd.dof
 
 function evaluate!(fd::FitData, pvalues::Vector{Float64})
     internal_data(fd.model.pvalues)[fd.ifree] .= pvalues
     eval_step2(fd.model)
     eval_step3(fd.model)
     fd.resid .= (fd.model() .- fd.data) ./ fd.unc
-    ProgressMeter.next!(fd.progress; showvalues=() -> begin
-                        [(:fit_stat, sum(abs2, fd.resid) / fd.dof)]
-                        end)
     return fd.resid
 end
 
@@ -53,12 +49,10 @@ function finalize!(fd::FitData, best::Vector{Float64}, unc::Vector{Float64})
     all_unc = fill(NaN, length(internal_data(fd.model.params)))
     all_unc[fd.ifree] = unc
     eval_step4(fd.model, all_unc)
-    ProgressMeter.finish!(fd.progress)
 end
 
 function error!(fd::FitData)
     eval_step4(fd.model)
-    ProgressMeter.finish!(fd.progress)
 end
 
 
@@ -66,7 +60,6 @@ end
 # ====================================================================
 struct MultiFitData <: AbstractFitData
     timestamp::DateTime
-    progress::ProgressUnknown
     multi::MultiModel
     fds::Vector{FitData}
     resid::Vector{Float64}
@@ -80,8 +73,7 @@ struct MultiFitData <: AbstractFitData
         nfree = sum(length.(getfield.(fds, :ifree)))
         @assert nfree > 0 "No free parameter in the model"
         dof = length(resid) - nfree
-        prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
-        return new(now(), prog, multi, fds, resid, dof)
+        return new(now(), multi, fds, resid, dof)
     end
 end
 
@@ -93,6 +85,7 @@ function free_params(fd::MultiFitData)
     return out
 end
 residuals(fd::MultiFitData) = fd.resid
+fit_stat(fd::MultiFitData) = sum(abs2, fd.resid) / fd.dof
 
 function evaluate!(fd::MultiFitData, pvalues::Vector{Float64})
     # We need to copy all parameter values before evaluate!, to ensure
@@ -140,7 +133,6 @@ function finalize!(fd::MultiFitData, best::Vector{Float64}, unc::Vector{Float64}
             i1 += nn
         end
     end
-    ProgressMeter.finish!(fd.progress)
 end
 
 
@@ -148,5 +140,4 @@ function error!(fd::MultiFitData)
     for id in 1:length(fd.multi)
         finalize!(fd.fds[id])
     end
-    ProgressMeter.finish!(fd.progress)
 end

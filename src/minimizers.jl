@@ -43,12 +43,16 @@ struct lsqfit <: AbstractMinimizer; end
 function fit!(minimizer::lsqfit, fd::AbstractFitData)
     params = free_params(fd)
     ndata = length(residuals(fd))
-    res = LsqFit.curve_fit((dummy, pvalues) -> evaluate!(fd, pvalues),
+    prog = ProgressUnknown("Model (dof=$(fd.dof)) evaluations:", dt=0.5, showspeed=true)
+    res = LsqFit.curve_fit((dummy, pvalues) -> begin
+                           ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fd))])
+                           evaluate!(fd, pvalues)
+                           end,
                            1.:ndata, fill(0., ndata),
                            getfield.(params, :val),
                            lower=getfield.(params, :low),
                            upper=getfield.(params, :high))
-
+    ProgressMeter.finish!(prog)
     if !res.converged
         error!(fd)
         return MinimizerStatusError("Not converged", res)
@@ -97,8 +101,13 @@ function fit!(minimizer::cmpfit, fd::AbstractFitData)
     evaluate!(fd, guess)
     last_fitstat = sum(abs2, residuals(fd))
     while true
-        res = CMPFit.cmpfit((pvalues) -> evaluate!(fd, pvalues),
+        prog = ProgressUnknown("Model (dof=$(fd.dof)) evaluations:", dt=0.5, showspeed=true)
+        res = CMPFit.cmpfit((pvalues) -> begin
+                            ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fd))])
+                            evaluate!(fd, pvalues)
+                            end,
                             guess, parinfo=parinfo, config=minimizer.config)
+        ProgressMeter.finish!(prog)
 
         if res.status <= 0
             error!(fd)
