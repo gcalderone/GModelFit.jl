@@ -224,13 +224,6 @@ function show(io::IO, multi::MultiModel)
         show(io, multi.models[id])
     end
     println(io)
-
-    if length(multi.patchfuncts) > 0
-        section(io, "Multi model patch expressions:")
-        for pf in multi.patchfuncts
-            println(io, string(pf.display))
-        end
-    end
 end
 
 
