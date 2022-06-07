@@ -7,21 +7,17 @@ abstract type AbstractMinimizerStatus end
 
 # --------------------------------------------------------------------
 struct MinimizerStatusOK <: AbstractMinimizerStatus
-    best::Vector{Float64}
-    unc::Vector{Float64}
-    specific
+    internal
 end
 
 struct MinimizerStatusWarn <: AbstractMinimizerStatus
-    best::Vector{Float64}
-    unc::Vector{Float64}
     message::String
-    specific
+    internal
 end
 
 struct MinimizerStatusError <: AbstractMinimizerStatus
     message::String
-    specific
+    internal
 end
 
 as_string(::Nothing) = (crayon"bold red", "DRY", "")
@@ -44,20 +40,22 @@ import LsqFit
 
 struct lsqfit <: AbstractMinimizer; end
 
-function minimize(minimizer::lsqfit, func::Function, params::Vector{Parameter})
-    ndata = length(func(getfield.(params, :val)))
-    res = LsqFit.curve_fit((dummy, pvalues) -> func(pvalues),
+function fit!(minimizer::lsqfit, fd::AbstractFitData)
+    params = free_params(fd)
+    ndata = length(residuals(fd))
+    res = LsqFit.curve_fit((dummy, pvalues) -> evaluate!(fd, pvalues),
                            1.:ndata, fill(0., ndata),
                            getfield.(params, :val),
                            lower=getfield.(params, :low),
                            upper=getfield.(params, :high))
 
     if !res.converged
+        error!(fd)
         return MinimizerStatusError("Not converged", res)
     end
-    return MinimizerStatusOK(getfield.(Ref(res), :param),
-                             LsqFit.stderror(res),
-                             res)
+
+    finalize!(fd, getfield.(Ref(res), :param), LsqFit.stderror(res))
+    return MinimizerStatusOK(res)
 end
 
 
@@ -83,7 +81,8 @@ mutable struct cmpfit <: AbstractMinimizer
     cmpfit() = new(CMPFit.Config(), NaN)
 end
 
-function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
+function fit!(minimizer::cmpfit, fd::AbstractFitData)
+    params = free_params(fd)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
     high  = getfield.(params, :high)
@@ -95,12 +94,14 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
         parinfo[i].limits  = (low[i], high[i])
     end
 
-    last_fitstat = sum(abs2, func(guess))
+    evaluate!(fd, guess)
+    last_fitstat = sum(abs2, residuals(fd))
     while true
-        res = CMPFit.cmpfit(func,
+        res = CMPFit.cmpfit((pvalues) -> evaluate!(fd, pvalues),
                             guess, parinfo=parinfo, config=minimizer.config)
 
         if res.status <= 0
+            error!(fd)
             return MinimizerStatusError("Status = $(res.status)", res)
         end
 
@@ -114,17 +115,13 @@ function minimize(minimizer::cmpfit, func::Function, params::Vector{Parameter})
             end
         end
 
-        if res.status == 2
-            return MinimizerStatusWarn(
-                getfield.(Ref(res), :param),
-                getfield.(Ref(res), :perror),
-                "CMPFit status = 2 may imply one (or more) guess values are too far from optimum",
-                res)
-        end
+        finalize!(fd,
+                  getfield.(Ref(res), :param),
+                  getfield.(Ref(res), :perror))
 
-        return MinimizerStatusOK(getfield.(Ref(res), :param),
-                                 getfield.(Ref(res), :perror),
-                                 res)
+        if res.status == 2
+            return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum", res)
+        end
+        return MinimizerStatusOK(res)
     end
 end
-

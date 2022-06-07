@@ -8,74 +8,29 @@ struct FitResult
     fitstat::Float64
     gofstat::Float64
     log10testprob::Float64
-    resid::Vector{Float64}
-    mzer::Union{Nothing, AbstractMinimizerStatus}
+    status::AbstractMinimizerStatus
+
+    function FitResult(fd::FitData, status::AbstractMinimizerStatus)
+        gof_stat = sum(abs2, residuals(fd))
+        tp = NaN
+        try
+            tp = logccdf(Chisq(fd.dof), gof_stat) * log10(exp(1))
+        catch; end
+        new(fd.timestamp, (now() - fd.timestamp).value / 1e3,
+            length(residuals(fd)), length(fd.ifree), fd.dof,
+            gof_stat, gof_stat, tp, status)
+    end
 end
 
 
-function fit!(model::Model, data::Measures{N};
-              minimizer=lsqfit(), dry=false) where N
-    timestamp = now()
-    evaluate(model)
 
-    data1d = flatten(data)
-    resid1d = fill(NaN, length(data1d))
+fit!(model::Model, data::Measures) =
+    fit!(lsqfit(), model, data)
 
-    ifree = Vector{Int}()
-    i = 1
-    for (cname, hv) in model.params
-        for (pname, par) in hv
-            if !par.fixed  &&  (model.cevals[cname].cfixed == 0)
-                push!(ifree, i)
-            end
-            i += 1
-        end
-    end
-    @assert length(ifree) > 0 "No free parameter in the model"
-
-    function private_func(pvalues::Vector{Float64})
-        internal_data(model.pvalues)[ifree] .= pvalues
-        eval_step2(model)
-        eval_step3(model)
-        resid1d .= (model() .- data1d.val) ./ data1d.unc
-
-        evaluate_showvalues(x) = () -> begin
-            dof = (length(resid1d) - length(pvalues))
-            [(:fit_stat, sum(abs2, x) / dof)]
-        end
-        ProgressMeter.next!(prog; showvalues=evaluate_showvalues(resid1d))
-        return resid1d
-    end
-
-    dof = length(resid1d) - length(ifree)
-    prog = ProgressUnknown("Model (dof=$dof) evaluations:", dt=0.5, showspeed=true)
-    if !dry
-        result = minimize(minimizer, private_func, internal_data(model.params)[ifree])
-        if !isa(result, GFit.MinimizerStatusError)
-            private_func(result.best)
-            unc = fill(NaN, length(internal_data(model.params)))
-            unc[ifree] = result.unc
-            eval_step4(model, unc)
-        end
-    else
-        resid1d .= (model() .- data1d.val) ./ data1d.unc
-    end
-    ProgressMeter.finish!(prog)
-
-    # Prepare output
-    ndata = length(resid1d)
-    nfree = length(ifree)
-    dof = ndata - nfree
-    fitstat = sum(abs2, resid1d)
-    gofstat = sum(abs2, resid1d)
-    elapsed = now() - timestamp
-    @assert isa(elapsed, Millisecond)
-    tp = NaN
-    try; tp = logccdf(Chisq(dof), gofstat) * log10(exp(1)); catch; end
-    return FitResult(timestamp, elapsed.value / 1.e3,
-                     ndata, nfree, dof, fitstat, gofstat,
-                     tp,
-                     resid1d, (dry  ?  nothing  :  result))
+function fit!(mzer::AbstractMinimizer, model::Model, data::Measures)
+    fd = FitData(model, data)
+    status = fit!(mzer, fd)
+    return FitResult(fd, status)
 end
 
 

@@ -242,7 +242,7 @@ function show(io::IO, res::FitResult)
     println(io, @sprintf("    DOF    : %8d              Prob.   : %-10.4g", res.dof, 10^res.log10testprob))
 
     print(io,            "    Status : ")
-    (crayon, status, message) = as_string(res.mzer)
+    (crayon, status, message) = as_string(res.status)
     if showsettings.plain
         print(io, @sprintf("%8s", status))
     else

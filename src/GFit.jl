@@ -370,6 +370,7 @@ domain(model::Model) = model.domain
 
 
 include("multimodel.jl")
+include("fitdata.jl")
 include("minimizers.jl")
 include("fit.jl")
 include("show.jl")
