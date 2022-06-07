@@ -190,12 +190,20 @@ struct Model
         function parse_args(args::Vararg{Pair})
             out = OrderedDict{Symbol, AbstractComponent}()
             for arg in args
-                out[arg[1]] = arg[2]
+                if isa(arg[2], AbstractComponent)
+                    out[arg[1]] = arg[2]
+                elseif isa(arg[2], λFunct)
+                    out[arg[1]] = λComp(arg[2])
+                else
+                    error("Unsupported data type: " * string(typeof(arg[2])) *
+                          ".  Must be an AbstractComponent or a λFunct.")
+                end
             end
             return parse_args(out)
         end
 
         parse_args(arg::AbstractComponent) = parse_args(:main => arg)
+        parse_args(arg::λFunct) = parse_args(:main => λComp(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
                     HashHashVector{Parameter}(),
@@ -312,6 +320,7 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
 end
 
 
+setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, λComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
