@@ -155,42 +155,27 @@ data1 = simulate_measures(Domain(x), y1)
 data2 = simulate_measures(Domain(x), y2)
 
 model = MultiModel(model1, model2)
+freeze(model[1], :bkg);
+freeze(model[2], :bkg);
 res = fit!(model, [data1, data2])
 
 
 
+thaw(model[1], :bkg);
+thaw(model[2], :bkg);
 
-# Global model
-model = Model([pred1, pred2]);
-freeze(model, :bkg);
+model[2][:bkg].offset.fixed = true
+model[2][:bkg].offset.patch = @λ (v, m) -> m[1][:bkg].offset
+model[2][:bkg].slope.fixed = true
+model[2][:bkg].slope.patch = @λ (v, m) -> m[1][:bkg].slope
 
-@gp "set grid" tit="Multi-epoch data fitting" linetypes(:tab10, lw=1.5) "set bars 0"
-@gp :- x model[1]() "w l t 'True model (T1)'"
-@gp :- x model[2]() "w l t 'True model (T2)'"
-
-# Simulate data measurements
-data1 = Measures(model[1]() .+ noise .* randn(length(x)), noise);
-data2 = Measures(model[2]() .+ noise .* randn(length(x)), noise);
-
-
-@gp :- x data1.val data1.unc "w yerr t 'Data (T1)'"
-@gp :- x data2.val data2.unc "w yerr t 'Data (T2)'"
 
 model[1][:l2].center.fixed = true
-patch!(model) do m
-    m[1][:l2].center = m[2][:l2].center
-end
+model[1][:l2].center.patch = @λ (v, m) -> m[2][:l2].center
 
 @time res = fit!(model, [data1, data2])
 
 
-res.cost/res.dof
+# @gp x y1 "w l t 'True model'" x data1.val data1.unc "w yerr t 'Data'" x model1() "w l t 'Best fit'"
+# @gp x y2 "w l t 'True model'" x data2.val data2.unc "w yerr t 'Data'" x model2() "w l t 'Best fit'"
 
-@gp :- x model[1]() "w l t 'Best fit model (T1)'"
-@gp :- x model[2]() "w l t 'Best fit model (T2)'"
-
-thaw(model, :bkg);
-@time res = fit!(model, [data1, data2]);
-
-
-viewer(model, [data1, data2], res, selcomps=[:bkg, :l1, :l2])
