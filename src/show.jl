@@ -11,7 +11,7 @@ mutable struct ShowSettings
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true, true,
+    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true, false,
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
                          crayon"light_red blink", crayon"negative", crayon"green bold")
