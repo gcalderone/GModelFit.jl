@@ -1,5 +1,6 @@
 struct SumReducer <: AbstractComponent
     list::Vector{Symbol}
+    SumReducer(args::Vararg{Symbol}) = new([args...])
 end
 
 deps(comp::SumReducer) = comp.list
