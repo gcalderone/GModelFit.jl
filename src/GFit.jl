@@ -59,10 +59,9 @@ mutable struct Parameter
     step::Float64
     fixed::Bool
     patch::Union{Nothing, Symbol, λFunct}
-    superpatch::Union{Nothing, λFunct}
     pval::Float64
     unc::Float64
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, nothing, NaN, NaN)
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, NaN, NaN)
 end
 
 
@@ -132,7 +131,7 @@ end
 
 
 function evaluate!(c::CompEval, pvalues::Vector{Float64})
-    c.done  &&  (return c.buffer)
+    c.done  &&  return
 
     # Do we actually need a new evaluation?
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
@@ -285,7 +284,7 @@ function eval_step2(model::Model; fromparent=false)
                         # Use same parameter from a different component
                         model.patched[cname][pname] = model.pvalues[par.patch][pname]
                     else
-                        # Evaluate a patch function
+                        # Invoke a patch function
                         model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
                     end
                 end
@@ -302,25 +301,28 @@ function eval_step3(model::Model, cname::Symbol)
     for d in deps(model.cevals[cname].comp)
         eval_step3(model, d)
     end
-    # Evaluate current component
     evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
 
-# Evaluation step 4: copy back fit and patched values (and optionally
-# uncertainties) into their original Parameter structures.
-function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
-    # Update values, uncertainties and patched params from ModelEval
-    # to the actual Model structure.
-    i = 1
+# Evaluation step 4: copy back fit and patched values into their
+# original Parameter structures.
+function eval_step4(model::Model)
     for (cname, hv) in model.params
         for (pname, par) in hv
             par.val  = model.pvalues[cname][pname]
             par.pval = model.patched[cname][pname]
-            if !isnothing(unc)
-                par.unc = unc[i]
-            else
-                par.unc = NaN
-            end
+            par.unc = NaN
+        end
+    end
+end
+
+# Also copy uncertainties into original Parameter structures.
+function eval_step4(model::Model, unc::Vector{Float64})
+    eval_step4(model)
+    i = 1
+    for (cname, hv) in model.params
+        for (pname, par) in hv
+            par.unc = unc[i]
             i += 1
         end
     end
