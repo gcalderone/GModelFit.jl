@@ -82,6 +82,14 @@ struct HashHashVector{V}
 end
 
 internal_data(hhv::HashHashVector) = hhv.data
+function empty!(hhv::HashHashVector)
+    for (key, hv) in hhv.dict
+        empty!(internal_dict(hv))
+    end
+    empty!(hhv.data)
+    nothing
+end
+
 
 function getindex(hhv::HashHashVector{V}, key::Symbol) where V
     if !haskey(hhv.dict, key)
@@ -93,12 +101,3 @@ end
 
 iterate(hhv::HashHashVector, state...) = 
     iterate(hhv.dict, state...)
-
-
-function empty!(hhv::HashHashVector)
-    for (key, hv) in hhv.dict
-        empty!(internal_dict(hv))
-    end
-    empty!(hhv.data)
-    nothing
-end
