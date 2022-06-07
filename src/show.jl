@@ -122,7 +122,7 @@ end
 
 
 function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
-    table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
@@ -137,8 +137,11 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
+        patch = ""
+        isa(param.patch, Symbol)  &&  (patch = string(param.patch))
+        isa(param.patch, λFunct)  &&  (patch = param.patch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval patch])
         push!(fixed, param.fixed)
         push!(error, !(param.low <= param.val <= param.high))
         push!(watch, param.val != param.pval)
@@ -153,7 +156,7 @@ end
 
 function show(io::IO, comp::AbstractComponent)
     (table, fixed, error, watch) = preparetable(comp)
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i]  && (j in (3,4,5))), showsettings.error),
@@ -170,7 +173,7 @@ function show(io::IO, model::Model)
     section(io, "Components:")
     (length(model.cevals) == 0)  &&  (return nothing)
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
     error = Vector{Bool}()
     watch = Vector{Bool}()
@@ -185,7 +188,7 @@ function show(io::IO, model::Model)
         append!(watch, w)
         push!(hrule, length(error)+1)
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Patched"],
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> (watch[i]  &&  (j==7)), showsettings.highlighted),
                              Highlighter((data,i,j) -> (error[i] &&  (j in (3,4,5))), showsettings.error),

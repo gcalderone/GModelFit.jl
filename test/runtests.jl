@@ -50,7 +50,8 @@ for (key1, hv) in hhv
 end
 
 
-function simulate_measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, noise=0.1) where {T <: Real, N}
+# ====================================================================
+function simulate_measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, noise=0.05) where {T <: Real, N}
     ee = extrema(val)
     range = ee[2] - ee[1]
     Measures(domain, val .+ noise .* range .* randn(length(val)), noise .* range)
@@ -120,4 +121,14 @@ model = Model(Domain(x),
               :main => SumReducer(:l1, :l2, :bkg));
 y = model();
 data = simulate_measures(Domain(x), y)
+res = fit!(model, data)
+
+
+# Tie two parameters
+model[:l2].norm.patch = :l1
+res = fit!(model, data)
+
+# Pacth one parameter to another via a λ function
+model[:l2].norm.fixed = false
+model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)

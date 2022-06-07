@@ -25,7 +25,7 @@ import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, roi, AbstractMeasures, Measures,
     Model, @λ, SumReducer, domain,
-    MultiModel, patch!, evaluate, isfixed, thaw, freeze, fit!
+    MultiModel, evaluate, isfixed, thaw, freeze, fit!
 
 
 include("HashVector.jl")
@@ -255,7 +255,8 @@ function eval_step1(model::Model)
             model.params[ cname][pname] = par
             model.pvalues[cname][pname] = par.val
             model.patched[cname][pname] = par.val
-            if !par.fixed  &&  (ceval.cfixed == 0)  &&  !isa(par.patch, Symbol)
+            isa(par.patch, Symbol)  &&  (par.fixed = true)
+            if !par.fixed  &&  (ceval.cfixed == 0)
                 push!(model.ifree, length(internal_data(model.params)))
             end
         end
@@ -271,12 +272,12 @@ function eval_step2(model::Model; fromparent=false)
     if !isnothing(model.parent)  &&  !fromparent
         eval_step2(model.parent)
     else
-        # Copy pvalues into patched
-        internal_data(model.patched) .= internal_data(model.pvalues)
         # Reset `done` flag
         for (cname, ceval) in model.cevals
             ceval.done = false
         end
+        # Copy pvalues into patched
+        internal_data(model.patched) .= internal_data(model.pvalues)
         # Patch parameter values
         for (cname, hv) in model.params
             for (pname, par) in hv
@@ -317,6 +318,8 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
             if !isnothing(unc)  &&  (i in model.ifree)
                 par.unc = unc[i]
                 i += 1
+            else
+                par.unc = NaN
             end
         end
     end
