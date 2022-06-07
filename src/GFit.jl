@@ -194,9 +194,11 @@ struct Model
                     out[arg[1]] = arg[2]
                 elseif isa(arg[2], λFunct)
                     out[arg[1]] = λComp(arg[2])
+                elseif isa(arg[2], Number)
+                    out[arg[1]] = SimplePar(arg[2])
                 else
                     error("Unsupported data type: " * string(typeof(arg[2])) *
-                          ".  Must be an AbstractComponent or a λFunct.")
+                          ".  Must be an AbstractComponent, a λFunct or a real number.")
                 end
             end
             return parse_args(out)
@@ -320,6 +322,7 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
 end
 
 
+setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
 setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, λComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
