@@ -53,7 +53,7 @@ function fit!(model::Model, data::Measures{N};
         result = minimize(minimizer, private_func, internal_data(model.params)[ifree])
         if !isa(result, GFit.MinimizerStatusError)
             private_func(result.best)
-            unc = fill(NaN, length(model.params))
+            unc = fill(NaN, length(internal_data(model.params)))
             unc[ifree] = result.unc
             eval_step4(model, unc)
         end

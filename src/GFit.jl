@@ -302,7 +302,7 @@ end
 
 # Evaluation step 4: copy back fit and patched values, as well as
 # uncertinties into their original Parameter structures.
-eval_step4(model::Model) = eval_step4(model, fill(NaN, length(model.params)))
+eval_step4(model::Model) = eval_step4(model, fill(NaN, length(internal_data(model.params))))
 function eval_step4(model::Model, unc::Vector{Float64})
     i = 1
     for (cname, hv) in model.params
