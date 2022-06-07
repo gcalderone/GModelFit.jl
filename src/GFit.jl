@@ -300,24 +300,15 @@ function eval_step3(model::Model, cname::Symbol)
     evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
 
-# Evaluation step 4: copy back fit and patched values into their
-# original Parameter structures.
-function eval_step4(model::Model)
+# Evaluation step 4: copy back fit and patched values, as well as
+# uncertinties into their original Parameter structures.
+eval_step4(model::Model) = eval_step4(model, fill(NaN, length(model.params)))
+function eval_step4(model::Model, unc::Vector{Float64})
+    i = 1
     for (cname, hv) in model.params
         for (pname, par) in hv
             par.val  = model.pvalues[cname][pname]
             par.pval = model.patched[cname][pname]
-            par.unc = NaN
-        end
-    end
-end
-
-# Also copy uncertainties into original Parameter structures.
-function eval_step4(model::Model, unc::Vector{Float64})
-    eval_step4(model)
-    i = 1
-    for (cname, hv) in model.params
-        for (pname, par) in hv
             par.unc = unc[i]
             i += 1
         end
