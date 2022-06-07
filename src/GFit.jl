@@ -234,6 +234,9 @@ function evaluate(model::Model)
     return model
 end
 
+# Evaluation step 1: update internal structures, i.e. a 1D vector
+# (actually a HashVectors) of parameters, as well as of their fit and
+# patched values
 function eval_step1(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
@@ -262,6 +265,8 @@ function eval_step1(model::Model)
     end
 end
 
+# Evaluation step 2: copy all fit values into patched, update the
+# latter by invoking the user functions
 function eval_step2(model::Model; fromparent=false)
     if !isnothing(model.parent)  &&  !fromparent
         eval_step2(model.parent)
@@ -289,9 +294,9 @@ function eval_step2(model::Model; fromparent=false)
     end
 end
 
-# Evaluation of model component, starting from model.maincomp[1]
+# Evaluation step 3: actual evaluation of model components, starting
+# from model.maincomp[1]
 eval_step3(model::Model) = eval_step3(model, model.maincomp[1])
-
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
     for d in deps(model.cevals[cname].comp)
@@ -301,6 +306,8 @@ function eval_step3(model::Model, cname::Symbol)
     evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
 
+# Evaluation step 4: copy back fit and patched values (and optionally
+# uncertainties) into their original Parameter structures.
 function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
     # Update values, uncertainties and patched params from ModelEval
     # to the actual Model structure.
@@ -320,6 +327,7 @@ function eval_step4(model::Model, unc::Union{Nothing, Vector{Float64}}=nothing)
 end
 
 
+# User interface
 setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
 setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, λComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
