@@ -131,7 +131,6 @@ model[:l2].norm.patch = :l1
 res = fit!(model, data)
 
 # Patch one parameter to another via a λ function
-model[:l2].norm.fixed = false
 model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)
 # GFitViewer.save_json(model, data, res, filename="test2.json")
@@ -167,10 +166,8 @@ res = fit!(model, [data1, data2])
 thaw(model[1], :bkg);
 thaw(model[2], :bkg);
 
-model[2][:bkg].offset.fixed = true
-model[2][:bkg].offset.mpatch = @λ (v, m) -> m[1][:bkg].offset
-model[2][:bkg].slope.fixed = true
-model[2][:bkg].slope.mpatch = @λ (v, m) -> m[1][:bkg].slope
+model[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
+model[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope
 
 
 model[1][:l2].center.fixed = true

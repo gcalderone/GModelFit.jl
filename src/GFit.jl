@@ -251,7 +251,26 @@ function eval_step1(model::Model)
             model.params[ cname][pname] = par
             model.pvalues[cname][pname] = par.val
             model.patched[cname][pname] = par.val
-            isa(par.patch, Symbol)  &&  (par.fixed = true)
+
+            if !isnothing(par.patch)
+                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
+                if isa(par.patch, Symbol)  # use same param. value from a different component
+                    par.fixed = true
+                else                       # invoke a patch function
+                    if length(par.patch.args) == 1
+                        par.fixed = true
+                    else
+                        par.fixed = false
+                    end
+                end
+            elseif !isnothing(par.mpatch)
+                @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
+                if length(par.mpatch.args) == 1
+                    par.fixed = true
+                else
+                    par.fixed = false
+                end
+            end
         end
 
         empty!(ceval.deps)
@@ -277,12 +296,20 @@ function eval_step2(model::Model)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
                     model.patched[cname][pname] = model.pvalues[par.patch][pname]
-                else  # invoke a patch function
-                    model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                else                       # invoke a patch function
+                    if length(par.patch.args) == 1
+                        model.patched[cname][pname] = par.patch(model.pvalues)
+                    else
+                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                    end
                 end
             elseif !isnothing(par.mpatch)
                 @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
-                model.patched[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
+                if length(par.mpatch.args) == 1
+                    model.patched[cname][pname] = par.mpatch(model.parent.pvalues)
+                else
+                    model.patched[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
+                end
             end
         end
     end
