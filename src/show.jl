@@ -139,6 +139,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         patch = ""
         isa(param.patch, Symbol)  &&  (patch = string(param.patch))
         isa(param.patch, λFunct)  &&  (patch = param.patch.display)
+        isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
         table = vcat(table,
                      [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval patch])
         push!(fixed, param.fixed)

@@ -59,9 +59,10 @@ mutable struct Parameter
     step::Float64
     fixed::Bool
     patch::Union{Nothing, Symbol, λFunct}
+    mpatch::Union{Nothing, λFunct}
     pval::Float64
     unc::Float64
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, NaN, NaN)
+    Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, nothing, NaN, NaN)
 end
 
 
@@ -273,17 +274,15 @@ function eval_step2(model::Model)
     for (cname, hv) in model.params
         for (pname, par) in hv
             if !isnothing(par.patch)
-                if isa(par.patch, Symbol)
-                    # Use same parameter from a different component
+                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
+                if isa(par.patch, Symbol)  # use same param. value from a different component
                     model.patched[cname][pname] = model.pvalues[par.patch][pname]
-                else
-                    # Invoke a patch function
-                    if isnothing(model.parent)
-                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
-                    else
-                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.parent.pvalues)
-                    end
+                else  # invoke a patch function
+                    model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
                 end
+            elseif !isnothing(par.mpatch)
+                @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
+                model.patched[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
             end
         end
     end

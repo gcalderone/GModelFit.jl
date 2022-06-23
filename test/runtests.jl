@@ -66,6 +66,7 @@ model = Model(Domain(x), :a2 => 1, :a1 => 1, :a0 => 5)
 model[:parabola] = @λ (x, a2, a1, a0) -> @. (a2 * x^2  +  a1 * x  + a0)
 res = fit!(model, data)
 # @gp x y "w l t 'True model'" x data.val data.unc "w yerr t 'Data'" x model() "w l t 'Best fit'"
+# viewer(model, data, res)
 
 
 # ====================================================================
@@ -109,6 +110,7 @@ model[:f2] = f2
 model[:f3] = f3
 model[:main] = @λ (x, f1, f2, f3) -> (f1 .+ f2) .* f3
 res = fit!(model, data)
+# GFitViewer.save_json(model, data, res, filename="test1.json")
 
 
 
@@ -132,6 +134,7 @@ res = fit!(model, data)
 model[:l2].norm.fixed = false
 model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)
+# GFitViewer.save_json(model, data, res, filename="test2.json")
 
 
 
@@ -165,17 +168,20 @@ thaw(model[1], :bkg);
 thaw(model[2], :bkg);
 
 model[2][:bkg].offset.fixed = true
-model[2][:bkg].offset.patch = @λ (v, m) -> m[1][:bkg].offset
+model[2][:bkg].offset.mpatch = @λ (v, m) -> m[1][:bkg].offset
 model[2][:bkg].slope.fixed = true
-model[2][:bkg].slope.patch = @λ (v, m) -> m[1][:bkg].slope
+model[2][:bkg].slope.mpatch = @λ (v, m) -> m[1][:bkg].slope
 
 
 model[1][:l2].center.fixed = true
-model[1][:l2].center.patch = @λ (v, m) -> m[2][:l2].center
+model[1][:l2].center.mpatch = @λ (v, m) -> m[2][:l2].center
 
 @time res = fit!(model, [data1, data2])
 
 
-# @gp x y1 "w l t 'True model'" x data1.val data1.unc "w yerr t 'Data'" x model1() "w l t 'Best fit'"
-# @gp x y2 "w l t 'True model'" x data2.val data2.unc "w yerr t 'Data'" x model2() "w l t 'Best fit'"
-
+#=
+@gp x y1 "w l t 'True model'" x data1.val data1.unc "w yerr t 'Data'" x model1() "w l t 'Best fit'"
+@gp x y2 "w l t 'True model'" x data2.val data2.unc "w yerr t 'Data'" x model2() "w l t 'Best fit'"
+viewer(model, [data1, data2], res)
+GFitViewer.save_json(model, [data1, data2], res, filename="test3.json")
+=#
