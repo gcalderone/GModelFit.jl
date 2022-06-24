@@ -24,7 +24,7 @@ import Base.iterate
 import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, roi, AbstractMeasures, Measures,
-    Model, @λ, SumReducer, domain,
+    Model, @λ, select_maincomp!, SumReducer, domain,
     MultiModel, evaluate, isfixed, thaw, freeze, fit!
 
 
@@ -390,6 +390,11 @@ domain(model::Model) = model.domain
 (model::Model)() = model.cevals[model.maincomp].buffer
 (model::Model)(name::Symbol) = model.cevals[name].buffer
 
+
+function select_maincomp!(model::Model, cname::Symbol)
+    @assert haskey(model, cname)
+    model.maincomp = cname
+end
 
 include("multimodel.jl")
 include("fitdata.jl")
