@@ -350,8 +350,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     model.cevals[cname] = ceval
     model.buffers[cname] = ceval.buffer
 
-    # Last added component is the one to be used as main model
-    model.maincomp = cname
+    (model.maincomp == Symbol(""))  &&  (model.maincomp = cname)
     evaluate(model)
 end
 
