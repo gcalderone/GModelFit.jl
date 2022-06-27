@@ -315,9 +315,47 @@ function eval_step2(model::Model)
     end
 end
 
-# Evaluation step 3: actual evaluation of model components, starting
-# from model.maincomp
-eval_step3(model::Model) = eval_step3(model, model.maincomp)
+function find_maincomp(model::Model)
+    if model.maincomp != Symbol("")
+        return model.maincomp
+    end
+
+    if length(model.cevals) == 1
+        return collect(keys(model.cevals))[1]
+    end
+
+    maincomps = collect(keys(model.cevals))
+    for (cname, ceval) in model.cevals
+        for d in deps(ceval.comp)
+            @assert d in maincomps "$cname depends on $d, but the latter is not a component in the model."
+            i = findfirst(maincomps .== d)
+            deleteat!(maincomps, i)
+        end
+    end
+
+    if length(maincomps) > 1
+        # Ignoring components with no dependencies
+        for (cname, ceval) in model.cevals
+            if length(deps(ceval.comp)) == 0
+                i = findfirst(maincomps .== cname)
+                if !isnothing(i)
+                    deleteat!(maincomps, i)
+
+                    # ...but keep the last
+                    if length(maincomps) == 1
+                        return maincomps[1]
+                    end
+                end
+            end
+        end
+    end
+
+    return maincomps[end]
+end
+
+
+# Evaluation step 3: actual evaluation of model components, starting from the main one
+eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
     for d in deps(model.cevals[cname].comp)
@@ -349,8 +387,6 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
     model.buffers[cname] = ceval.buffer
-
-    (model.maincomp == Symbol(""))  &&  (model.maincomp = cname)
     evaluate(model)
 end
 
@@ -386,7 +422,7 @@ function Base.getindex(model::Model, name::Symbol)
     error("Name $name not defined")
 end
 domain(model::Model) = model.domain
-(model::Model)() = model.cevals[model.maincomp].buffer
+(model::Model)() = model.cevals[find_maincomp(model)].buffer
 (model::Model)(name::Symbol) = model.cevals[name].buffer
 
 

@@ -215,6 +215,8 @@ function show(io::IO, model::Model)
                    formatters=ft_printf(showsettings.floatformat, 3:5),
                    highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
     end
+
+    section(io, "Reference component: " * string(find_maincomp(model)))
 end
 
 
