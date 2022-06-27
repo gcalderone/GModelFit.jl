@@ -222,6 +222,45 @@ mutable struct Model   # mutable because of parent and maincomp
 end
 
 
+function find_maincomp(model::Model)
+    if model.maincomp != Symbol("")
+        return model.maincomp
+    end
+
+    if length(model.cevals) == 1
+        return collect(keys(model.cevals))[1]
+    end
+
+    maincomps = collect(keys(model.cevals))
+    for (cname, ceval) in model.cevals
+        for d in deps(ceval.comp)
+            @assert d in maincomps "$cname depends on $d, but the latter is not a component in the model."
+            i = findfirst(maincomps .== d)
+            deleteat!(maincomps, i)
+        end
+    end
+
+    if length(maincomps) > 1
+        # Ignoring components with no dependencies
+        for (cname, ceval) in model.cevals
+            if length(deps(ceval.comp)) == 0
+                i = findfirst(maincomps .== cname)
+                if !isnothing(i)
+                    deleteat!(maincomps, i)
+
+                    # ...but keep the last
+                    if length(maincomps) == 1
+                        return maincomps[1]
+                    end
+                end
+            end
+        end
+    end
+
+    return maincomps[end]
+end
+
+
 function evaluate(model::Model)
     eval_step1(model)
     eval_step2(model)
@@ -229,6 +268,7 @@ function evaluate(model::Model)
     eval_step4(model)
     return model
 end
+
 
 # Evaluation step 1: update internal structures, i.e. a 1D vector
 # (actually a HashVectors) of parameters, as well as of their fit and
@@ -280,6 +320,7 @@ function eval_step1(model::Model)
     end
 end
 
+
 # Evaluation step 2: copy all fit values into patched, update the
 # latter by invoking the user functions
 function eval_step2(model::Model)
@@ -315,44 +356,6 @@ function eval_step2(model::Model)
     end
 end
 
-function find_maincomp(model::Model)
-    if model.maincomp != Symbol("")
-        return model.maincomp
-    end
-
-    if length(model.cevals) == 1
-        return collect(keys(model.cevals))[1]
-    end
-
-    maincomps = collect(keys(model.cevals))
-    for (cname, ceval) in model.cevals
-        for d in deps(ceval.comp)
-            @assert d in maincomps "$cname depends on $d, but the latter is not a component in the model."
-            i = findfirst(maincomps .== d)
-            deleteat!(maincomps, i)
-        end
-    end
-
-    if length(maincomps) > 1
-        # Ignoring components with no dependencies
-        for (cname, ceval) in model.cevals
-            if length(deps(ceval.comp)) == 0
-                i = findfirst(maincomps .== cname)
-                if !isnothing(i)
-                    deleteat!(maincomps, i)
-
-                    # ...but keep the last
-                    if length(maincomps) == 1
-                        return maincomps[1]
-                    end
-                end
-            end
-        end
-    end
-
-    return maincomps[end]
-end
-
 
 # Evaluation step 3: actual evaluation of model components, starting from the main one
 eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
@@ -363,6 +366,7 @@ function eval_step3(model::Model, cname::Symbol)
     end
     evaluate!(model.cevals[cname], values(model.patched[cname]))
 end
+
 
 # Evaluation step 4: copy back fit and patched values, as well as
 # uncertainties into their original Parameter structures.
