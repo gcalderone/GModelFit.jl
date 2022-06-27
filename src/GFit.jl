@@ -434,8 +434,6 @@ Base.haskey(p::Model, name::Symbol) = haskey(p.cevals, name)
 function Base.getindex(model::Model, name::Symbol)
     if name in keys(model.cevals)
         return model.cevals[name].comp
-    elseif name in keys(model.revals)
-        return model.revals[name].red
     end
     error("Name $name not defined")
 end
