@@ -5,7 +5,7 @@ struct SumReducer <: AbstractComponent
     SumReducer(args::Vararg{Symbol}) = new([args...])
 end
 
-deps(comp::SumReducer) = comp.list
+dependencies(comp::SumReducer) = comp.list
 
 
 function evaluate!(buffer::Vector{Float64}, comp::SumReducer, domain::AbstractDomain)

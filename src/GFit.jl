@@ -87,7 +87,7 @@ function getparams(comp::AbstractComponent)
     return out
 end
 
-deps(comp::AbstractComponent) = Symbol[]
+dependencies(comp::AbstractComponent) = Symbol[]
 
 prepare!(comp::AbstractComponent, domain::AbstractDomain) =
     fill(NaN, length(domain))
@@ -115,7 +115,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     lastvalues::Vector{Float64}
     buffer::Vector{Float64}
     cfixed::Bool
-    done::Bool
+    updated::Bool
 
     function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
         # Components internal state may be affected by `prepare!`
@@ -132,7 +132,7 @@ end
 
 
 function evaluate!(c::CompEval, pvalues::Vector{Float64})
-    c.done  &&  return
+    c.updated  &&  return
 
     # Do we actually need a new evaluation?
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
@@ -144,7 +144,7 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
         c.lastvalues .= pvalues
         c.counter += 1
     end
-    c.done = true
+    c.updated = true
     return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
@@ -233,7 +233,7 @@ function find_maincomp(model::Model)
 
     maincomps = collect(keys(model.cevals))
     for (cname, ceval) in model.cevals
-        for d in deps(ceval.comp)
+        for d in dependencies(ceval.comp)
             @assert d in maincomps "$cname depends on $d, but the latter is not a component in the model."
             i = findfirst(maincomps .== d)
             deleteat!(maincomps, i)
@@ -243,7 +243,7 @@ function find_maincomp(model::Model)
     if length(maincomps) > 1
         # Ignoring components with no dependencies
         for (cname, ceval) in model.cevals
-            if length(deps(ceval.comp)) == 0
+            if length(dependencies(ceval.comp)) == 0
                 i = findfirst(maincomps .== cname)
                 if !isnothing(i)
                     deleteat!(maincomps, i)
@@ -314,7 +314,7 @@ function eval_step1(model::Model)
         end
 
         empty!(ceval.deps)
-        for d in deps(ceval.comp)
+        for d in dependencies(ceval.comp)
             push!(ceval.deps, model.buffers[d])
         end
     end
@@ -324,9 +324,9 @@ end
 # Evaluation step 2: copy all fit values into patched, update the
 # latter by invoking the user functions
 function eval_step2(model::Model)
-    # Reset `done` flag
+    # Reset `updated` flag
     for (cname, ceval) in model.cevals
-        ceval.done = false
+        ceval.updated = false
     end
     # Copy pvalues into patched
     internal_data(model.patched) .= internal_data(model.pvalues)
@@ -361,7 +361,7 @@ end
 eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
-    for d in deps(model.cevals[cname].comp)
+    for d in dependencies(model.cevals[cname].comp)
         eval_step3(model, d)
     end
     evaluate!(model.cevals[cname], values(model.patched[cname]))

@@ -20,7 +20,7 @@ end
 propertynames(comp::λComp) = collect(keys(getfield(getfield(comp, :hash), :dict)))
 getproperty(comp::λComp, key::Symbol) = getproperty(getfield(comp, :hash), key)
 
-deps(comp::λComp) = getfield(comp, :list)
+dependencies(comp::λComp) = getfield(comp, :list)
 
 
 function getparams(comp::λComp)
