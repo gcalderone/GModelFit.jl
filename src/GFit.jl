@@ -378,6 +378,23 @@ function eval_step4(model::Model, unc=Vector{Float64}[])
             i += 1
         end
     end
+
+    # Delete uncertainties if parameter values has changed
+    delete_uncert = false
+    for loop = 1:2
+        if length(unc) == 0
+            for (cname, ceval) in model.cevals
+                ii = 1
+                for (pname, par) in getparams(ceval.comp)
+                    if par.val != ceval.lastvalues[ii]
+                        delete_uncert = true
+                    end
+                    ii += 1
+                    delete_uncert  &&  (par.unc = NaN)
+                end
+            end
+        end
+    end
 end
 
 
