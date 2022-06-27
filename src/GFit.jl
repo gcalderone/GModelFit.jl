@@ -145,7 +145,6 @@ function evaluate!(c::CompEval, pvalues::Vector{Float64})
         c.counter += 1
     end
     c.updated = true
-    return c.buffer
 end
 evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
 
