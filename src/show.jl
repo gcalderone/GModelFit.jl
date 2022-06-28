@@ -166,9 +166,25 @@ function show(io::IO, red::λFunct)
     println(io, red.display)
 end
 
+
+printdeps(io::IO, model::Model) = printdeps(io, model, find_maincomp(model), 0)
+function printdeps(io::IO, model::Model, cname::Symbol, level::Int)
+    prefix = join(fill("  ", level)) * (level > 0  ?  "├ " : "")
+    print(io, prefix, cname)
+    printstyled(io, color=:light_black, " (", string(typeof(model[cname])), ", ", model.cevals[cname].counter, ")\n")
+    deps = dependencies(model[cname])
+    for i in 1:length(deps)
+        printdeps(io, model, deps[i], level+1)
+    end
+end
+
+
 function show(io::IO, model::Model)
     println(io)
     section(io, "Components:")
+    printdeps(io, model)
+    println(io)
+    section(io, "Parameters:")
     (length(model.cevals) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
