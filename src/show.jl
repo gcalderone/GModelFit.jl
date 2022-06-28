@@ -3,7 +3,6 @@ mutable struct ShowSettings
     tableformat::TextFormat
     floatformat::String
     showfixed::Bool
-    showevals::Bool
     border::Crayon
     header::Crayon
     subheader::Crayon
@@ -11,7 +10,7 @@ mutable struct ShowSettings
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true, false,
+    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true,
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
                          crayon"light_red blink", crayon"negative", crayon"green bold")
@@ -147,6 +146,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box
             ctype = ""
+            cfixed = false
         end
     end
     return (table, fixed, watch)
@@ -167,22 +167,56 @@ function show(io::IO, red::λFunct)
 end
 
 
-printdeps(io::IO, model::Model) = printdeps(io, model, find_maincomp(model), 0)
-function printdeps(io::IO, model::Model, cname::Symbol, level::Int)
-    prefix = join(fill("  ", level)) * (level > 0  ?  "├ " : "")
-    print(io, prefix, cname)
-    printstyled(io, color=:light_black, " (", string(typeof(model[cname])), ", ", model.cevals[cname].counter, ")\n")
+function tabledeps(model::Model)
+    out0 = tabledeps(model, find_maincomp(model), 0)
+    out = Vector{Tuple}()
+    for i in 1:length(out0)-1
+        push!(out, ((out0[i+1][1] < out0[i][1]), out0[i]...))
+    end
+    push!(out, (true, out0[end]...))
+
+    table = Matrix{Union{String,Int,Float64}}(undef, length(out), 7)
+    fixed = Vector{Bool}()
+    for i in 1:length(out)
+        final = out[i][1]
+        level = out[i][2]
+        prefix = ""
+        (level > 1)  &&  (prefix  = join(fill("  │", level-1)))
+        (level > 0)  &&  (prefix *= (final  ?  "  └─ "  :  "  ├─ "))
+        table[i, 1] = prefix * out[i][3]
+        for j in 2:7
+            table[i, j] = out[i][j+2]
+        end
+        push!(fixed, model.cevals[Symbol(out[i][3])].cfixed)
+    end
+    return table, fixed
+end
+
+function tabledeps(model::Model, cname::Symbol, level::Int)
+    out = Vector{Tuple}()
+    result = model.cevals[cname].buffer
+    v = view(result, findall(isfinite.(result)))
+    push!(out, (level, string(cname),
+                string(typeof(model[cname])),
+                model.cevals[cname].counter,
+                minimum(v), maximum(v), mean(v),
+                count(isnan.(result)) + count(isinf.(result))))
     deps = dependencies(model[cname])
     for i in 1:length(deps)
-        printdeps(io, model, deps[i], level+1)
+        append!(out, tabledeps(model, deps[i], level+1))
     end
+    return out
 end
 
 
 function show(io::IO, model::Model)
     println(io)
     section(io, "Components:")
-    printdeps(io, model)
+    table, fixed = tabledeps(model)
+    printtable(io, table, ["Component", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+               hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+1],
+               formatters=ft_printf(showsettings.floatformat, 4:6),
+               highlighters=Highlighter((data,i,j) -> fixed[i], showsettings.fixed))
     println(io)
     section(io, "Parameters:")
     (length(model.cevals) == 0)  &&  (return nothing)
@@ -194,45 +228,16 @@ function show(io::IO, model::Model)
     push!(hrule, 0, 1)
     for (cname, ceval) in model.cevals
         comp = ceval.comp
-        (t, f, w) = preparetable(comp, cname=string(cname), cfixed=(ceval.cfixed >= 1))
+        (t, f, w) = preparetable(comp, cname=string(cname), cfixed=ceval.cfixed)
         table = vcat(table, t)
-        append!(fixed, f .| (ceval.cfixed >= 1))
+        append!(fixed, f .| ceval.cfixed)
         append!(watch, w)
         push!(hrule, length(watch)+1)
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> (!watch[i]  &&  (j in (7,8))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed)))
-
-
-    if showsettings.showevals
-        i = 1
-        error = Vector{Bool}()
-        table = Matrix{Union{String,Int,Float64}}(undef,
-                                                  length(model.cevals), 6)
-        for (cname, ceval) in model.cevals
-            result = ceval.buffer
-            v = view(result, findall(isfinite.(result)))
-            (length(v) == 0)  &&  (v = [NaN])
-            nan = length(findall(isnan.(result)))
-            inf = length(findall(isinf.(result)))
-            table[i, 1] = string(cname)
-            table[i, 2] = ceval.counter
-            table[i, 3:5] = [minimum(v), maximum(v), mean(v)]
-            table[i, 6] = (nan+inf > 0  ?  string(nan)  :  "")
-            push!(error, (nan+inf > 0))
-            i += 1
-        end
-
-        section(io, "Evaluations:")
-        printtable(io, table, ["Component", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-                   hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+1],
-                   formatters=ft_printf(showsettings.floatformat, 3:5),
-                   highlighters=(Highlighter((data,i,j) -> (error[i] && j==5), showsettings.error)))
-    end
-
-    section(io, "Reference component: " * string(find_maincomp(model)))
+                             Highlighter((data,i,j) -> (fixed[i]   &&  (j in (3,4,5,6))), showsettings.fixed)))
 end
 
 
