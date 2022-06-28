@@ -110,8 +110,11 @@ model[:f2] = f2
 model[:f3] = f3
 model[:main] = @λ (x, f1, f2, f3) -> (f1 .+ f2) .* f3
 res = fit!(model, data)
-# GFitViewer.save_json(model, data, res, filename="test1.json")
-
+#=
+GFitViewer.save_json(model, data, res, filename="test1.json")
+GFitViewer.save_json(model, data     , filename="test1a.json")
+GFitViewer.save_json(model           , filename="test1b.json")
+=#
 
 
 # ====================================================================
@@ -133,8 +136,11 @@ res = fit!(model, data)
 # Patch one parameter to another via a λ function
 model[:l2].norm.patch = @λ (v, m) -> v + m[:l1].norm
 res = fit!(model, data)
-# GFitViewer.save_json(model, data, res, filename="test2.json")
-
+#=
+GFitViewer.save_json(model, data, res, filename="test2.json")
+GFitViewer.save_json(model, data     , filename="test2a.json")
+GFitViewer.save_json(model           , filename="test2b.json")
+=#
 
 
 # ====================================================================
@@ -170,15 +176,16 @@ model[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
 model[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope
 
 
-model[1][:l2].center.fixed = true
-model[1][:l2].center.mpatch = @λ (v, m) -> m[2][:l2].center
+model[1][:l2].center.mpatch = @λ m -> m[2][:l2].center
 
 @time res = fit!(model, [data1, data2])
-
 
 #=
 @gp x y1 "w l t 'True model'" x data1.val data1.unc "w yerr t 'Data'" x model1() "w l t 'Best fit'"
 @gp x y2 "w l t 'True model'" x data2.val data2.unc "w yerr t 'Data'" x model2() "w l t 'Best fit'"
 viewer(model, [data1, data2], res)
+
 GFitViewer.save_json(model, [data1, data2], res, filename="test3.json")
+GFitViewer.save_json(model, [data1, data2]     , filename="test3a.json")
+GFitViewer.save_json(model                     , filename="test3b.json")
 =#
