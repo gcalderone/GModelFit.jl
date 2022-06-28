@@ -169,11 +169,14 @@ end
 
 function tabledeps(model::Model)
     out0 = tabledeps(model, find_maincomp(model), 0)
+    levels = getindex.(out0, 1)
     out = Vector{Tuple}()
-    for i in 1:length(out0)-1
-        push!(out, ((out0[i+1][1] < out0[i][1]), out0[i]...))
+    for i in 1:length(out0)
+        isamelevel = findfirst(levels[i+1:end] .== levels[i])
+        isuper     = findfirst(levels[i+1:end] .<  levels[i])
+        final = isnothing(isamelevel)  ||  (!isnothing(isuper)  &&  (isuper < isamelevel))
+        push!(out, (final, out0[i]...))
     end
-    push!(out, (true, out0[end]...))
 
     table = Matrix{Union{String,Int,Float64}}(undef, length(out), 7)
     fixed = Vector{Bool}()
