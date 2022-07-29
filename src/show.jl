@@ -205,7 +205,7 @@ function show(io::IO, model::Model)
     section(io, "Components:")
     table, fixed = tabledeps(model)
     printtable(io, table, ["Component", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-               hlines=[0,1, length(model.cevals)+1,  length(model.cevals)+1],
+               hlines=[0,1, size(table)[1]+1],
                formatters=ft_printf(showsettings.floatformat, 4:6),
                highlighters=Highlighter((data,i,j) -> fixed[i], showsettings.fixed))
     println(io)

@@ -33,7 +33,7 @@ end
 
 
 function prepare!(comp::λComp, domain::Domain)
-    # Discard as many argumnts as the number of dimensions in the domain
+    # Discard as many arguments as the number of dimensions in the domain
     list = getfield(comp, :list)
     for i in 1:ndims(domain)
         deleteat!(list, 1)
