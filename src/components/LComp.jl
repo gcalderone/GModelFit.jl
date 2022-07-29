@@ -32,7 +32,7 @@ function getparams(comp::λComp)
 end
 
 
-function prepare!(comp::λComp, domain::Domain)
+function prepare!(comp::λComp, domain::AbstractDomain)
     # Discard as many arguments as the number of dimensions in the domain
     list = getfield(comp, :list)
     for i in 1:ndims(domain)
