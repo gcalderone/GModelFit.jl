@@ -42,6 +42,7 @@ struct CartesianDomain{N} <: AbstractDomain{N}
     end
 
     function CartesianDomain(lengths::Vararg{T,N}; kw...) where {T <: Integer, N}
+        @assert N >= 2 "A cartesian domain requires at least 2 dimensions"
         @assert all(lengths .>= 1)
         axis = [collect(1.:lengths[i]) for i in 1:N]
         return CartesianDomain(axis...; kw...)
@@ -76,46 +77,61 @@ axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
 # ====================================================================
 # Measures and Counts types
 #
-abstract type AbstractData{T,N} end
 
-struct Measures{N} <: AbstractData{Float64,N}
-    domain::AbstractDomain{N}
-    val::Vector{Float64}
-    unc::Vector{Float64}
+abstract type AbstractMeasures{N} end
 
-    function Measures(domain::Domain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
-        @assert length(domain) == length(val) == length(unc) "Domain and dataset have incompatible lengths"
-        return new{N}(deepcopy(domain), deepcopy(val[:]), deepcopy(unc[:]))
+domain(d::AbstractMeasures) = d.domain
+ndims(d::AbstractMeasures) = ndims(domain(d))
+length(d::AbstractMeasures) = length(domain(d))
+size(d::AbstractMeasures) = size(domain(d))
+
+values(d::AbstractMeasures, index=1) = d.values[index]
+function original_shape(d::AbstractMeasures{N}, index=1) where N
+    if isa(domain(d), CartesianDomain)
+        out = fill(NaN, size(d))
+        out[domain(d).roi] .= values(d, index)
+        return out
     end
-
-    function Measures(domain::CartesianDomain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
-        @assert size(domain) == size(val) == size(unc) "Domain and dataset have incompatible size"
-        return new{N}(deepcopy(domain), deepcopy(val[domain.roi]), deepcopy(unc[domain.roi]))
-    end
+    out = values(d, index)
+    return out
 end
 
-Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, unc::T) where {T <: Real, N} =
-    Measures(domain, val, fill(unc, size(val)))
 
-
-struct Counts{N} <: AbstractData{Int,N}
+struct Measures{N} <: AbstractMeasures{N}
     domain::AbstractDomain{N}
-    val::Vector{Int}
+    values::NTuple{2, Vector{Float64}}
+    labels::NTuple{2, String}
 
-    function Counts(domain::Domain{N}, val::AbstractArray{T, N}) where {T <: Real, N}
-        @assert length(domain) == length(val) "Domain and dataset have incompatible lengths"
-        return new{N}(deepcopy(domain), deepcopy(val[:]))
+    # Measures with linear domain are built using 1D vector(s).
+    function Measures(domain::Domain{N}, values::AbstractVector{T}, uncerts::AbstractVector{T}) where {T <: AbstractFloat, N}
+        @assert length(domain) == length(values) == length(uncerts) "Domain and dataset have incompatible length"
+        return new{N}(deepcopy(domain), tuple(deepcopy(values), deepcopy(uncerts)), ("values", "uncerts"))
     end
 
-    function Counts(domain::CartesianDomain{N}, val::AbstractArray{T, N}) where {T <: Real, N}
-        @assert size(domain) == size(val) == size(unc) "Domain and dataset have incompatible size"
-        return new{N}(deepcopy(domain), deepcopy(val[domain.roi]))
+    # Measures with cartesian domain are built using N-dim arrays(s).
+    function Measures(domain::CartesianDomain{N}, values::AbstractArray{T, N}, uncerts::AbstractArray{T, N}) where {T <: AbstractFloat, N}
+        @assert size(domain) == size(values) == size(uncerts) "Domain and dataset have incompatible size"
+        return new{N}(deepcopy(domain), tuple(deepcopy(values[domain.roi]), deepcopy(uncerts[domain.roi])), ("values", "uncerts"))
     end
 end
+uncerts(d::Measures) = d.values[2]
+Measures(dom::AbstractDomain, values::AbstractArray, uncert::Real) = Measures(dom, values, fill(uncert, size(values)))
 
-domain(d::AbstractData) = d.domain
-values(d::AbstractData) = d.val
-uncerts(d::Measures) = d.unc
-ndims(d::AbstractData) where N = ndims(domain(d))
-length(d::AbstractData) = length(domain(d))
-size(d::AbstractData) = size(domain(d))
+
+struct PoissonCounts{N} <: AbstractMeasures{N}
+    domain::AbstractDomain{N}
+    values::NTuple{1, Vector{Int}}
+    labels::NTuple{1, String}
+
+    # Measures with linear domain are built using 1D vector(s).
+    function PoissonCounts(domain::Domain{N}, values::AbstractVector{T}) where {T <: Integer, N}
+        @assert length(domain) == length(values) "Domain and dataset have incompatible length"
+        return new{N}(deepcopy(domain), tuple(deepcopy(values)), ("counts", ))
+    end
+
+    # Measures with cartesian domain are built using N-dim arrays(s).
+    function PoissonCounts(domain::CartesianDomain{N}, values::AbstractArray{T, N}) where {T <: Integer, N}
+        @assert size(domain) == size(values) "Domain and dataset have incompatible size"
+        return new{N}(deepcopy(domain), tuple(deepcopy(values[domain.roi])), ("counts", ))
+    end
+end

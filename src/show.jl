@@ -71,20 +71,20 @@ function show(io::IO, dom::AbstractDomain)
 end
 
 
-function show(io::IO, data::Measures)
-    section(io, typeof(data), ": (length: ", (length(data.val)), ")")
+function show(io::IO, data::AbstractMeasures)
+    section(io, typeof(data), ": (length: ", (length(data)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
-    for name in [:val, :unc]
-        a = getfield(data, name)
-        nan = length(findall(isnan.(a))) + length(findall(isinf.(a)))
-        a = a[findall(isfinite.(a))]
+    for i in 1:length(data.labels)
+        vv = values(data, i)
+        nan = length(findall(isnan.(vv))) + length(findall(isinf.(vv)))
+        vv = vv[findall(isfinite.(vv))]
         push!(error, nan > 0)
-        table = vcat(table, [string(name) minimum(a) maximum(a) mean(a) median(a) std(a) (nan > 0  ?  string(nan)  :  "") ])
+        table = vcat(table, [data.labels[i] minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
     push!(hrule, 0, size(table)[1]+1)
     printtable(io, table, ["", "Min", "Max", "Mean", "Median", "Std. dev.", "Nan/Inf"],
