@@ -46,30 +46,28 @@ end
 
 
 
-show(io::IO, mime::MIME"text/plain", domain::AbstractDomain) = show(io, domain)
 function show(io::IO, dom::AbstractDomain)
     section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
     hrule = Vector{Int}()
     push!(hrule, 0, 1, ndims(dom)+1)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
-        a = dom[i]
-        b = 0
-        if length(a) > 1
-            b = a .- circshift(a, 1)
-            b = b[2:end]
+        if isa(dom, CartesianDomain)
+            vv = axis(dom, i)
+        else
+            vv = coords(dom, i)
+        end
+        steps = 0
+        if length(vv) > 1
+            steps = vv .- circshift(vv, 1)
+            steps = steps[2:end]
         end
         table[i, 1] = i
-        table[i, 2] = length(a)
-        table[i, 3:6] = [minimum(a), maximum(a), minimum(b), maximum(b)]
+        table[i, 2] = length(vv)
+        table[i, 3:6] = [minimum(vv), maximum(vv), minimum(steps), maximum(steps)]
     end
-    if isa(dom, Domain)  &&  (ndims(dom) >= 2) # treat Domain{1} as a Cartesian one, despite it is a linear one.
-        printtable(io, table[:, 1:4], ["Dim", "Size", "Min val", "Max val"],
-                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:4))
-    else
-        printtable(io, table, ["Dim", "Size", "Min val", "Max val", "Min step", "Max step"],
-                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
-    end
+    printtable(io, table, ["Dim", "Length", "Min val", "Max val", "Min step", "Max step"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
 end
 
 

@@ -11,6 +11,6 @@ function evaluate!(buffer::Vector{Float64}, comp::Polynomial, x::Domain{1},
                    coeffs...)
     buffer .= coeffs[1]
     for deg in 1:length(coeffs)-1
-        buffer .+= x[:].^deg .* coeffs[deg+1]
+        buffer .+= coords(x).^deg .* coeffs[deg+1]
     end
 end

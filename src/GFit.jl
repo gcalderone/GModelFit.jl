@@ -23,7 +23,7 @@ import Base.setproperty!
 import Base.iterate
 import Base.push!
 
-export AbstractDomain, Domain, CartesianDomain, linear_domain, AbstractMeasures, Measures,
+export AbstractDomain, Domain, CartesianDomain, coords, axis, AbstractMeasures, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain,
     MultiModel, evaluate, isfixed, thaw, freeze, fit!
 

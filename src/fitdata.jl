@@ -12,8 +12,7 @@ struct FitData <: AbstractFitData
 
     function FitData(model::Model, data::Measures{N}) where N
         evaluate(model)
-        data1d = flatten(data)
-        resid = fill(NaN, length(data1d))
+        resid = fill(NaN, length(data))
         ifree = Vector{Int}()
         i = 1
         for (cname, hv) in model.params
@@ -27,7 +26,7 @@ struct FitData <: AbstractFitData
         nfree = length(ifree)
         @assert nfree > 0 "No free parameter in the model"
         dof = length(resid) - nfree
-        return new(now(), model, data1d.val, data1d.unc, resid, ifree, dof)
+        return new(now(), model, values(data), uncerts(data), resid, ifree, dof)
     end
 end
 

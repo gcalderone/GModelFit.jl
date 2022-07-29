@@ -47,9 +47,10 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 # Evaluate component 
 function evaluate!(buffer::Vector{Float64}, comp::Lorentzian_1D, x::AbstractDomain{1},
                    norm, center, fwhm)
+    X = coords(x)
     @. (buffer = norm /
         (1. +
-         ((x[:] - center) / fwhm)^2.
+         ((X - center) / fwhm)^2.
         ))
 end
 

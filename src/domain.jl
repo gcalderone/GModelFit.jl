@@ -1,6 +1,7 @@
 abstract type AbstractDomain{N} end
 
-# A non-cartesian domain has the same number of points in all dimensions.
+# A non-cartesian domain has the same number of points in all
+# dimensions.
 struct Domain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
 
@@ -17,7 +18,9 @@ struct Domain{N} <: AbstractDomain{N}
 end
 
 
-# A cartesian domain has the coordinates specified independently for each axis, and can always be trasformed into a non-cartesian one.  Cartesian domains also supports region-of-interest (ROI),
+# A cartesian domain has the coordinates specified independently for
+# each axis, and can always be trasformed into a non-cartesian one.
+# Cartesian domains also support region-of-interest (ROI).
 struct CartesianDomain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
     roi::Vector{Int}
@@ -27,7 +30,7 @@ struct CartesianDomain{N} <: AbstractDomain{N}
         @assert N >= 2 "A cartesian domain requires at least 2 dimensions"
         isnothing(roi)  &&  (roi = collect(1:prod(length.(axis))))
 
-        # Prepare corresponding linear domain
+        # Pre-compute corresponding linear domain
         ss = tuple(length.(axis)...)
         ci = Tuple.(CartesianIndices(ss))[roi]
         vv = Vector{Vector{Float64}}()
@@ -49,18 +52,25 @@ end
 ndims(d::Union{Domain{N}, CartesianDomain{N}}) where N = N
 
 length(d::Domain) = length(d.axis[1])
-length(d::CartesianDomain) = length(linear_domain(d))
-size(d::CartesianDomain) = [length(v) for v in d.axis]
+length(d::CartesianDomain) = length(coords(d, 1))
 
-getindex(d::Domain{1}, ::Colon) = d.axis[1]
-getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = d.axis[dim]
+# Return coordinates of all points along a given dimension
+coords(d::Domain{1}) = d.axis[1]
+coords(d::Domain, dim::Integer) = d.axis[dim]
+coords(d::CartesianDomain, dim::Integer) = coords(flatten(d), dim)
+getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = coords(d, dim)
 
+# Iterate through domain dimensions returning coordinates
 function iterate(d::Union{Domain, CartesianDomain}, ii=1)
     (ii > ndims(d))  &&  (return nothing)
-    return (d[ii], ii+1)
+    return (coords(d, ii), ii+1)
 end
 
-linear_domain(d::CartesianDomain) = d.ldomain
+# Cartesian-only methods
+flatten(d::CartesianDomain) = d.ldomain
+size(d::CartesianDomain) = [length(v) for v in d.axis]
+axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
+
 
 
 # ====================================================================
@@ -70,18 +80,17 @@ abstract type AbstractData{T,N} end
 
 struct Measures{N} <: AbstractData{Float64,N}
     domain::AbstractDomain{N}
-    val::Array{Float64,N}
-    unc::Array{Float64,N}
+    val::Vector{Float64}
+    unc::Vector{Float64}
 
     function Measures(domain::Domain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
-        @assert length(domain) == length(val) "Domain and dataset have incompatible lengths"
-        @assert length(unc) == length(val) "Dataset values and uncertainties have incompatible lengths"
-        return new{N}(deepcopy(domain), deepcopy(val), deepcopy(unc))
+        @assert length(domain) == length(val) == length(unc) "Domain and dataset have incompatible lengths"
+        return new{N}(deepcopy(domain), deepcopy(val[:]), deepcopy(unc[:]))
     end
 
     function Measures(domain::CartesianDomain{N}, val::AbstractArray{T, N}, unc::AbstractArray{T, N}) where {T <: Real, N}
-        @assert prod(orig_size(domain)) == length(val) "Domain and dataset have incompatible lengths"
-        return new{N}(deepcopy(domain), deepcopy(val), deepcopy(unc))
+        @assert size(domain) == size(val) == size(unc) "Domain and dataset have incompatible size"
+        return new{N}(deepcopy(domain), deepcopy(val[domain.roi]), deepcopy(unc[domain.roi]))
     end
 end
 
@@ -91,45 +100,22 @@ Measures(domain::AbstractDomain{N}, val::AbstractArray{T, N}, unc::T) where {T <
 
 struct Counts{N} <: AbstractData{Int,N}
     domain::AbstractDomain{N}
-    val::Array{Int,N}
+    val::Vector{Int}
 
-    function Counts(domain::Domain{N}, val::AbstractArray{T, N}) where {T <: Integer, N}
+    function Counts(domain::Domain{N}, val::AbstractArray{T, N}) where {T <: Real, N}
         @assert length(domain) == length(val) "Domain and dataset have incompatible lengths"
-        new{N}(deepcopy(domain), deepcopy(val))
+        return new{N}(deepcopy(domain), deepcopy(val[:]))
     end
 
     function Counts(domain::CartesianDomain{N}, val::AbstractArray{T, N}) where {T <: Real, N}
-        @assert prod(orig_size(domain)) == length(val) "Domain and dataset have incompatible lengths"
-        return new{N}(deepcopy(domain), deepcopy(val))
+        @assert size(domain) == size(val) == size(unc) "Domain and dataset have incompatible size"
+        return new{N}(deepcopy(domain), deepcopy(val[domain.roi]))
     end
 end
 
-
-ndims(d::Measures{N}) where N = N
-size(d::Measures) = size(d.val)
-length(d::Measures) = length(d.val)
-uncerts(d::Measures) = d.uncerts
-
-ndims(d::Counts{N}) where N = N
-size(d::Counts) = size(d.val)
-iterate(d::Counts, args...) = iterate(d.val, args...)
-
-
-# ====================================================================
-# Methods to "flatten" a multidimensional object into a 1D one
-#
-function flatten(data::Measures{N}) where N
-    (N == 1)  &&  return data
-    if isa(data.domain, CartesianDomain)
-        return Measures(data.val[roi(data.domain)], data.unc[roi(data.domain)])
-    end
-    return Measures(data.val[:], data.unc[:])
-end
-
-function flatten(data::Counts{N}) where N
-    (N == 1)  &&  return data
-    if isa(data.domain, CartesianDomain)
-        return Counts(data.val[roi(data.domain)])
-    end
-    return Counts(data.val[:])
-end
+domain(d::AbstractData) = d.domain
+values(d::AbstractData) = d.val
+uncerts(d::Measures) = d.unc
+ndims(d::AbstractData) where N = ndims(domain(d))
+length(d::AbstractData) = length(domain(d))
+size(d::AbstractData) = size(domain(d))
