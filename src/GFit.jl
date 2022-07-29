@@ -23,7 +23,7 @@ import Base.setproperty!
 import Base.iterate
 import Base.push!
 
-export AbstractDomain, Domain, CartesianDomain, coords, axis, AbstractMeasures, Measures, uncerts,
+export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain,
     MultiModel, evaluate, isfixed, thaw, freeze, fit!
 
@@ -269,9 +269,7 @@ function evaluate(model::Model)
 end
 
 
-# Evaluation step 1: update internal structures, i.e. a 1D vector
-# (actually a HashVectors) of parameters, as well as of their fit and
-# patched values
+# Evaluation step 1: update internal structures before fitting
 function eval_step1(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
@@ -320,8 +318,8 @@ function eval_step1(model::Model)
 end
 
 
-# Evaluation step 2: copy all fit values into patched, update the
-# latter by invoking the user functions
+# Evaluation step 2: copy all parameter values into patched, then
+# update the latter by invoking the user patch functions.
 function eval_step2(model::Model)
     # Reset `updated` flag
     for (cname, ceval) in model.cevals
@@ -356,7 +354,8 @@ function eval_step2(model::Model)
 end
 
 
-# Evaluation step 3: actual evaluation of model components, starting from the main one
+# Evaluation step 3: actual evaluation of model components, starting
+# from the main one and following dependencies
 eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies

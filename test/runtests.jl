@@ -65,7 +65,7 @@ data = Measures(Domain(x), y .+ randn(length(x)), 1.)
 model = Model(Domain(x), :a2 => 1, :a1 => 1, :a0 => 5)
 model[:parabola] = @λ (x, a2, a1, a0) -> @. (a2 * x^2  +  a1 * x  + a0)
 res = fit!(model, data)
-# @gp x y "w l t 'True model'" x data.val data.unc "w yerr t 'Data'" x model() "w l t 'Best fit'"
+# @gp x y "w l t 'True model'" x values(data) uncerts(data) "w yerr t 'Data'" x model() "w l t 'Best fit'"
 # viewer(model, data, res)
 
 
@@ -181,8 +181,8 @@ model[1][:l2].center.mpatch = @λ m -> m[2][:l2].center
 @time res = fit!(model, [data1, data2])
 
 #=
-@gp x y1 "w l t 'True model'" x data1.val data1.unc "w yerr t 'Data'" x model1() "w l t 'Best fit'"
-@gp x y2 "w l t 'True model'" x data2.val data2.unc "w yerr t 'Data'" x model2() "w l t 'Best fit'"
+@gp x y1 "w l t 'True model'" x values(data1) uncerts(data1) "w yerr t 'Data'" x model1() "w l t 'Best fit'"
+@gp x y2 "w l t 'True model'" x values(data2) uncerts(data2) "w yerr t 'Data'" x model2() "w l t 'Best fit'"
 viewer(model, [data1, data2], res)
 
 GFitViewer.save_json(model, [data1, data2], res, filename="test3.json")
