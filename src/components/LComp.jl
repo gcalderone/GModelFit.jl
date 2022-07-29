@@ -32,7 +32,7 @@ function getparams(comp::λComp)
 end
 
 
-function prepare!(comp::λComp, domain::AbstractDomain)
+function prepare!(comp::λComp, domain::Domain)
     # Discard as many argumnts as the number of dimensions in the domain
     list = getfield(comp, :list)
     for i in 1:ndims(domain)
@@ -45,10 +45,10 @@ end
 # We need to implement two evaluate! methods, with/without deps argument respectively
 function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    params...)
-    buffer .= getfield(comp, :func)(coords(domain)..., params...)
+    buffer .= getfield(comp, :func)(domain..., params...)
 end
 
 function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    deps, params...)
-    buffer .= getfield(comp, :func)(coords(domain)..., deps..., params...)
+    buffer .= getfield(comp, :func)(domain..., deps..., params...)
 end

@@ -53,11 +53,7 @@ function show(io::IO, dom::AbstractDomain)
     push!(hrule, 0, 1, ndims(dom)+1)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
-        if isa(dom, Domain{1})
-            a = convert(Vector{Float64}, dom)
-        else
-            a = isa(dom, Domain)  ?  dom[i]  :  axis(dom, i)
-        end
+        a = dom[i]
         b = 0
         if length(a) > 1
             b = a .- circshift(a, 1)
@@ -77,13 +73,7 @@ function show(io::IO, dom::AbstractDomain)
 end
 
 
-#=
-The following is needed since AbstractData <: AbstractArray:
-without it the show(bstractArray) would be invoked.
-=#
-show(io::IO, mime::MIME"text/plain", data::AbstractData) = show(io, data)
-
-function show(io::IO, data::AbstractData)
+function show(io::IO, data::Measures)
     section(io, typeof(data), ": (length: ", (length(data.val)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
     hrule = Vector{Int}()
@@ -91,7 +81,7 @@ function show(io::IO, data::AbstractData)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
-    for name in names
+    for name in [:val, :unc]
         a = getfield(data, name)
         nan = length(findall(isnan.(a))) + length(findall(isinf.(a)))
         a = a[findall(isfinite.(a))]

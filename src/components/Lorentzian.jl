@@ -49,7 +49,7 @@ function evaluate!(buffer::Vector{Float64}, comp::Lorentzian_1D, x::AbstractDoma
                    norm, center, fwhm)
     @. (buffer = norm /
         (1. +
-         ((x - center) / fwhm)^2.
+         ((x[:] - center) / fwhm)^2.
         ))
 end
 

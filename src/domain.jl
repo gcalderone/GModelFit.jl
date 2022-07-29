@@ -1,50 +1,23 @@
-abstract type AbstractDomain{N} <: AbstractVector{Union{Float64, Vector{Float64}}} end
+abstract type AbstractDomain{N} end
 
+# A non-cartesian domain has the same number of points in all dimensions.
 struct Domain{N} <: AbstractDomain{N}
-    coords::AbstractMatrix{Float64}
-
-    Domain(coords::Matrix{T}) where {T <: Real} =
-        new{size(coords)[2]}(coords)
+    axis::NTuple{N, Vector{Float64}}
 
     function Domain(coords::Vararg{AbstractVector{T},N}) where {T <: Real, N}
-        (N > 1)  &&  (@assert all(length(coords[1]) .== [length.(coords)...]))
-        mat = deepcopy(coords[1])
-        if N > 1
-            for i in 2:N
-                mat = hcat(mat, coords[i])
-            end
-        else
-            mat = reshape(mat, length(mat), 1)
-        end
-        return new{N}(mat)
+        @assert N >= 1
+        @assert all(length(coords[1]) .== [length.(coords)...])
+        return new{N}(convert(NTuple{N, Vector{Float64}}, coords))
     end
 
     function Domain(length::Integer)
         @assert length >= 1
-        return new{1}(reshape(collect(1.:length), length, 1))
+        return Domain(collect(1.:length))
     end
 end
 
-ndims(d::Domain{N}) where N = N
-length(d::Domain) = size(d.coords)[1]
-size(d::Domain{N}) where N = (length(d),)
 
-getindex(d::Domain{1}, ::Colon) = d.coords[:, 1]
-getindex(d::Domain{1}, index::Integer) = d.coords[index, 1]
-getindex(d::Domain, dim::Integer) = d.coords[:, dim]
-
-function iterate(d::Domain{1}, ii=1)
-    (ii > size(d.coords)[1])  &&  (return nothing)
-    return (d.coords[ii, 1], ii+1)
-end
-function iterate(d::Domain, ii=1)
-    (ii > size(d.coords)[1])  &&  (return nothing)
-    return (d.coords[ii, :], ii+1)
-end
-
-coords(d::Domain{N}) where N = [d.coords[:, i] for i in 1:N]
-
-
+# A cartesian domain has the coordinates specified independently for each axis, and can always be trasformed into a non-cartesian one.  Cartesian domains also supports region-of-interest (ROI),
 struct CartesianDomain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
     roi::Vector{Int}
@@ -52,17 +25,16 @@ struct CartesianDomain{N} <: AbstractDomain{N}
 
     function CartesianDomain(axis::Vararg{AbstractVector{T},N}; roi=nothing) where {T <: Real, N}
         @assert N >= 2 "A cartesian domain requires at least 2 dimensions"
-        len = prod(length.(axis))
-        ss = tuple(length.(axis)...)
-        isnothing(roi)  &&  (roi = collect(1:len))
+        isnothing(roi)  &&  (roi = collect(1:prod(length.(axis))))
 
         # Prepare corresponding linear domain
-        mat = Matrix{Float64}(undef, length(roi), N)
+        ss = tuple(length.(axis)...)
         ci = Tuple.(CartesianIndices(ss))[roi]
+        vv = Vector{Vector{Float64}}()
         for i = 1:N
-            mat[:, i] .= axis[i][getindex.(ci, i)]
+            push!(vv, axis[i][getindex.(ci, i)])
         end
-        ldomain = Domain(mat)
+        ldomain = Domain(vv...)
         return new{N}(deepcopy(axis), roi, ldomain)
     end
 
@@ -73,18 +45,22 @@ struct CartesianDomain{N} <: AbstractDomain{N}
     end
 end
 
-# Forward methods to ldomain field
-ndims(d::CartesianDomain{N}) where N = N
-length(d::CartesianDomain) = length(d.ldomain)
-size(d::CartesianDomain) = size(d.ldomain)
-getindex(d::CartesianDomain, ii) = getindex(d.ldomain, ii)
-iterate(d::CartesianDomain, args...) = iterate(d.ldomain, args...)
-coords(d::CartesianDomain) = coords(d.ldomain)
 
-# Cartesian-only methods
-orig_size(d::CartesianDomain) = tuple(length.(d.axis)...)
-axis(d::CartesianDomain, dim) = d.axis[dim]
-roi(d::CartesianDomain) = d.roi
+ndims(d::Union{Domain{N}, CartesianDomain{N}}) where N = N
+
+length(d::Domain) = length(d.axis[1])
+length(d::CartesianDomain) = length(linear_domain(d))
+size(d::CartesianDomain) = [length(v) for v in d.axis]
+
+getindex(d::Domain{1}, ::Colon) = d.axis[1]
+getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = d.axis[dim]
+
+function iterate(d::Union{Domain, CartesianDomain}, ii=1)
+    (ii > ndims(d))  &&  (return nothing)
+    return (d[ii], ii+1)
+end
+
+linear_domain(d::CartesianDomain) = d.ldomain
 
 
 # ====================================================================
