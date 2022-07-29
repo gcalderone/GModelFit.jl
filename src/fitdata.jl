@@ -1,142 +1,108 @@
-abstract type AbstractFitData end
+abstract type AbstractFitProblem end
 
 # ====================================================================
-struct FitData <: AbstractFitData
-    timestamp::DateTime
+struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
     model::Model
-    data::Vector{Float64}
-    unc::Vector{Float64}
+    measures::AbstractMeasures
     resid::Vector{Float64}
-    ifree::Vector{Int}
+    nfree::Int
     dof::Int
 
-    function FitData(model::Model, data::Measures{N}) where N
+    function FitProblem(model::Model, data::T) where T <: AbstractMeasures
         evaluate(model)
         resid = fill(NaN, length(data))
-        ifree = Vector{Int}()
-        i = 1
-        for (cname, hv) in model.params
-            for (pname, par) in hv
-                if !par.fixed  &&  (model.cevals[cname].cfixed == 0)
-                    push!(ifree, i)
-                end
-                i += 1
-            end
-        end
-        nfree = length(ifree)
+        nfree = length(free_params(model))
         @assert nfree > 0 "No free parameter in the model"
-        dof = length(resid) - nfree
-        return new(now(), model, values(data), uncerts(data), resid, ifree, dof)
+        return new{T}(model, data, resid, nfree, length(resid) - nfree)
     end
 end
 
-free_params(fd::FitData) = internal_data(fd.model.params)[fd.ifree]
-residuals(fd::FitData) = fd.resid
-fit_stat(fd::FitData) = sum(abs2, fd.resid) / fd.dof
+free_params(fp::FitProblem) = free_params(fp.model)
+residuals(fp::FitProblem) = fp.resid
 
-function evaluate!(fd::FitData, pvalues::Vector{Float64})
-    internal_data(fd.model.pvalues)[fd.ifree] .= pvalues
-    eval_step2(fd.model)
-    eval_step3(fd.model)
-    fd.resid .= (fd.model() .- fd.data) ./ fd.unc
-    return fd.resid
+function update!(fp::FitProblem, pvalues::Vector{Float64})
+    eval_step1(fp.model, pvalues)
+    eval_step2(fp.model)
+    eval_step3(fp.model)
+    update_residuals!(fp)
+    return fp.resid
 end
 
-function finalize!(fd::FitData, best::Vector{Float64}, unc::Vector{Float64})
-    @assert length(fd.ifree) == length(best) == length(unc)
-    evaluate!(fd, best)
-    all_unc = fill(NaN, length(internal_data(fd.model.params)))
-    all_unc[fd.ifree] = unc
-    eval_step4(fd.model, all_unc)
+function update_residuals!(fp::FitProblem{Measures{N}}) where N
+    fp.resid .= (fp.model() .- values(fp.measures)) ./ uncerts(fp.measures)
+end
+fit_stat(fp::FitProblem{Measures{N}}) where N =
+    sum(abs2, fp.resid) / fp.dof
+
+function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
+    @assert fp.nfree == length(best) == length(uncerts)
+    update!(fp, best)
+    eval_step4(fp.model, uncerts)
 end
 
-function error!(fd::FitData)
-    eval_step4(fd.model)
+function error!(fp::FitProblem)
+    eval_step4(fp.model, fill(NaN, fp.nfree))
 end
 
 
 
 # ====================================================================
-struct MultiFitData <: AbstractFitData
-    timestamp::DateTime
+struct MultiFitProblem <: AbstractFitProblem
     multi::MultiModel
-    fds::Vector{FitData}
+    fp::Vector{FitProblem}
     resid::Vector{Float64}
+    nfree::Int
     dof::Int
 
-    function MultiFitData(multi::MultiModel, datasets::Vector{Measures{N}}) where N
+    function MultiFitProblem(multi::MultiModel, datasets::Vector{T}) where T <: AbstractMeasures
         @assert length(multi) == length(datasets)
         evaluate(multi)
-        fds = [FitData(multi[id], datasets[id]) for id in 1:length(multi)]
-        resid = fill(NaN, sum(length.(getfield.(fds, :data))))
-        nfree = sum(length.(getfield.(fds, :ifree)))
+        fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
+        resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
+        nfree = sum(getfield.(fp, :nfree))
         @assert nfree > 0 "No free parameter in the model"
-        dof = length(resid) - nfree
-        return new(now(), multi, fds, resid, dof)
+        return new(multi, fp, resid, nfree, length(resid) - nfree)
     end
 end
 
-function free_params(fd::MultiFitData)
-    out = Vector{Parameter}()
-    for id in 1:length(fd.multi)
-        append!(out, free_params(fd.fds[id]))
-    end
-    return out
-end
-residuals(fd::MultiFitData) = fd.resid
-fit_stat(fd::MultiFitData) = sum(abs2, fd.resid) / fd.dof
+free_params(fp::MultiFitProblem) = free_params(fp.multi)
+residuals(fp::MultiFitProblem) = fp.resid
 
-function evaluate!(fd::MultiFitData, pvalues::Vector{Float64})
-    # We need to copy all parameter values before evaluate!, to ensure
+function update!(fp::MultiFitProblem, pvalues::Vector{Float64})
+    # We need to copy all parameter values before evaluation to ensure
     # all patch functions use the current parameter values
-    i1 = 1
-    for id in 1:length(fd.multi)
-        nn = length(fd.fds[id].ifree)
-        if nn > 0
-            i2 = i1 + nn - 1
-            internal_data(fd.fds[id].model.pvalues)[fd.fds[id].ifree] .= pvalues[i1:i2]
-            i1 += nn
-        end
+    for (id, i1, i2) in free_params_indices(fp.multi)
+        eval_step1(fp.multi[id], pvalues[i1:i2])
     end
-    # Now proceed to evaluation
-    i1 = 1
-    for id in 1:length(fd.multi)
-        nn = length(fd.fds[id].ifree)
-        if nn > 0
-            i2 = i1 + nn - 1
-            evaluate!(fd.fds[id], pvalues[i1:i2])
-            i1 += nn
-        end
-    end
+    eval_step2(fp.multi)
+    eval_step3(fp.multi)
+
     # Populate resid vector
     i1 = 1
-    for id in 1:length(fd.multi)
-        nn = length(fd.fds[id].resid)
+    for id in 1:length(fp.multi)
+        update_residuals!(fp.fp[id])
+        nn = length(fp.fp[id].resid)
         if nn > 0
             i2 = i1 + nn - 1
-            fd.resid[i1:i2] .= fd.fds[id].resid
+            fp.resid[i1:i2] .= fp.fp[id].resid
             i1 += nn
         end
     end
-    return fd.resid
+    return fp.resid
 end
 
+# TODO: Handle the case where one (or more) dataset is not a `Measures`
+fit_stat(fp::MultiFitProblem) =
+    sum(abs2, fp.resid) / fp.dof
 
-function finalize!(fd::MultiFitData, best::Vector{Float64}, unc::Vector{Float64})
-    i1 = 1
-    for id in 1:length(fd.multi)
-        nn = length(fd.fds[id].ifree)
-        if nn > 0
-            i2 = i1 + nn - 1
-            finalize!(fd.fds[id], best[i1:i2], unc[i1:i2])
-            i1 += nn
-        end
+function finalize!(fp::MultiFitProblem, best::Vector{Float64}, unc::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(fp.multi)
+        finalize!(fp.fp[id], best[i1:i2], unc[i1:i2])
     end
 end
 
-
-function error!(fd::MultiFitData)
-    for id in 1:length(fd.multi)
-        finalize!(fd.fds[id])
+function error!(fp::MultiFitProblem)
+    for id in 1:length(fp.multi)
+        error!(fp.fp[id])
     end
 end

@@ -170,6 +170,7 @@ mutable struct Model   # mutable because of parent and maincomp
     params::HashHashVector{Parameter}
     pvalues::HashHashVector{Float64}
     patched::HashHashVector{Float64}
+    ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
 
@@ -210,6 +211,7 @@ mutable struct Model   # mutable because of parent and maincomp
                     HashHashVector{Parameter}(),
                     HashHashVector{Float64}(),
                     HashHashVector{Float64}(),
+                    Vector{Int}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
 
@@ -261,7 +263,8 @@ end
 
 
 function evaluate(model::Model)
-    eval_step1(model)
+    eval_step0(model)
+    # eval_step1()
     eval_step2(model)
     eval_step3(model)
     eval_step4(model)
@@ -269,12 +272,14 @@ function evaluate(model::Model)
 end
 
 
-# Evaluation step 1: update internal structures before fitting
-function eval_step1(model::Model)
+# Evaluation step 0: update internal structures before fitting
+function eval_step0(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
     empty!(model.patched)
+    empty!(model.ifree)
 
+    ipar = 1
     for (cname, ceval) in model.cevals
         for (pname, par) in getparams(ceval.comp)
             if !(par.low <= par.val <= par.high)
@@ -308,6 +313,10 @@ function eval_step1(model::Model)
                     par.fixed = false
                 end
             end
+            if !par.fixed  &&  (ceval.cfixed == 0)
+                push!(model.ifree, ipar)
+            end
+            ipar += 1
         end
 
         empty!(ceval.deps)
@@ -317,6 +326,11 @@ function eval_step1(model::Model)
     end
 end
 
+
+# Evaluation step 1: set new model parameters
+function eval_step1(model::Model, pvalues::Vector{Float64})
+    internal_data(model.pvalues)[model.ifree] .= pvalues
+end
 
 # Evaluation step 2: copy all parameter values into patched, then
 # update the latter by invoking the user patch functions.
@@ -368,39 +382,20 @@ end
 
 # Evaluation step 4: copy back fit and patched values, as well as
 # uncertainties into their original Parameter structures.
-function eval_step4(model::Model, unc=Vector{Float64}[])
+function eval_step4(model::Model, uncerts=Vector{Float64}[])
+    ipar = 1
     i = 1
     for (cname, hv) in model.params
         for (pname, par) in hv
             par.val  = model.pvalues[cname][pname]
             par.pval = model.patched[cname][pname]
-            if length(unc) > 0
-                par.unc = unc[i]
+            if (length(uncerts) > 0)  &&  (ipar in model.ifree)
+                par.unc = uncerts[i]
+                i += 1
             end
-            i += 1
+            ipar += 1
         end
     end
-
-    #= TODO
-    if length(unc) == 0
-        # Delete uncertainties if parameter values has changed
-        delete_uncert = false
-        for loop = 1:2
-            for (cname, ceval) in model.cevals
-                ii = 1
-                for (pname, par) in getparams(ceval.comp)
-                    if par.val != ceval.lastvalues[ii]
-                        @info "DELETEEEIINNGGG"
-                        sleep(0.2)
-                        delete_uncert = true
-                    end
-                    ii += 1
-                    delete_uncert  &&  (par.unc = NaN)
-                end
-            end
-        end
-    end
-    =#
 end
 
 
@@ -414,6 +409,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     evaluate(model)
 end
 
+free_params(model::Model) = internal_data(model.params)[model.ifree]
 
 function isfixed(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"

@@ -40,13 +40,13 @@ import LsqFit
 
 struct lsqfit <: AbstractMinimizer; end
 
-function fit!(minimizer::lsqfit, fd::AbstractFitData)
-    params = free_params(fd)
-    ndata = length(residuals(fd))
-    prog = ProgressUnknown("Model (dof=$(fd.dof)) evaluations:", dt=0.5, showspeed=true)
+function fit!(minimizer::lsqfit, fp::AbstractFitProblem)
+    params = free_params(fp)
+    ndata = length(residuals(fp))
+    prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
     res = LsqFit.curve_fit((dummy, pvalues) -> begin
-                           ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fd))])
-                           evaluate!(fd, pvalues)
+                           ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
+                           update!(fp, pvalues)
                            end,
                            1.:ndata, fill(0., ndata),
                            getfield.(params, :val),
@@ -54,11 +54,11 @@ function fit!(minimizer::lsqfit, fd::AbstractFitData)
                            upper=getfield.(params, :high))
     ProgressMeter.finish!(prog)
     if !res.converged
-        error!(fd)
+        error!(fp)
         return MinimizerStatusError("Not converged", res)
     end
 
-    finalize!(fd, getfield.(Ref(res), :param), LsqFit.stderror(res))
+    finalize!(fp, getfield.(Ref(res), :param), LsqFit.stderror(res))
     return MinimizerStatusOK(res)
 end
 
@@ -85,8 +85,8 @@ mutable struct cmpfit <: AbstractMinimizer
     cmpfit() = new(CMPFit.Config(), NaN)
 end
 
-function fit!(minimizer::cmpfit, fd::AbstractFitData)
-    params = free_params(fd)
+function fit!(minimizer::cmpfit, fp::AbstractFitProblem)
+    params = free_params(fp)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
     high  = getfield.(params, :high)
@@ -98,19 +98,19 @@ function fit!(minimizer::cmpfit, fd::AbstractFitData)
         parinfo[i].limits  = (low[i], high[i])
     end
 
-    evaluate!(fd, guess)
-    last_fitstat = sum(abs2, residuals(fd))
+    update!(fp, guess)
+    last_fitstat = sum(abs2, residuals(fp))
     while true
-        prog = ProgressUnknown("Model (dof=$(fd.dof)) evaluations:", dt=0.5, showspeed=true)
+        prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
         res = CMPFit.cmpfit((pvalues) -> begin
-                            ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fd))])
-                            evaluate!(fd, pvalues)
+                            ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
+                            update!(fp, pvalues)
                             end,
                             guess, parinfo=parinfo, config=minimizer.config)
         ProgressMeter.finish!(prog)
 
         if res.status <= 0
-            error!(fd)
+            error!(fp)
             return MinimizerStatusError("Status = $(res.status)", res)
         end
 
@@ -124,7 +124,7 @@ function fit!(minimizer::cmpfit, fd::AbstractFitData)
             end
         end
 
-        finalize!(fd,
+        finalize!(fp,
                   getfield.(Ref(res), :param),
                   getfield.(Ref(res), :perror))
 

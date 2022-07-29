@@ -10,14 +10,14 @@ struct FitResult
     log10testprob::Float64
     status::AbstractMinimizerStatus
 
-    function FitResult(fd::AbstractFitData, status::AbstractMinimizerStatus)
-        gof_stat = sum(abs2, residuals(fd))
+    function FitResult(timestamp::DateTime, fp::AbstractFitProblem, status::AbstractMinimizerStatus)
+        gof_stat = sum(abs2, residuals(fp))
         tp = NaN
         try
-            tp = logccdf(Chisq(fd.dof), gof_stat) * log10(exp(1))
+            tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
         catch; end
-        new(fd.timestamp, (now() - fd.timestamp).value / 1e3,
-            length(residuals(fd)), length(residuals(fd)) - fd.dof, fd.dof,
+        new(timestamp, (now() - timestamp).value / 1e3,
+            length(residuals(fp)), length(residuals(fp)) - fp.dof, fp.dof,
             gof_stat, gof_stat, tp, status)
     end
 end
@@ -28,9 +28,10 @@ fit!(model::Model, data::Measures) =
     fit!(lsqfit(), model, data)
 
 function fit!(mzer::AbstractMinimizer, model::Model, data::Measures)
-    fd = FitData(model, data)
-    status = fit!(mzer, fd)
-    return FitResult(fd, status)
+    ts = now()
+    fp = FitProblem(model, data)
+    status = fit!(mzer, fp)
+    return FitResult(ts, fp, status)
 end
 
 
@@ -38,9 +39,10 @@ fit!(multi::MultiModel, data::Vector{Measures{N}}) where N =
     fit!(lsqfit(), multi, data)
 
 function fit!(mzer::AbstractMinimizer, multi::MultiModel, data::Vector{Measures{N}}) where N
-    fd = MultiFitData(multi, data)
-    status = fit!(mzer, fd)
-    return FitResult(fd, status)
+    ts = now()
+    fp = MultiFitProblem(multi, data)
+    status = fit!(mzer, fp)
+    return FitResult(ts, fp, status)
 end
 
 
