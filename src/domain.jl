@@ -68,7 +68,7 @@ end
 
 # Cartesian-only methods
 flatten(d::CartesianDomain) = d.ldomain
-size(d::CartesianDomain) = [length(v) for v in d.axis]
+size(d::CartesianDomain) = tuple([length(v) for v in d.axis]...)
 axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
 
 
