@@ -169,7 +169,7 @@ mutable struct Model   # mutable because of parent and maincomp
     cevals::OrderedDict{Symbol, CompEval}
     params::HashHashVector{Parameter}
     pvalues::HashHashVector{Float64}
-    patched::HashHashVector{Float64}
+    actual::HashHashVector{Float64}
     ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
@@ -276,7 +276,7 @@ end
 function eval_step0(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
-    empty!(model.patched)
+    empty!(model.actual)
     empty!(model.ifree)
 
     ipar = 1
@@ -292,7 +292,7 @@ function eval_step0(model::Model)
             end
             model.params[ cname][pname] = par
             model.pvalues[cname][pname] = par.val
-            model.patched[cname][pname] = par.val
+            model.actual[cname][pname] = par.val
 
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -332,35 +332,35 @@ function eval_step1(model::Model, pvalues::Vector{Float64})
     internal_data(model.pvalues)[model.ifree] .= pvalues
 end
 
-# Evaluation step 2: copy all parameter values into patched, then
+# Evaluation step 2: copy all parameter values into actual, then
 # update the latter by invoking the user patch functions.
 function eval_step2(model::Model)
     # Reset `updated` flag
     for (cname, ceval) in model.cevals
         ceval.updated = false
     end
-    # Copy pvalues into patched
-    internal_data(model.patched) .= internal_data(model.pvalues)
+    # Copy pvalues into actual
+    internal_data(model.actual) .= internal_data(model.pvalues)
     # Patch parameter values
     for (cname, hv) in model.params
         for (pname, par) in hv
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
-                    model.patched[cname][pname] = model.pvalues[par.patch][pname]
+                    model.actual[cname][pname] = model.pvalues[par.patch][pname]
                 else                       # invoke a patch function
                     if length(par.patch.args) == 1
-                        model.patched[cname][pname] = par.patch(model.pvalues)
+                        model.actual[cname][pname] = par.patch(model.pvalues)
                     else
-                        model.patched[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                        model.actual[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
                     end
                 end
             elseif !isnothing(par.mpatch)
                 @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
                 if length(par.mpatch.args) == 1
-                    model.patched[cname][pname] = par.mpatch(model.parent.pvalues)
+                    model.actual[cname][pname] = par.mpatch(model.parent.pvalues)
                 else
-                    model.patched[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
+                    model.actual[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
                 end
             end
         end
@@ -376,11 +376,11 @@ function eval_step3(model::Model, cname::Symbol)
     for d in dependencies(model.cevals[cname].comp)
         eval_step3(model, d)
     end
-    evaluate!(model.cevals[cname], values(model.patched[cname]))
+    evaluate!(model.cevals[cname], values(model.actual[cname]))
 end
 
 
-# Evaluation step 4: copy back fit and patched values, as well as
+# Evaluation step 4: copy back fit and actual values, as well as
 # uncertainties into their original Parameter structures.
 function eval_step4(model::Model, uncerts=Vector{Float64}[])
     ipar = 1
@@ -388,7 +388,7 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
     for (cname, hv) in model.params
         for (pname, par) in hv
             par.val    = model.pvalues[cname][pname]
-            par.actual = model.patched[cname][pname]
+            par.actual = model.actual[ cname][pname]
             if (length(uncerts) > 0)  &&  (ipar in model.ifree)
                 par.unc = uncerts[i]
                 i += 1
