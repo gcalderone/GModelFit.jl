@@ -10,63 +10,60 @@ import Base.iterate
 import Base.values
 using DataStructures
 
-struct HashVector{V}
+struct HashVector{T}
     dict::OrderedDict{Symbol, Int}
-    data::Vector{V}
+    data::Vector{T}
 
-    HashVector{V}() where V =
-        new{V}(OrderedDict{Symbol, Int}(), Vector{V}())
+    HashVector{T}() where T =
+        new{T}(OrderedDict{Symbol, Int}(), Vector{T}())
 
-    HashVector{V}(data::Vector{V}) where V =
-        new{V}(OrderedDict{Symbol, Int}(), data)
+    HashVector{T}(data::Vector{T}) where T =
+        new{T}(OrderedDict{Symbol, Int}(), data)
 end
 
-internal_dict(hv::HashVector) = getfield(hv, :dict)
 internal_data(hv::HashVector) = getfield(hv, :data)
-allowed_indices(hv::HashVector) = collect(values(internal_dict(hv)))
+values(hv::HashVector) = getfield(hv, :data)[collect(values(getfield(hv, :dict)))]
 
 function empty!(hv::HashVector)
-    deleteat!(internal_data(hv), allowed_indices(hv))
-    empty!(internal_dict(hv))
+    dict = getfield(hv, :dict)
+    data = getfield(hv, :data)
+    deleteat!(data, collect(values(dict)))
+    empty!(dict)
     nothing
 end
 
-# Dictionary interface
-length(hv::HashVector) = length(internal_dict(hv))
-keys(hv::HashVector) = keys(internal_dict(hv))
-values(hv::HashVector) = internal_data(hv)[allowed_indices(hv)]
+length(hv::HashVector) = length(getfield(hv, :dict))
+propertynames(hv::HashVector) = collect(keys(getfield(hv, :dict)))
 
-function getindex(hv::HashVector, key::Symbol)
-    id = internal_dict(hv)[key]
-    return internal_data(hv)[id]
+getindex(hv::HashVector, key::Symbol) = getproperty(hv, key)
+function getproperty(hv::HashVector, key::Symbol)
+    id = getfield(hv, :dict)[key]
+    return getfield(hv, :data)[id]
 end
 
-function setindex!(hv::HashVector{V}, value::V, key::Symbol) where V
-    if haskey(internal_dict(hv), key)
-        id = internal_dict(hv)[key]
-        internal_data(hv)[id] = value
+setindex!(hv::HashVector, value, key::Symbol) = setproperty!(hv, key, value)
+function setproperty!(hv::HashVector{T}, key::Symbol, value::T) where T
+    dict = getfield(hv, :dict)
+    data = getfield(hv, :data)
+
+    id = get(dict, key, nothing)
+    if isnothing(id)
+        id = length(data) + 1
+        dict[key] = id
+        push!(data, value)
     else
-        id = length(internal_data(hv)) + 1
-        internal_dict(hv)[key] = id
-        push!(internal_data(hv), value)
+        data[id] = value
     end
     return value
 end
 
-# Get/set property interface
-propertynames(hv::HashVector) = keys(internal_dict(hv))
-getproperty(hv::HashVector, key::Symbol) = getindex(hv, key)
-setproperty!(hv::HashVector{V}, key::Symbol, value::V) where V = setindex!(hv, value, key)
-
-# Iterate interface
 function iterate(hv::HashVector, state...)
-    out = iterate(internal_dict(hv), state...)
+    dict = getfield(hv, :dict)
+    data = getfield(hv, :data)
+    out = iterate(dict, state...)
     isnothing(out)  &&  (return nothing)
-    return (out[1][1] => internal_data(hv)[out[1][2]], out[2])
+    return (out[1][1] => data[out[1][2]], out[2])
 end
-
-
-
 
 
 # ====================================================================
@@ -82,14 +79,14 @@ struct HashHashVector{V}
 end
 
 internal_data(hhv::HashHashVector) = hhv.data
+
 function empty!(hhv::HashHashVector)
     for (key, hv) in hhv.dict
-        empty!(internal_dict(hv))
+        empty!(getfield(hv, :dict))
     end
     empty!(hhv.data)
     nothing
 end
-
 
 function getindex(hhv::HashHashVector{V}, key::Symbol) where V
     if !haskey(hhv.dict, key)
@@ -99,5 +96,5 @@ function getindex(hhv::HashHashVector{V}, key::Symbol) where V
 end
 
 
-iterate(hhv::HashHashVector, state...) = 
+iterate(hhv::HashHashVector, state...) =
     iterate(hhv.dict, state...)

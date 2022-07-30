@@ -2,6 +2,7 @@ using Random, Test, GFit
 
 hv = GFit.HashVector{Int}()
 hv.a = 1
+push!(GFit.internal_data(hv), 999)
 hv.b = 2
 hv.b = 3
 
@@ -28,10 +29,11 @@ hv[:b] = 99
 @test hv[:b] == 99
 
 
+
 hhv = GFit.HashHashVector{Int}()
-hhv[:comp1][:a] = 10
-hhv[:comp1][:b] = 20
-hhv[:comp2][:a] = 30
+hhv[:comp1].a = 10
+hhv[:comp1].b = 20
+hhv[:comp2].a = 30
 
 
 @test hhv[:comp1].a == 10
