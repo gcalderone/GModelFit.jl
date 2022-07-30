@@ -10,6 +10,7 @@ import Base.iterate
 import Base.values
 using DataStructures
 
+# A wrapper for a vector allowing access to elements via a symbol name
 struct HashVector{T}
     dict::OrderedDict{Symbol, Int}
     data::Vector{T}
@@ -22,7 +23,6 @@ struct HashVector{T}
 end
 
 internal_data(hv::HashVector) = getfield(hv, :data)
-values(hv::HashVector) = getfield(hv, :data)[collect(values(getfield(hv, :dict)))]
 
 function empty!(hv::HashVector)
     dict = getfield(hv, :dict)
@@ -33,6 +33,8 @@ function empty!(hv::HashVector)
 end
 
 length(hv::HashVector) = length(getfield(hv, :dict))
+values(hv::HashVector) = getfield(hv, :data)[collect(values(getfield(hv, :dict)))]
+keys(hv::HashVector) = propertynames(hv)
 propertynames(hv::HashVector) = collect(keys(getfield(hv, :dict)))
 
 getindex(hv::HashVector, key::Symbol) = getproperty(hv, key)
@@ -73,19 +75,13 @@ struct HashHashVector{V}
 
     HashHashVector{V}() where V =
         new{V}(OrderedDict{Symbol, HashVector{V}}(), Vector{V}())
-
-    HashHashVector{V}(data::Vector{V}) where V =
-        new{V}(OrderedDict{Symbol, HashVector{V}}(), data)
 end
 
 internal_data(hhv::HashHashVector) = hhv.data
 
 function empty!(hhv::HashHashVector)
-    for (key, hv) in hhv.dict
-        empty!(getfield(hv, :dict))
-    end
+    empty!(hhv.dict)
     empty!(hhv.data)
-    nothing
 end
 
 function getindex(hhv::HashHashVector{V}, key::Symbol) where V
@@ -94,7 +90,6 @@ function getindex(hhv::HashHashVector{V}, key::Symbol) where V
     end
     return hhv.dict[key]
 end
-
 
 iterate(hhv::HashHashVector, state...) =
     iterate(hhv.dict, state...)
