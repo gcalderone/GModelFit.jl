@@ -450,9 +450,11 @@ function select_maincomp!(model::Model, cname::Symbol)
 end
 
 include("multimodel.jl")
-include("fitdata.jl")
+
+abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
+
 include("show.jl")
 
 end
