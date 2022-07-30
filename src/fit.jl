@@ -115,19 +115,24 @@ struct FitResult
     nfree::Int
     dof::Int
     fitstat::Float64
-    gofstat::Float64
-    log10testprob::Float64
+    # gofstat::Float64
+    # log10testprob::Float64
     status::AbstractMinimizerStatus
+    bestfit::Union{Vector{HashHashVector{Parameter}}, HashHashVector{Parameter}}
 
     function FitResult(timestamp::DateTime, fp::AbstractFitProblem, status::AbstractMinimizerStatus)
-        gof_stat = sum(abs2, residuals(fp))
-        tp = NaN
-        try
-            tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
-        catch; end
+        # gof_stat = sum(abs2, residuals(fp))
+        # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
+
+        if isa(fp, FitProblem)
+            bestfit = fp.model.params
+        else
+            bestfit = [fp.model.params for fp in fp.fp]
+        end
+
         new(timestamp, (now() - timestamp).value / 1e3,
-            length(residuals(fp)), length(residuals(fp)) - fp.dof, fp.dof,
-            gof_stat, gof_stat, tp, status)
+            length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
+            status, bestfit)
     end
 end
 

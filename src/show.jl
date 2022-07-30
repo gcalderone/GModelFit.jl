@@ -109,9 +109,8 @@ end
 
 
 function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
-    table = Matrix{Union{String,Float64}}(undef, 0, 8)
+    table = Matrix{Union{String,Float64}}(undef, 0, 7)
     fixed = Vector{Bool}()
-    watch = Vector{Bool}()
 
     ctype = split(string(typeof(comp)), ".")
     (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
@@ -128,25 +127,23 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         isa(param.patch, λFunct)  &&  (patch = param.patch.display)
         isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.actual patch])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (patch == ""  ?  ""  :  param.actual) patch])
         push!(fixed, param.fixed)
-        push!(watch, !isnothing(param.patch))
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box
             ctype = ""
             cfixed = false
         end
     end
-    return (table, fixed, watch)
+    return (table, fixed)
 end
 
 
 function show(io::IO, comp::AbstractComponent)
-    (table, fixed, watch) = preparetable(comp)
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+    (table, fixed) = preparetable(comp)
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (!(watch[i])  &&  (j in (7,8))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed)))
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed)))
 end
 
 
@@ -212,23 +209,20 @@ function show(io::IO, model::Model)
     section(io, "Parameters:")
     (length(model.cevals) == 0)  &&  (return nothing)
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 8)
+    table = Matrix{Union{String,Float64}}(undef, 0, 7)
     fixed = Vector{Bool}()
-    watch = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for (cname, ceval) in model.cevals
         comp = ceval.comp
-        (t, f, w) = preparetable(comp, cname=string(cname), cfixed=ceval.cfixed)
+        (t, f) = preparetable(comp, cname=string(cname), cfixed=ceval.cfixed)
         table = vcat(table, t)
         append!(fixed, f .| ceval.cfixed)
-        append!(watch, w)
-        push!(hrule, length(watch)+1)
+        push!(hrule, length(fixed)+1)
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (!watch[i]  &&  (j in (7,8))), showsettings.fixed),
-                             Highlighter((data,i,j) -> (fixed[i]   &&  (j in (3,4,5,6))), showsettings.fixed)))
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (3,4,5,6))), showsettings.fixed)))
 end
 
 
@@ -242,22 +236,62 @@ function show(io::IO, multi::MultiModel)
 end
 
 
+function show(io::IO, bestfit::Vector{HashHashVector{Parameter}})
+    for id in 1:length(bestfit)
+        section(io, "\n=====================================================================")
+        section(io, "Model $id:")
+        show(io, bestfit[id])
+    end
+    println(io)
+end
+
+function show(io::IO, bestfit::HashHashVector{Parameter})
+    table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    fixed = Vector{Bool}()
+    hrule = Vector{Int}()
+    push!(hrule, 0, 1)
+    for (cname, hv) in bestfit
+        scname = string(cname)
+        for (pname, param) in hv
+            parname = string(pname)
+            parname *= (param.fixed  ?  " (FIXED)"  :  "")
+            (!showsettings.showfixed)  &&  param.fixed  &&  continue
+            range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
+            (range == "-Inf:Inf")  &&  (range = "")
+            patch = ""
+            isa(param.patch, Symbol)  &&  (patch = string(param.patch))
+            isa(param.patch, λFunct)  &&  (patch = param.patch.display)
+            isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
+            table = vcat(table,
+                         [scname parname range param.val param.unc (patch == ""  ?  ""  :  param.actual) patch])
+            push!(fixed, param.fixed)
+            if !showsettings.plain
+                scname = ""  # delete from following lines within the same component box
+            end
+        end
+        push!(hrule, length(fixed)+1)
+    end
+    printtable(io, table, ["Component", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:7),
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (2,3,4,5))), showsettings.fixed)))
+end
+
 function show(io::IO, res::FitResult)
+    section(io, "Best fit parameters:")
+    show(res.bestfit)
+
     section(io, "Fit results:")
 
-    println(io, @sprintf("    #Data  : %8d              Fit-stat: %-10.5g", res.ndata, res.fitstat))
-    println(io, @sprintf("    #Param : %8d              Red. GOF: %-10.4g", res.nfree, res.gofstat / res.dof))
-    println(io, @sprintf("    DOF    : %8d              Prob.   : %-10.4g", res.dof, 10^res.log10testprob))
-
-    print(io,            "    Status : ")
+    println(io, @sprintf("    #Data : %8d              #Free params  : %10d"    , res.ndata, res.nfree))
+    println(io, @sprintf("    DOF   : %8d              Red. fit stat.: %10.5g", res.dof, res.fitstat / res.dof))
+    print(io,            "    Status: ")
     (crayon, status, message) = as_string(res.status)
     if showsettings.plain
         print(io, @sprintf("%8s", status))
     else
         print(io, crayon, @sprintf("%8s", status), crayon"default")
     end
-
-    println(io, @sprintf("              Elapsed : %-10.4g s", res.elapsed))
+    println(io, @sprintf("              Elapsed time  : %10.4g s", res.elapsed))
 
     if message != ""
         println(io, crayon, message, crayon"default")

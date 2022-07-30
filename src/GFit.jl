@@ -393,13 +393,19 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
             if (length(uncerts) > 0)  &&  (ipar in model.ifree)
                 par.unc = uncerts[i]
                 i += 1
+            else
+                par.unc = NaN
             end
             ipar += 1
+        end
+    end
 
-            # Also update Model's parameters
-            getfield(model[cname], pname).val    = par.val
-            getfield(model[cname], pname).actual = par.actual
-            getfield(model[cname], pname).unc    = NaN
+    # Also update Model's parameters
+    for (cname, ceval) in model.cevals
+        for (pname, par) in getparams(ceval.comp)
+            par.val    = model.params[cname][pname].val
+            par.actual = model.params[cname][pname].actual
+            par.unc = NaN
         end
     end
 end
