@@ -60,7 +60,7 @@ mutable struct Parameter
     fixed::Bool
     patch::Union{Nothing, Symbol, λFunct}
     mpatch::Union{Nothing, λFunct}
-    pval::Float64
+    actual::Float64
     unc::Float64
     Parameter(value::Number) = new(float(value), -Inf, +Inf, NaN, false, nothing, nothing, NaN, NaN)
 end
@@ -387,8 +387,8 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
     i = 1
     for (cname, hv) in model.params
         for (pname, par) in hv
-            par.val  = model.pvalues[cname][pname]
-            par.pval = model.patched[cname][pname]
+            par.val    = model.pvalues[cname][pname]
+            par.actual = model.patched[cname][pname]
             if (length(uncerts) > 0)  &&  (ipar in model.ifree)
                 par.unc = uncerts[i]
                 i += 1

@@ -99,10 +99,10 @@ function show(io::IO, par::Parameter)
     elseif isnan(par.unc)
         println(io, "Value : ", par.val, "  [", par.low , " : ", par.high, "]")
     else
-        if par.val == par.pval
+        if par.val == par.actual
             println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "] ")
         else
-            println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "], patched: " , par.pval)
+            println(io, "Value : ", par.val, " ± ", par.unc,  "  [", par.low , " : ", par.high, "], actual: " , par.actual)
         end
     end
 end
@@ -128,7 +128,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         isa(param.patch, λFunct)  &&  (patch = param.patch.display)
         isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.pval patch])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val param.unc param.actual patch])
         push!(fixed, param.fixed)
         push!(watch, !isnothing(param.patch))
         if !showsettings.plain
