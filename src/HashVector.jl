@@ -68,7 +68,9 @@ function iterate(hv::HashVector, state...)
 end
 
 
-# ====================================================================
+# --------------------------------------------------------------------
+# A Dict{HashVector{V}} with automatic generation of empty HashVector values
+
 struct HashHashVector{V}
     dict::OrderedDict{Symbol, HashVector{V}}
     data::Vector{V}
