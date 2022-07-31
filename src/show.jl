@@ -198,7 +198,6 @@ end
 
 
 function show(io::IO, model::Model)
-    println(io)
     section(io, "Components:")
     table, fixed = tabledeps(model)
     printtable(io, table, ["Component", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
@@ -229,7 +228,7 @@ end
 
 function show(io::IO, multi::MultiModel)
     for id in 1:length(multi.models)
-        section(io, "\n=====================================================================")
+        section(io, "=====================================================================")
         section(io, "Model $id:")
         show(io, multi.models[id])
     end
@@ -239,7 +238,7 @@ end
 
 function show(io::IO, bestfit::Vector{HashHashVector{Parameter}})
     for id in 1:length(bestfit)
-        section(io, "\n=====================================================================")
+        section(io, "=====================================================================")
         section(io, "Model $id:")
         show(io, bestfit[id])
     end
