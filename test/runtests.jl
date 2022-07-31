@@ -167,7 +167,8 @@ data2 = simulate_measures(Domain(x), y2)
 model = MultiModel(model1, model2)
 freeze(model[1], :bkg);
 freeze(model[2], :bkg);
-res = fit!(model, [data1, data2])
+res = fit!(GFit.cmpfit(), model, [data1, data2])
+GFit.print_param_covariance(res, sort=true, select=["[2][l1].norm"])
 
 
 

@@ -281,7 +281,9 @@ function eval_step0(model::Model)
 
     ipar = 1
     for (cname, ceval) in model.cevals
-        for (pname, par) in getparams(ceval.comp)
+        for (pname, _par) in getparams(ceval.comp)
+            # Parameter may be changed here, hence we take a copy of the original one
+            par = deepcopy(_par)
             if !(par.low <= par.val <= par.high)
                 s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
@@ -313,7 +315,10 @@ function eval_step0(model::Model)
                     par.fixed = false
                 end
             end
-            if !par.fixed  &&  (ceval.cfixed == 0)
+            if ceval.cfixed != 0
+                par.fixed = true
+            end
+            if !par.fixed
                 push!(model.ifree, ipar)
             end
             ipar += 1
@@ -331,6 +336,7 @@ end
 function eval_step1(model::Model, pvalues::Vector{Float64})
     internal_data(model.pvalues)[model.ifree] .= pvalues
 end
+
 
 # Evaluation step 2: copy all parameter values into actual, then
 # update the latter by invoking the user patch functions.
@@ -380,8 +386,8 @@ function eval_step3(model::Model, cname::Symbol)
 end
 
 
-# Evaluation step 4: copy back fit and actual values, as well as
-# uncertainties into their original Parameter structures.
+# Evaluation step 4: copy back bestfit and actual values, as well as
+# uncertainties, into their original Parameter structures.
 function eval_step4(model::Model, uncerts=Vector{Float64}[])
     ipar = 1
     i = 1
@@ -396,6 +402,15 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
                 par.unc = NaN
             end
             ipar += 1
+        end
+    end
+
+    # Also update Model's parameters
+    for (cname, ceval) in model.cevals
+        for (pname, par) in getparams(ceval.comp)
+            par.val    = model.params[cname][pname].val
+            par.actual = model.params[cname][pname].actual
+            par.unc = NaN
         end
     end
 end
@@ -458,5 +473,6 @@ include("minimizers.jl")
 include("fit.jl")
 
 include("show.jl")
+include("utils.jl")
 
 end
