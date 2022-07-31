@@ -58,8 +58,8 @@ meas = [6.29, 7.27, 10.41, 18.67, 25.3]
 unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
 
 domain = Domain(x)
-model = Model(domain, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 data = Measures(domain, meas, unc)
+model = Model(domain, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 res = fit!(model, data)
 # @gp data model
 
