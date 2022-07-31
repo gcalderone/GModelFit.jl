@@ -25,12 +25,12 @@ using GFit
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]
 meas = [6.29, 7.27, 10.41, 18.67, 25.3]
 unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
-domain = Domain(x)
-data = Measures(domain, meas, unc)
+dom  = Domain(x)
+data = Measures(dom, meas, unc)
 
 # Create a model using an explicit mathematical expression, and provide the
 # initial guess values:
-model = Model(domain, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
+model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
 res = fit!(model, data)
@@ -50,4 +50,11 @@ Fit results:
     #Data :        5              #Free params  :          3
     DOF   :        2              Red. fit stat.:     1.0129
     Status:       OK              Elapsed time  :          0 s
+```
+
+You may also plot the empirical data and the best fit model with a plotting framework of your choice, e.g. [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
+```julia
+using Gnuplot
+@gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'"
+@gp :- coords(domain(model)) model() "w l t 'Best fit model'"
 ```
