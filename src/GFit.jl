@@ -281,8 +281,7 @@ function eval_step0(model::Model)
 
     ipar = 1
     for (cname, ceval) in model.cevals
-        for (pname, _par) in getparams(ceval.comp)
-            par = deepcopy(_par)
+        for (pname, par) in getparams(ceval.comp)
             if !(par.low <= par.val <= par.high)
                 s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
@@ -397,15 +396,6 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
                 par.unc = NaN
             end
             ipar += 1
-        end
-    end
-
-    # Also update Model's parameters
-    for (cname, ceval) in model.cevals
-        for (pname, par) in getparams(ceval.comp)
-            par.val    = model.params[cname][pname].val
-            par.actual = model.params[cname][pname].actual
-            par.unc = NaN
         end
     end
 end

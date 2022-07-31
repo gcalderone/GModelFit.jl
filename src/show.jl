@@ -220,9 +220,10 @@ function show(io::IO, model::Model)
         append!(fixed, f .| ceval.cfixed)
         push!(hrule, length(fixed)+1)
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value.", "Actual", "Patch"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (3,4,5,6))), showsettings.fixed)))
+    table = table[:, [1; 3:end]]  # drop the Type column
+    printtable(io, table, ["Component", "Param.", "Range", "Value.", "Actual", "Patch"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:6),
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (2,3,4,5))), showsettings.fixed)))
 end
 
 

@@ -90,13 +90,13 @@ function update!(fp::MultiFitProblem, pvalues::Vector{Float64})
     return fp.resid
 end
 
-# TODO: Handle the case where one (or more) dataset is not a `Measures`
+# TODO: Handle the case where at least one dataset is not a `Measures`
 fit_stat(fp::MultiFitProblem) =
     sum(abs2, fp.resid) / fp.dof
 
-function finalize!(fp::MultiFitProblem, best::Vector{Float64}, unc::Vector{Float64})
+function finalize!(fp::MultiFitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     for (id, i1, i2) in free_params_indices(fp.multi)
-        finalize!(fp.fp[id], best[i1:i2], unc[i1:i2])
+        finalize!(fp.fp[id], best[i1:i2], uncerts[i1:i2])
     end
 end
 
@@ -125,9 +125,9 @@ struct FitResult
         # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
 
         if isa(fp, FitProblem)
-            bestfit = fp.model.params
+            bestfit = deepcopy(fp.model.params)
         else
-            bestfit = [fp.model.params for fp in fp.fp]
+            bestfit = [deepcopy(fp.model.params) for fp in fp.fp]
         end
 
         new(timestamp, (now() - timestamp).value / 1e3,
