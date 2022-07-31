@@ -15,7 +15,7 @@ function print_param_covariance(fitres::FitResult;
         end
     else
         for (cname, hv) in fitres.bestfit
-            for (pname, _) in hv                
+            for (pname, _) in hv
                 par.fixed  &&  continue
                 push!(parnames, "[$(cname)].$(pname)")
             end
@@ -46,3 +46,14 @@ function print_param_covariance(fitres::FitResult;
     end
 end
 
+
+function mockdata(model::Model; propnoise=0.01, rangenoise=0.05, absnoise=0., seed=nothing)
+    rng = MersenneTwister(seed);
+    evaluate(model)
+    values = model()
+    ee = extrema(values)
+    range = ee[2] - ee[1]
+    @assert range > 0
+    noise = (propnoise .* values .+ rangenoise .* range .+ absnoise)
+    Measures(domain(model), values .+ noise .* randn(rng, length(values)), noise)
+end

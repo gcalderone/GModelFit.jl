@@ -284,7 +284,7 @@ function show(io::IO, res::FitResult)
     section(io, "Fit results:")
 
     println(io, @sprintf("    #Data : %8d              #Free params  : %10d"    , res.ndata, res.nfree))
-    println(io, @sprintf("    DOF   : %8d              Red. fit stat.: %10.5g", res.dof, res.fitstat / res.dof))
+    println(io, @sprintf("    DOF   : %8d              Red. fit stat.: %10.5g", res.dof, res.fitstat))
     print(io,            "    Status: ")
     (crayon, status, message) = as_string(res.status)
     if showsettings.plain

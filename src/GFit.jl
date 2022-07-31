@@ -7,6 +7,7 @@ using LsqFit
 using MacroTools
 using Dates
 using ProgressMeter
+using Random
 
 import Base.show
 import Base.ndims
@@ -25,7 +26,8 @@ import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain,
-    MultiModel, evaluate, isfixed, thaw, freeze, fit!
+    MultiModel, evaluate, isfixed, thaw, freeze, fit!,
+    mockdata
 
 
 include("HashVector.jl")
