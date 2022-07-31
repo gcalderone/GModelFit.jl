@@ -63,7 +63,7 @@ using Gnuplot
 
 
 
-### Fit using builtin components
+### Fit using built-in components
 
 ```julia
 # Create a GFit model
