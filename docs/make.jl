@@ -6,7 +6,6 @@ makedocs(sitename="Gfit.jl",
          modules=[GFit],
          pages = [
              "Home" => "index.md",
-             "Workflow" => "workflow.md",
              "Basic concepts and data types" => "concepts.md",
              "Built-in components" => "builtincomp.md",
              "Parameter patching" => "patch.md",
