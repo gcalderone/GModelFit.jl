@@ -58,3 +58,4 @@ using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'"
 @gp :- coords(domain(model)) model() "w l t 'Best fit model'"
 ```
+![Example plot](https://github.com/gcalderone/GFit.jl/blob/master/examples/ex0.png)
