@@ -1,5 +1,7 @@
 # GFit.jl
 
+**Note: This package is now mature enough to be released as v0.1, however it is not yet a registered package since it lacks the associated documentation.**
+
 [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
 [![DocumentationStatus](https://img.shields.io/badge/docs-stable-blue.svg?style=flat)](https://gcalderone.github.io/GFit.jl/v0.1.0/index.html)
 
