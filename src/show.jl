@@ -274,7 +274,7 @@ end
 
 function show(io::IO, res::FitResult)
     section(io, "Best fit parameters:")
-    show(res.bestfit)
+    show(io, res.bestfit)
 
     section(io, "Fit results:")
 
