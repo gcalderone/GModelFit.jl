@@ -39,12 +39,6 @@ function section(io, args...)
     end
 end
 
-function left(s::String, maxlen::Int)
-    (length(s) <= maxlen)  &&  (return s)
-    return s[1:maxlen]
-end
-
-
 
 function show(io::IO, dom::AbstractDomain)
     section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
@@ -169,8 +163,8 @@ function tabledeps(model::Model)
         final = out[i][1]
         level = out[i][2]
         prefix = ""
-        (level > 1)  &&  (prefix  = join(fill("  │", level-1)))
-        (level > 0)  &&  (prefix *= (final  ?  "  └─ "  :  "  ├─ "))
+        (level > 1)  &&  (prefix  = join(fill(" │", level-1)))
+        (level > 0)  &&  (prefix *= (final  ?  " └─ "  :  " ├─ "))
         table[i, 1] = prefix * out[i][3]
         for j in 2:7
             table[i, j] = out[i][j+2]
@@ -228,8 +222,8 @@ end
 
 function show(io::IO, multi::MultiModel)
     for id in 1:length(multi.models)
-        section(io, "=====================================================================")
-        section(io, "Model $id:")
+        println(io)
+        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
         show(io, multi.models[id])
     end
     println(io)
@@ -238,12 +232,13 @@ end
 
 function show(io::IO, bestfit::Vector{HashHashVector{Parameter}})
     for id in 1:length(bestfit)
-        section(io, "=====================================================================")
-        section(io, "Model $id:")
+        println(io)
+        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
         show(io, bestfit[id])
     end
     println(io)
 end
+
 
 function show(io::IO, bestfit::HashHashVector{Parameter})
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
@@ -275,6 +270,7 @@ function show(io::IO, bestfit::HashHashVector{Parameter})
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:7),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (2,3,4,5))), showsettings.fixed)))
 end
+
 
 function show(io::IO, res::FitResult)
     section(io, "Best fit parameters:")
