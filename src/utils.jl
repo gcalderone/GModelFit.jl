@@ -47,13 +47,14 @@ function print_param_covariance(fitres::FitResult;
 end
 
 
-function mockdata(model::Model; propnoise=0.01, rangenoise=0.05, absnoise=0., seed=nothing)
+function mock(::Type{Measures}, model::Model; propnoise=0.01, rangenoise=0.05, absnoise=0., seed=nothing) where N
     rng = MersenneTwister(seed);
     evaluate(model)
     values = model()
     ee = extrema(values)
     range = ee[2] - ee[1]
     @assert range > 0
-    noise = (propnoise .* values .+ rangenoise .* range .+ absnoise)
+    noise = (propnoise .* abs.(values) .+ rangenoise .* range .+ absnoise)
     Measures(domain(model), values .+ noise .* randn(rng, length(values)), noise)
 end
+mock(T, multi::MultiModel; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]

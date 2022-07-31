@@ -26,9 +26,7 @@ import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain,
-    MultiModel, evaluate, isfixed, thaw, freeze, fit!,
-    mockdata
-
+    MultiModel, evaluate, isfixed, thaw, freeze, fit!
 
 include("HashVector.jl")
 include("domain.jl")
