@@ -13,5 +13,6 @@ makedocs(sitename="Gfit.jl",
              "Multi-dimensional fitting" => "multidim.md",
              "Multi-model fitting" => "multimodel.md",
              "Interactive fitting" => "interactive.md",
-             "Examples" => "examples.md"
+             "Examples" => "examples.md",
+             "API" => "api.md"
          ])

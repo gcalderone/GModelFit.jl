@@ -74,7 +74,7 @@ function show(io::IO, data::AbstractMeasures)
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
     for i in 1:length(data.labels)
-        vv = values(data, i)
+        vv = data.values[i]
         nan = length(findall(isnan.(vv))) + length(findall(isinf.(vv)))
         vv = vv[findall(isfinite.(vv))]
         push!(error, nan > 0)
@@ -216,7 +216,7 @@ function show(io::IO, model::Model)
     table = table[:, [1; 3:end]]  # drop the Type column
     printtable(io, table, ["Component", "Param.", "Range", "Value.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:6),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (2,3,4,5))), showsettings.fixed)))
+               highlighters=(Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)))
 end
 
 

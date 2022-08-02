@@ -1,6 +1,15 @@
 # ====================================================================
-# MultiModel
-#
+"""
+    MultiModel
+
+A structure containing a multi-model description, whose evaluation is suitable to be compared to a set of empirical datasets. A `MultiModel` is very similar to a vector of `Model` objects, with the ability to trasparently handle the patch constraints between one model and the other.
+
+Constructor is: `MultiModel(model1, model2, ...)`.
+
+You may access the individual `Model` objects the indexing syntax, as if it was a `Vector{Model}`.  Also, you may add new model to a `MultiModel` after it has been created using the `push!()` function. Finally, you may retrieve the length of the vector with `length()`.
+
+Just like a `Model` object you may need to manually trigger a `MultiModel` evaluation using the `evaluate()` function.
+"""
 struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
     pvalues::Vector{HashHashVector{Float64}}
@@ -15,8 +24,19 @@ struct MultiModel <: AbstractMultiModel
 end
 
 Base.getindex(m::MultiModel, id::Int) = m.models[id]
-Base.length(m::MultiModel) = length(m.models)
 
+"""
+    length(multi::MultiModel)
+
+Returns how many `Model` objects are contained in a `MultiModel`.
+"""
+Base.length(multi::MultiModel) = length(multi.models)
+
+"""
+    push!(multi::MultiModel, model::Model)
+
+Push a new `Model` object into a `MultiModel`.
+"""
 function push!(multi::MultiModel, model::Model)
     push!(multi.models, model)
     model.parent = multi
@@ -24,6 +44,11 @@ function push!(multi::MultiModel, model::Model)
 end
 
 
+"""
+    evaluate(multi::MultiModel)
+
+Evaluate a `MultiModel` and update internal structures.
+"""
 function evaluate(multi::MultiModel)
     eval_step0(multi)
     # eval_step1(multi)

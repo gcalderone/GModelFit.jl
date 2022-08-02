@@ -152,16 +152,16 @@ model2 = Model(Domain(x),
                :main => SumReducer(:l1, :l2, :bkg));
 
 model = MultiModel(model1, model2)
-freeze(model[1], :bkg);
-freeze(model[2], :bkg);
+freeze!(model[1], :bkg);
+freeze!(model[2], :bkg);
 data = GFit.mock(Measures, model, seed=1)
-res = fit!(GFit.cmpfit(), model, data)
+res = fit!(model, data, GFit.cmpfit())
 GFit.print_param_covariance(res, sort=true, select=["[2][l1].norm"])
 
 
 
-thaw(model[1], :bkg);
-thaw(model[2], :bkg);
+thaw!(model[1], :bkg);
+thaw!(model[2], :bkg);
 
 model[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
 model[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope

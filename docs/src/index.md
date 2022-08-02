@@ -13,6 +13,7 @@ saveas(file) = Gnuplot.save(term="pngcairo size 550,350 fontscale 0.8", output="
 
 It provides the basic tools to define, interactively manipulate and efficiently evaluate a (possibly very complex) model, and to fit the latter to empirical data. The main functionalities are:
 - it handles datasets of any dimensionality;
+- the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit!()` and the object constructors (see [Basic concepts and data types](@ref));
 - the fitting model is evaluated on a user defined domain, and is the result of a combination of *model components* or mathematical expressions (in the form of [lambda functions](https://en.wikipedia.org/wiki/Anonymous_function)), or any arbitrary mixture of the two;
 - it allows to define new model components to suit specific needs;
 - model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters;
@@ -23,6 +24,8 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - it provides several facilities for interactive fitting and result displaying.
 
 The fitting process is actually a [non-linear least square](https://en.wikipedia.org/wiki/Non-linear_least_squares) regression, and is  carried out by one of the above mentioned minimizer packages, whose purpose is to automatically vary the parameter values (according to the user defined constraints) until the differences between the evaluated model and the empirical data are minimized.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model facing the user, and the low-level implementation details facing the minimizer.
+
+Note that the purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advatage in using it for a simple linear regression or models ivolving just a single parameter, although it is definitely possible to use it also in these cases.
 
 
 ## Installation

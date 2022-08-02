@@ -2,6 +2,18 @@ abstract type AbstractDomain{N} end
 
 # A non-cartesian domain has the same number of points in all
 # dimensions.
+
+"""
+    Domain{N}
+
+An object representing a model, or a dataset, N-dimensional linear domain.
+
+Available constructors:
+- `Domain(coords...)`: each argument is a vector, one for each dimension (all arguments must have same lengths);
+- `Domain(length)`: returns a 1-dim `Domain` object of the given length.
+
+Coordinates for all points along a given axis can be obtained with the `coords` function.
+"""
 struct Domain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
 
@@ -21,6 +33,19 @@ end
 # A cartesian domain has the coordinates specified independently for
 # each axis, and can always be trasformed into a non-cartesian one.
 # Cartesian domains also support region-of-interest (ROI).
+"""
+    CartesianDomain{N}
+
+An object representing a model, or a dataset, N-dimensional cartesian domain (i.e. a grid).
+
+Available constructors:
+- `Domain(axis...)`: each argument is a vector containing the coordinates on a given axis (arguments may have different lengths);
+- `Domain(lengths...)`: returns a N-dim `CartesianDomain` object whose axis lengths are specified in the arguments.
+
+Note that a `CartesianDomain` requires at least 2 dimensions.
+
+Coordinates for all points along a given axis can be obtained with the `coords()` function, while the coordinates of the grid can be obtained with `axis()`.
+"""
 struct CartesianDomain{N} <: AbstractDomain{N}
     axis::NTuple{N, Vector{Float64}}
     roi::Vector{Int}
@@ -55,10 +80,22 @@ ndims(d::Union{Domain{N}, CartesianDomain{N}}) where N = N
 length(d::Domain) = length(d.axis[1])
 length(d::CartesianDomain) = length(coords(d, 1))
 
-# Return coordinates of all points along a given dimension
+"""
+    coords(d::Domain{1})
+    coords(d::Domain, dim::Integer)
+    coords(d::CartesianDomain, dim::Integer)
+
+Returns coordinates of all points along a given dimension as a `Vector{Float64}`.
+"""
 coords(d::Domain{1}) = d.axis[1]
 coords(d::Domain, dim::Integer) = d.axis[dim]
 coords(d::CartesianDomain, dim::Integer) = coords(flatten(d), dim)
+
+"""
+    getindex(d::Union{Domain, CartesianDomain}, dim::Integer)
+
+Shortcut for `coords(d, dim)`.
+"""
 getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = coords(d, dim)
 
 # Iterate through domain dimensions returning coordinates
@@ -70,6 +107,12 @@ end
 # Cartesian-only methods
 flatten(d::CartesianDomain) = d.ldomain
 size(d::CartesianDomain) = tuple([length(v) for v in d.axis]...)
+
+"""
+    axis(d::CartesianDomain, dim::Integer)
+
+Returns the coordinates of the grid along a given dimension as a `Vector{Float64}`.
+"""
 axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
 
 
@@ -85,7 +128,6 @@ ndims(d::AbstractMeasures) = ndims(domain(d))
 length(d::AbstractMeasures) = length(domain(d))
 size(d::AbstractMeasures) = size(domain(d))
 
-values(d::AbstractMeasures, index=1) = d.values[index]
 function original_shape(d::AbstractMeasures{N}, index=1) where N
     if isa(domain(d), CartesianDomain)
         out = fill(NaN, size(d))
@@ -97,6 +139,23 @@ function original_shape(d::AbstractMeasures{N}, index=1) where N
 end
 
 
+"""
+    Measures{N}
+
+An object representing a set of empirical measurements (with Gaussian uncertainties)
+
+Available constructors:
+- `Measures(domain::Domain{N},
+            values::AbstractVector{T},
+            uncerts::AbstractVector{T}) where {T <: AbstractFloat, N}`
+- `Measures(domain::CartesianDomain{N},
+            values::AbstractArray{T, N},
+            uncerts::AbstractArray{T, N}) where {T <: AbstractFloat, N}`
+
+In the above constructor methods the last argument may also be a scalar value, to set the same uncertainty for all the measurements. The method accepting a `CartesianDomain` requires arrays with at least 2 dimensions.
+
+The domain, values and uncertainties for a `Measures` object can be retrieved using the `domain`, `values` and `uncerts` functions respectively.
+"""
 struct Measures{N} <: AbstractMeasures{N}
     domain::AbstractDomain{N}
     values::NTuple{2, Vector{Float64}}
@@ -114,6 +173,19 @@ struct Measures{N} <: AbstractMeasures{N}
         return new{N}(deepcopy(domain), tuple(deepcopy(values[domain.roi]), deepcopy(uncerts[domain.roi])), ("values", "uncerts"))
     end
 end
+
+"""
+    values(d::Measures)
+
+Returns the measurement values as a `Vector{Float64}`.
+"""
+values(d::Measures) = d.values[1]
+
+"""
+    uncerts(d::Measures)
+
+Returns the measurement uncertainties as a `Vector{Float64}`.
+"""
 uncerts(d::Measures) = d.values[2]
 Measures(dom::AbstractDomain, values::AbstractArray, uncert::Real) = Measures(dom, values, fill(uncert, size(values)))
 
