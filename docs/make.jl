@@ -1,4 +1,4 @@
-using Revise, Documenter, GFit
+using Revise, Documenter, GFit, Gnuplot
 
 makedocs(sitename="Gfit.jl",
          authors = "Giorgio Calderone",
@@ -17,3 +17,9 @@ makedocs(sitename="Gfit.jl",
              "Examples" => "examples.md",
              "API" => "api.md"
          ])
+Gnuplot.quitall()
+
+if !(@isdefined is_compiled)
+    is_compiled = true
+    error("Re-run with compiled code!")
+end

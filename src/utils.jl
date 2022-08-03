@@ -47,14 +47,33 @@ function print_param_covariance(fitres::FitResult;
 end
 
 
-function mock(::Type{Measures}, model::Model; propnoise=0.01, rangenoise=0.05, absnoise=0., seed=nothing) where N
+"""
+    mock(::Type{Measures}, model::Model; keywords...)
+    mock(::Type{Measures}, multi::MultiModel; keywords...)
+
+Generate mock dataset(s) using a ground truth `Model` or `MultiModel` object. The first version returns a single `Measures` object, while the second returns a `Vector{Measures}`.
+
+The measurement random errors added to the data points are drawn from a Normal distribution centered on the data value itself, and a width given by the sum of three contributions:
+- *proportional* part: error proportional to each data point value;
+- *range* part: error proportional to the range spanned by all values in a single dataset;
+- *absolute* part: absolute error value.
+
+No systematic error is considered when generating mock dataset(s).
+
+# Accepted keywords:
+- `properr=0.01`: proportional error;
+- `rangeerr=0.05`: range error;
+- `abserr=0.`: absolute error;
+- `seed=nothing`: seed for the `Random.MersenneTwister` generator.
+"""
+function mock(::Type{Measures}, model::Model; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     rng = MersenneTwister(seed);
     evaluate(model)
     values = model()
     ee = extrema(values)
     range = ee[2] - ee[1]
     @assert range > 0
-    noise = (propnoise .* abs.(values) .+ rangenoise .* range .+ absnoise)
-    Measures(domain(model), values .+ noise .* randn(rng, length(values)), noise)
+    err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
+    Measures(domain(model), values .+ err .* randn(rng, length(values)), err)
 end
 mock(T, multi::MultiModel; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]

@@ -39,4 +39,5 @@ The following symbols are not exported by the **GFit.jl** package since they are
 GFit.FitResult
 GFit.λFunct
 GFit.Parameter
+GFit.mock
 ```

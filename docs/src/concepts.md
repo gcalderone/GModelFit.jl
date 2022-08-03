@@ -7,7 +7,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
   - or a [`CartesianDomain{N}`](@ref) object where the coordinates are specified for each of the `N` axis and the coordinates for all points are obtained as the cartesian product of the axis.  A carteisan domain is internally transformed into a linear one when needed;
   A domain object (either linear or cartesian) is required as first argument for the `Model` and `Measures` constructors (see below). However only the former is actually used during evaluation, while the latter is only used for visualization and consistency checks.
 
-- *Measures*:  a container for the N-dimensional empirical data and their associated $1\sigma$ Gaussian uncertainties, represented by an object of type [`Measures{N}`](@ref) (further options may be available in the future, such as Poisson counts);
+- *Measures*: a container for the N-dimensional empirical data and their associated $1\sigma$ Gaussian uncertainties, represented by an object of type [`Measures{N}`](@ref) (further options may be available in the future, such as Poisson counts);
 
 - *Model component*: the atomic building block of a (potentially very complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` represeting the component evaluation.  All components are structures inheriting from `GFit.AbstractComponent` and are typically parametrized (see below).  The **GFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user.  The caching mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none has of its parameter values has changed since last evaluation;
 
@@ -20,11 +20,17 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Fit results*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitResult`](@ref) structure.
 
-- *λ-function*: is a special anonymous function used in two different contexts within **GFit.jl**:
+- *λ-function*: is an anonymous function used in two different contexts within **GFit.jl**:
   - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models in a multi-model analysis;
   - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
+  In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous functions (e.g. `@λ x -> 2 .* x`).
 
-In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous function (e.g. `@λ x -> 2 .* x`).
+- *Minimizer*: the **GFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (or minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
+  - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
+  - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
+  Both are automatically installed with **GFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit!()`](@ref) function call).  However, for the most complex cases `CMPFit` seems to be more robust and less sensitive to initial guess parameters.
+
+- *Mock data*: sometimes it is useful to test a model even before actual data are available, e.g. to test its robustness and capabilities.  In this case it is possible to generate mock data sets using the model as ground truth, and add a random noise to simulate the measurement process. This  functionality is provided by the [`GFit.mock()`](@ref) function.
 
 Many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or a `struct`-like interface, hence it is important to keep in mind the relationships among some of the concepts to access them:
 ```
