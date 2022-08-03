@@ -108,6 +108,23 @@ end
 
 
 # ====================================================================
+"""
+    FitResult
+
+A structure representing the results of a fitting process.
+
+# Fields:
+- `timestamp::DateTime`: time at which the fitting process has started;
+- `elapsed::Float64`: elapsed time (in seconds);
+- `ndata::Int`: number of data empirical points;
+- `nfree::Int`: number of free parameters;
+- `dof::Int`: ndata - nfree;
+- `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
+- `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
+- `bestfit`: dictionary of `Parameter` objects containing best fit values and their 1-σ uncertainties.  In the multi-model case this will be a vector of dictionaries.
+
+Note: the `FitResult` fields are supposed to be accessed directly by the user, without invoking any get/set method.
+"""
 struct FitResult
     timestamp::DateTime
     elapsed::Float64

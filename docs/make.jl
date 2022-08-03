@@ -1,4 +1,4 @@
-using Documenter, GFit
+using Revise, Documenter, GFit
 
 makedocs(sitename="Gfit.jl",
          authors = "Giorgio Calderone",
@@ -13,6 +13,7 @@ makedocs(sitename="Gfit.jl",
              "Multi-dimensional fitting" => "multidim.md",
              "Multi-model fitting" => "multimodel.md",
              "Interactive fitting" => "interactive.md",
+             "Viewers" => "viewers.md",
              "Examples" => "examples.md",
              "API" => "api.md"
          ])

@@ -1,6 +1,6 @@
 # Basic concepts and data types
 
-In order to exploit the **GFit.jl** model expressiveness we need to introduce a few concepts and the associated data types:
+In order to exploit the **GFit.jl** model expressiveness we need to introduce a few concepts, and the associated data types:
 
 - *Domain*: an N-dimensional grid of points where the model is to be evaluated, it is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation. It is represented by either:
   - a [`Domain{N}`](@ref) object for linear domains, i.e. where the coordinates for each of the N dimensions are explicitly specified for all the points;
@@ -18,34 +18,31 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Multi-model*: a container for two or more models, suitable to be compared to a corresponding number of `Measures` objects to perform multi-dataset fitting.  All models are identified by a unique integer identifier, starting from 1.  A multi-model is represented by an object of type `MultiModel`;
 
+- *Fit results*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitResult`](@ref) structure.
 
-**λ-function**: TODO LComp, patch
+- *λ-function*: is a special anonymous function used in two different contexts within **GFit.jl**:
+  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models in a multi-model analysis;
+  - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
 
+In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous function (e.g. `@λ x -> 2 .* x`).
 
-- **Reducer**: a Julia function (encapsulated in a `Reducer` object) used to combine several component evaluations into a single evaluation output. If not explicitly mentioned when creating a `Model` object (see below), a default `Reducer` is created which simply performs an element-wise sum of all the components;
-
-
-
-It is important to keep in mind the relationships among the above concepts:
-
+Many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or a `struct`-like interface, hence it is important to keep in mind the relationships among some of the concepts to access them:
 ```
-Multi model (only if multiple models are involved)
+Multi-model (`multi`)
  |
- + -- Model 1 (includes at least a reducer to combine the components into a model evaluation)
+ + -- Model 1 (`model`)
  |     |
- |     + -- Component 1
+ |     + -- Domain
+ |     + -- Component1
  |     |     |
- |     |     + -- Param. 1
- |     |     + -- Param. 2
+ |     |     + -- Param1
+ |     |     + -- Param2
  |     |     + -- ...
- |     + -- Component 2
+ |     + -- Component2
  |     + -- etc.
- + -- Model 2
+ + -- Model2
  + -- ...
 ```
 
-
-
-The package most important function is `fit!`, whose purpose is to identify the best-fit parameter values which minimize the differences between the model evaluation and the empirical data.  The function arguments are a `Model` and a `Measures` objects, representing the fitting model and the empirical data respectively.  In the multi-dataset case the function accepts a `MultiModel` object and a vector of `Measures` objects.
-
-The `fit!` function modifies its `Model` or `MultiModel` inputs (hence the exclamation mark in the name) by replacing the the initial parameter values with the best fit ones. The function returns an object of type `FitResult`, containing the fit statistics.
+E.g. the syntax to access the value of a parameter in a single model case is: `model[:Component1].Param1.val`.  In a multi-model case it is: `multi[1][:Component1].Param1.val`.
+```

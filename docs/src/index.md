@@ -25,7 +25,7 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 
 The fitting process is actually a [non-linear least square](https://en.wikipedia.org/wiki/Non-linear_least_squares) regression, and is  carried out by one of the above mentioned minimizer packages, whose purpose is to automatically vary the parameter values (according to the user defined constraints) until the differences between the evaluated model and the empirical data are minimized.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model facing the user, and the low-level implementation details facing the minimizer.
 
-Note that the purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advatage in using it for a simple linear regression or models ivolving just a single parameter, although it is definitely possible to use it also in these cases.
+Note that the purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advantage in using it for a simple linear regression or for models involving just a single parameter, although it is definitely possible to use it also in these cases.
 
 
 ## Installation
@@ -80,7 +80,14 @@ show(res) # hide
 ```
 showing the best fit parameter values and the associated uncertaintites, as well as a few statistics concerning the fitting process.
 
-You may plot the data and the best fit model with a plotting framework of your choice. E.g., with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
+If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
+```@example abc
+model[:main].a0.val = 5
+res = fit!(model, data)
+nothing # hide
+```
+
+Once done, you may plot the data and the best fit model with a plotting framework of your choice. E.g., with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
 ```@example abc
 using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-

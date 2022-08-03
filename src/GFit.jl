@@ -32,6 +32,11 @@ include("HashVector.jl")
 include("domain.jl")
 
 # ====================================================================
+"""
+    λFunct
+
+A representation for a λ function, containing a reference to the function itself, a string representation of its source code (for displaying purposes) and a list of its arguments.
+"""
 struct λFunct
     funct::Function
     display::String
@@ -40,6 +45,11 @@ struct λFunct
 end
 (f::λFunct)(args...; kws...) = f.funct(args...; kws...)
 
+"""
+    @λ expr
+
+Macro to generate `λFunct` objects using the same syntax as in a standard Julia anonymous function.
+"""
 macro λ(_expr)
     @assert isexpr(longdef(_expr), :function)
     expr = prettify(_expr)
@@ -66,7 +76,7 @@ A structure representing a model parameter.
  - `actual::Float64`: actual value for the parameter (i.e. after applying the patch prescription)`;
  - `unc::Float64`: 1σ uncertainty associated to the parameter value.
 
-Note: the `Parameter` fields are supposed to be accessed directly by the user, without invoking get/set methods.
+Note: the `Parameter` fields are supposed to be accessed directly by the user, without invoking any get/set method.
 """
 mutable struct Parameter
     val::Float64
