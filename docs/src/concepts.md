@@ -30,7 +30,10 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
   Both are automatically installed with **GFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit!()`](@ref) function call).  However, for the most complex cases `CMPFit` seems to be more robust and less sensitive to initial guess parameters.
 
-- *Mock data*: sometimes it is useful to test a model even before actual data are available, e.g. to test its robustness and capabilities.  In this case it is possible to generate mock data sets using the model as ground truth, and add a random noise to simulate the measurement process. This  functionality is provided by the [`GFit.mock()`](@ref) function.
+- *Mock data*: sometimes it is useful to test a model even before actual data are available, e.g. to test its robustness and capabilities.  In this case it is possible to generate mock data set(s) using the model as ground truth, and add a random noise to simulate the measurement process. This  functionality is provided by the [`GFit.mock()`](@ref) function, and will be used in all the examples presented in the next sections.
+
+
+## Usage
 
 Many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or a `struct`-like interface, hence it is important to keep in mind the relationships among some of the concepts to access them:
 ```
