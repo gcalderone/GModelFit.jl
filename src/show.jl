@@ -18,14 +18,14 @@ end
 
 const showsettings = ShowSettings()
 
-function printtable(args...; formatters=(), hlines=:none, kw...)
+function printtable(io, table, header, args...; formatters=(), hlines=:none, kw...)
     if showsettings.plain
         c = crayon"default"
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
+        pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
                      border_crayon=c, header_crayon=c, subheader_crayon=c,
                      highlighters=())
     else
-        pretty_table(args...; formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
+        pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
                      border_crayon=showsettings.border, header_crayon=showsettings.header, subheader_crayon=showsettings.subheader,
                      kw...)
     end
