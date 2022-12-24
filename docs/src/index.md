@@ -17,15 +17,15 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - the fitting model is evaluated on a user defined domain, and is the result of a combination of *model components* or mathematical expressions (in the form of [lambda functions](https://en.wikipedia.org/wiki/Anonymous_function)), or any arbitrary mixture of the two;
 - it allows to define new model components to suit specific needs;
 - model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters;
-- multiple data sets can be fitted simultaneously against different models whose parameters can optionally be patched;
-- all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations;
+- multiple data sets can be fitted simultaneously against different models, whose parameters can optionally be patched;
+- all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
 - user provided components can pre-compute quantities based on the model domain, and store them in reserved areas for re-use;
-- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl));
+- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least square](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization;
 - it provides several facilities for interactive fitting and result displaying.
 
-The fitting process is actually a [non-linear least square](https://en.wikipedia.org/wiki/Non-linear_least_squares) regression, and is  carried out by one of the above mentioned minimizer packages, whose purpose is to automatically vary the parameter values (according to the user defined constraints) until the differences between the evaluated model and the empirical data are minimized.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model facing the user, and the low-level implementation details facing the minimizer.
+The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
 
-Note that the purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advantage in using it for a simple linear regression or for models involving just a single parameter, although it is definitely possible to use it also in these cases.
+Note that the main purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advantage in using it for a simple linear regression or for models involving just a single parameter, although it is definitely possible to use it also in these cases.
 
 
 ## Installation
@@ -47,7 +47,7 @@ julia> ]add Gnuplot
 
 The typical workflow to use **GFit.jl** is as follows:
 - Wrap empirical data domain and measures into one (ore more) `Domain` and `Measures` object(s);
-- Create a `Model` object and build it by adding components or mathematical expressions, each representing a specific aspect of the theoretical model;
+- Create a `Model` object and build it by adding components or mathematical expressions, each representing a specific *aspect* of the theoretical model;
 - Optionally set initial guess parameter values, define constraints between model parameters, etc.;
 - Fit the model against the data and inspect the results;
 - If needed, modify the model and repeat the fitting process;
