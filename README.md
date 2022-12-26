@@ -21,7 +21,7 @@ Install with:
 ```julia
 using GFit
 
-# Prepare vectors with domain points, empirical measures an their uncertainties and
+# Prepare vectors with domain points, empirical measures and uncertainties, and
 # use them to create the GFit input objects:
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]
 meas = [6.29, 7.27, 10.41, 18.67, 25.3]
@@ -57,7 +57,7 @@ You may plot the data and the best fit model with a plotting framework of your c
 ```julia
 using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
-@gp :- coords(domain(model)) model() "w l t 'Best fit model'"
+@gp :- coords(dom) model() "w l t 'Best fit model'"
 ```
 ![Example plot](https://github.com/gcalderone/GFit.jl/blob/master/examples/ex0.png)
 
@@ -72,7 +72,7 @@ model = Model(Domain(x),
               :l1  => GFit.Gaussian(1, 2, 0.2),
               :l2  => GFit.Gaussian(1, 3, 0.4),
               :bkg => GFit.OffsetSlope(0.5, 1, 0.1),
-              :main => SumReducer(:l1, :l2, :bkg));
+              :main => SumReducer(:l1, :l2, :bkg))
 
 # Constrain normalization of :l2 to be the same as :l1
 model[:l2].norm.patch = :l1
