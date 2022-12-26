@@ -7,6 +7,7 @@ struct λComp <: AbstractComponent
         list = deepcopy(f.args)
         params = HashVector{Parameter}()
         for i in 1:length(f.optargs)
+            @assert f.optargs[1].head != :... "Splat not allowed in LComp"
             @assert f.optargs[i].head == :(=)
             @assert isa(f.optargs[i].args[1], Symbol)
             @assert isa(f.optargs[i].args[2], Number)
