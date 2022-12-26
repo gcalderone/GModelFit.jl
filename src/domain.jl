@@ -172,6 +172,9 @@ struct Measures{N} <: AbstractMeasures{N}
         @assert size(domain) == size(values) == size(uncerts) "Domain and dataset have incompatible size"
         return new{N}(deepcopy(domain), tuple(deepcopy(values[domain.roi]), deepcopy(uncerts[domain.roi])), ("values", "uncerts"))
     end
+
+    Measures(domain::AbstractDomain{N}, values::AbstractArray{T, N}, uncert::T) where {T <: AbstractFloat, N} =
+        Measures(domain, values, fill(uncert, size(values)))
 end
 
 """

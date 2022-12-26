@@ -157,25 +157,25 @@ end
 
 # ====================================================================
 """
-    fit!(model::Model, data::Measures, mzer::AbstractMinimizer=lsqfit())
+    fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
-function fit!(model::Model, data::Measures, mzer::AbstractMinimizer=lsqfit())
+function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     ts = now()
     fp = FitProblem(model, data)
-    status = fit!(mzer, fp)
+    status = fit!(minimizer, fp)
     return FitResult(ts, fp, status)
 end
 
 """
-    fit!(multi::MultiModel, data::Vector{Measures{N}}, mzer::AbstractMinimizer=lsqfit())
+    fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
-function fit!(multi::MultiModel, data::Vector{Measures{N}}, mzer::AbstractMinimizer=lsqfit()) where N
+function fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     ts = now()
     fp = MultiFitProblem(multi, data)
-    status = fit!(mzer, fp)
+    status = fit!(minimizer, fp)
     return FitResult(ts, fp, status)
 end
