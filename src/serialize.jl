@@ -19,41 +19,74 @@ function dummyfunct(args...)
     @warn "Can't evaluate a dummy function!"
     nothing
 end
+serializable(f::λFunct) = λFunct(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
 
-
-# Create a copy of a Model object replacing all non-serializable
+# Create a copies of GFit objects replacing all non-serializable items
 # objects (such as component instances and λFunct) with dummy ones.
+function serializable!(par::Parameter)
+    if isa(par.patch, λFunct)
+        par.patch  = serializable(par.patch)
+    end
+    if isa(par.mpatch, λFunct)
+        par.mpatch = serializable(par.mpatch)
+    end
+end
+
+
+function serializable(ceval::CompEval, domain::AbstractDomain)
+    tname = collect(split(string(typeof(ceval)), ['{', ',']))[2]
+    (tname == "DummyComp")  &&  (return tname)
+
+    deps = deepcopy(dependencies(ceval.comp))
+    params = deepcopy(getparams(ceval.comp))
+    for (pname, par) in params
+        serializable!(par)
+    end
+    out = CompEval(DummyComp(tname, deps, params), domain)
+    for fname in fieldnames(typeof(ceval))
+        (fname == :comp)  &&  continue
+        setfield!(out, fname, getfield(ceval, fname))
+    end
+    return out
+end
+
+
 function serializable(source::Model)
     model = deepcopy(source)
     model.parent = nothing
-    cevals = OrderedDict{Symbol, CompEval}()
-    for (cname, ceval) in model.cevals
-        tname = collect(split(string(typeof(ceval)), ['{', ',']))[2]
-        deps = deepcopy(dependencies(ceval.comp))
-        params = deepcopy(getparams(ceval.comp))
-        for (pname, par) in params
-            f = par.patch
-            if isa(f, λFunct)
-                par.patch  = λFunct(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
-            end
-            f = par.mpatch
-            if isa(f, λFunct)
-                par.mpatch = λFunct(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
-            end
-        end
-        tmp = CompEval(DummyComp(tname, deps, params), model.domain)
-        for fname in fieldnames(typeof(ceval))
-            (fname == :comp)  &&  continue
-            setfield!(tmp, fname, getfield(ceval, fname))
-        end
-        cevals[cname] = tmp
-    end
-    for (cname, ceval) in cevals
-        model.cevals[cname] = cevals[cname]
+    for (cname, ceval) in source.cevals
+        model.cevals[cname] = serializable(ceval, model.domain)
     end
     return model
 end
 
+function serializable(source::MultiModel)
+    model = deepcopy(source)
+    for i in 1:length(model)
+        model.models[i] = serializable(source[i])
+    end
+    return model
+end
+
+serializable(v::AbstractDomain) = v
+serializable(v::AbstractMeasures) = v
+function serializable(source::FitResult)
+    res = deepcopy(source)
+    if isa(res.bestfit, Vector)
+        for i in 1:length(res.bestfit)
+            bb = res.bestfit[i]
+            for p in getfield(bb, :data)
+                serializable!(p)
+            end
+        end
+    else
+        bb = res.bestfit
+        for p in getfield(bb, :data)
+            serializable!(p)
+        end
+    end
+    return res
+end
 
 function todict(vv)
     @assert isstructtype(typeof(vv)) "Unsupported type: $(string(typeof(vv)))"
@@ -92,13 +125,13 @@ todict(v::AbstractArray) = todict.(v)
 todict(v::Tuple) = todict.(v)
 
 
-function snapshot(filename::String, model::Model)
-    serialize(filename, serializable(model))
+function snapshot(filename::String, args...)
+    serialize(filename, serializable.(args))
 end
 
-function snapshot_json(filename::String, model::Model)
+function snapshot_json(filename::String, args...)
     io = open(filename, "w")  # io = IOBuffer()
-    JSON.print(io, todict(serializable(model)))
+    JSON.print(io, todict(serializable.(args)))
     close(io)                 # String(take!(io))
 end
 
