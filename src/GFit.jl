@@ -122,7 +122,6 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
     error("No evaluate!() method implemented for $T")
 
 # Built-in components
-include("components/SimplePar.jl")
 include("components/LComp.jl")
 include("components/OffsetSlope.jl")
 include("components/Gaussian.jl")
@@ -217,7 +216,7 @@ mutable struct Model   # mutable because of parent and maincomp
         function parse_args(args::AbstractDict)
             out = OrderedDict{Symbol, AbstractComponent}()
             for (name, item) in args
-                isa(item, Number)  &&  (item = SimplePar(item))
+                # isa(item, Number)  &&  (item = SimplePar(item))
                 @assert isa(name, Symbol)
                 @assert isa(item, AbstractComponent)
                 out[name] = item
@@ -232,8 +231,8 @@ mutable struct Model   # mutable because of parent and maincomp
                     out[arg[1]] = arg[2]
                 elseif isa(arg[2], λFunct)
                     out[arg[1]] = λComp(arg[2])
-                elseif isa(arg[2], Number)
-                    out[arg[1]] = SimplePar(arg[2])
+                # elseif isa(arg[2], Number)
+                #     out[arg[1]] = SimplePar(arg[2])
                 else
                     error("Unsupported data type: " * string(typeof(arg[2])) *
                           ".  Must be an AbstractComponent, a λFunct or a real number.")
@@ -244,7 +243,7 @@ mutable struct Model   # mutable because of parent and maincomp
 
         parse_args(arg::AbstractComponent) = parse_args(:main => arg)
         parse_args(arg::λFunct) = parse_args(:main => λComp(arg))
-        parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
+        # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
                     HashHashVector{Parameter}(),
@@ -461,7 +460,7 @@ end
 
 
 # User interface
-setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
+# setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
 setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, λComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
