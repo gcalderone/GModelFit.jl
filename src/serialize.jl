@@ -1,4 +1,4 @@
-using Serialization, JSON
+using Serialization, JSON, GZip
 
 struct DummyComp <: AbstractComponent
     tname::String
@@ -89,12 +89,13 @@ function serializable(source::FitResult)
 end
 
 function todict(vv)
-    @assert isstructtype(typeof(vv)) "Unsupported type: $(string(typeof(vv)))"
-    out = OrderedDict{Symbol, Any}()
     tt = typeof(vv)
+    @assert isstructtype(tt) "Unsupported type: $(string(tt))"
+    @assert parentmodule(tt) == GFit
     if tt <: AbstractComponent
         @assert tt == DummyComp "Can't serialize instances of $(string(tt))"
     end
+    out = OrderedDict{Symbol, Any}()
     out[:_structtype] = string(tt)
     for fname in fieldnames(tt)
         if  (tt == GFit.λFunct)  && 
@@ -107,8 +108,7 @@ function todict(vv)
     return out
 end
 
-function todict(vv::AbstractDict{K,T}) where {K<:Any, T <: Any}
-    @assert K == Symbol
+function todict(vv::AbstractDict{Symbol,T}) where {T <: Any}
     out = OrderedDict{Symbol, Any}()
     out[:_dicttype] = string(typeof(vv))
     for (key, val) in vv
@@ -129,8 +129,16 @@ function snapshot(filename::String, args...)
     serialize(filename, serializable.(args))
 end
 
-function snapshot_json(filename::String, args...)
-    io = open(filename, "w")  # io = IOBuffer()
+function snapshot_json(filename::String, args...; compress=false)
+    if compress
+        fname = deepcopy(filename)
+        if fname[end-2:end] != ".gz"
+            fname *= ".gz"
+        end
+        io = GZip.open(fname, "w")
+    else
+        io = open(filename, "w")  # io = IOBuffer()
+    end
     JSON.print(io, todict(serializable.(args)))
     close(io)                 # String(take!(io))
 end
