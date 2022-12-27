@@ -135,7 +135,6 @@ include("components/SumReducer.jl")
 #
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
-    domain::TDomain
     counter::Int
     deps::Vector{Vector{Float64}}
     lastvalues::Vector{Float64}
@@ -149,7 +148,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         comp = deepcopy(_comp)
         buffer = prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
-            comp, domain, 0,
+            comp, 0,
             Vector{Vector{Float64}}(),
             fill(NaN, length(getparams(comp))),
             buffer, false, false)
@@ -157,29 +156,20 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function evaluate!(c::CompEval, pvalues::Vector{Float64})
+function evaluate!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
     c.updated  &&  return
 
     # Do we actually need a new evaluation?
     if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
         if length(c.deps) > 0
-            evaluate!(c.buffer, c.comp, c.domain, c.deps, pvalues...)
+            evaluate!(c.buffer, c.comp, domain, c.deps, pvalues...)
         else
-            evaluate!(c.buffer, c.comp, c.domain, pvalues...)
+            evaluate!(c.buffer, c.comp, domain, pvalues...)
         end
         c.lastvalues .= pvalues
         c.counter += 1
     end
     c.updated = true
-end
-evaluate!(c::CompEval) = evaluate!(c, getfield.(values(getparams(c.comp)), :val))
-
-
-# Facility to easily evaluate a component
-function evaluate(domain::AbstractDomain, comp::AbstractComponent)
-    ceval = CompEval(comp, domain)
-    evaluate(ceval)
-    return ceval.buffer
 end
 
 
@@ -436,7 +426,7 @@ function eval_step3(model::Model, cname::Symbol)
     for d in dependencies(model.cevals[cname].comp)
         eval_step3(model, d)
     end
-    evaluate!(model.cevals[cname], values(model.actual[cname]))
+    evaluate!(model.cevals[cname], model.domain, values(model.actual[cname]))
 end
 
 
@@ -556,6 +546,7 @@ include("multimodel.jl")
 abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
+include("serialize.jl")
 
 include("show.jl")
 include("utils.jl")
