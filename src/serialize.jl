@@ -127,19 +127,21 @@ todict(v::Tuple) = todict.(v)
 
 function snapshot(filename::String, args...)
     serialize(filename, serializable.(args))
+    return filename
 end
 
 function snapshot_json(filename::String, args...; compress=false)
+    fname = deepcopy(filename)
     if compress
-        fname = deepcopy(filename)
         if fname[end-2:end] != ".gz"
             fname *= ".gz"
         end
         io = GZip.open(fname, "w")
     else
-        io = open(filename, "w")  # io = IOBuffer()
+        io = open(fname, "w")  # io = IOBuffer()
     end
     JSON.print(io, todict(serializable.(args)))
-    close(io)                 # String(take!(io))
+    close(io)                  # String(take!(io))
+    return fname
 end
 
