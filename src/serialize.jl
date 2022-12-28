@@ -1,5 +1,4 @@
-using Serialization, JSON, GZip
-
+# DummyComp is used to create serializable snapshots of actual components
 struct DummyComp <: AbstractComponent
     tname::String
     deps::Vector{Symbol}
@@ -9,20 +8,26 @@ end
 getproperty(comp::DummyComp, pname::Symbol) = getfield(comp, :params)[pname]
 getparams(comp::DummyComp) = getfield(comp, :params)
 dependencies(comp::DummyComp) = getfield(comp, :deps)
+original_type(comp::DummyComp) = getfield(comp, :tname)
 
 function evaluate!(buffer::Vector{Float64}, comp::DummyComp, domain::AbstractDomain, pars...)
     @warn "Can't evaluate a dummy component!"
     nothing
 end
 
+# Named function used to create serializable λFunct objects
 function dummyfunct(args...)
     @warn "Can't evaluate a dummy function!"
     nothing
 end
+
+
+# The `serializable` methods are supposed to create copies of GFit
+# objects replacing all non-serializable items (such as
+# component instances and λFunct) with dummy ones.
 serializable(f::λFunct) = λFunct(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
 
-# Create a copies of GFit objects replacing all non-serializable items
-# objects (such as component instances and λFunct) with dummy ones.
+
 function serializable!(par::Parameter)
     if isa(par.patch, λFunct)
         par.patch  = serializable(par.patch)
@@ -60,6 +65,7 @@ function serializable(source::Model)
     return model
 end
 
+
 function serializable(source::MultiModel)
     model = deepcopy(source)
     for i in 1:length(model)
@@ -67,6 +73,7 @@ function serializable(source::MultiModel)
     end
     return model
 end
+
 
 serializable(v::AbstractDomain) = v
 serializable(v::AbstractMeasures) = v
@@ -87,6 +94,50 @@ function serializable(source::FitResult)
     end
     return res
 end
+
+
+"""
+    snapshot(filename::String, args...)
+
+Save a binary snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel, `Domain`, `Measures`, etc using the standard `Serialization` package.  The snapshot can be restored in a later session, and the objects will be similar to the original ones, with the following notable differences:
+- in `Model` objects, all components are casted into `GFit.DummyComp` ones.  The original type is availble (as a string) via the `original_type()` function, while the content of the original structure is lost;
+- all `λFunct` objects retain their textual representation, but the original function is lost;
+- `Model` and `MultiModel` objects, as well as all the components, retain their last evaluated values but they can no longer be evaluated (an attempt to invoke `evaluate()` will result in an error);
+
+The reason to introduce such differences is to ensure that all data structures being serialized are defined within the `GFit` package with no further external depencency, and to overcome limitation of the `Serialization` package related to, e.g., anonymous functions.
+
+## Example:
+```julia-repl
+# Create GFit objects
+using GFit
+dom  = Domain(1:5)
+model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+res = fit!(model, data)
+
+# Save a snapshot
+GFit.snapshot("my_snapshot.dat", (model, data, res))
+
+# Restore snapshot (possibly in a different Julia session)
+using Serialization, GFit
+(model, data, res) = deserialize("my_snapshot.dat")
+```
+
+!!! note
+    The GFit binary serialization facility is **experimental**,
+
+See also `GFit.snapshot_json()`.
+"""
+function snapshot(filename::String, arg)
+    serialize(filename, serializable(args))
+    return filename
+end
+
+function snapshot(filename::String, args::Tuple)
+    serialize(filename, serializable.(args))
+    return filename
+end
+
 
 function todict(vv)
     tt = typeof(vv)
@@ -125,23 +176,16 @@ todict(v::AbstractArray) = todict.(v)
 todict(v::Tuple) = todict.(v)
 
 
-function snapshot(filename::String, args...)
-    serialize(filename, serializable.(args))
-    return filename
-end
-
 function snapshot_json(filename::String, args...; compress=false)
-    fname = deepcopy(filename)
+    filename = ensure_file_extension(filename, "json")
     if compress
-        if fname[end-2:end] != ".gz"
-            fname *= ".gz"
-        end
-        io = GZip.open(fname, "w")
+        filename = ensure_file_extension(filename, "gz")
+        io = GZip.open(filename, "w")
     else
-        io = open(fname, "w")  # io = IOBuffer()
+        io = open(filename, "w")  # io = IOBuffer()
     end
     JSON.print(io, todict(serializable.(args)))
-    close(io)                  # String(take!(io))
-    return fname
+    close(io)                     # String(take!(io))
+    return filename
 end
 

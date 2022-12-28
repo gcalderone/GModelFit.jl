@@ -1,3 +1,18 @@
+version() = Pkg.TOML.parsefile(joinpath(pkgdir(GFit), "Project.toml"))["version"]
+
+
+function ensure_file_extension(_filename, _ext)
+    filename = deepcopy(_filename)
+    ext = "." * _ext
+    nn = length(ext)
+    if  (length(filename) <= nn)  ||
+        (filename[(end-nn+1):end] != ext)
+        filename *= ext
+    end
+    return filename
+end
+
+
 # ====================================================================
 function print_param_covariance(fitres::FitResult;
                                 select=nothing, sort=false, threshold=0.)
@@ -77,3 +92,4 @@ function mock(::Type{Measures}, model::Model; properr=0.01, rangeerr=0.05, abser
     Measures(domain(model), values .+ err .* randn(rng, length(values)), err)
 end
 mock(T, multi::MultiModel; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]
+

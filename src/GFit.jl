@@ -8,6 +8,8 @@ using MacroTools
 using Dates
 using ProgressMeter
 using Random
+using Serialization, JSON, GZip
+using Pkg
 
 import Base.show
 import Base.ndims
