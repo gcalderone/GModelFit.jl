@@ -1,7 +1,5 @@
 # GFit.jl
 
-**Note: This package is now mature enough to be released as v0.1, however it is not yet a registered package since it lacks the associated documentation.**
-
 [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
 [![DocumentationStatus](https://img.shields.io/badge/docs-stable-blue.svg?style=flat)](https://gcalderone.github.io/GFit.jl/)
 
@@ -110,10 +108,12 @@ Fit results:
     Status:       OK              Elapsed time  :      0.003 s
 ```
 
-Use [GfitViewer](https://github.com/lnicastro/GFitViewer.jl) to display the results:
+Use [GfitViewer](https://github.com/lnicastro/GFitViewer.jl) to display the results (only for the 1D case):
 ```julia
 using GFitViewer
 viewer(model, data, res)  # opens an HTML viewer in yuour browser
+
+# or
 
 using GFitViewer, Gnuplot
 @gp data model  # uses Gnuplot.jl recipes to display the plot

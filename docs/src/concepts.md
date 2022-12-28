@@ -11,7 +11,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Model component*: the atomic building block of a (potentially very complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` representing the component evaluation.  A component is a structure inheriting from `GFit.AbstractComponent` and is typically characterized by one or more *parameters* (see below). One component's evaluation can also be used as input for another one's calculation, thus inducing a dependency between the two.  The **GFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user.  The memoization mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none of its parameter values has changed since last evaluation;
 
-- *Parameter*: a single floating point value characterizing a specific aspect for the evaluation of a component, e.g. the slope of a power law or the width of a Gaussian profile.  The parameter values are automatically varied during the fitting process until the residuals between the global model evaluation and the empirical data are minimized.  A parameter can be fixed to a specific value, limited in an interval, and/or be dynamically calculated (patched) according to the values of other parameters.  All parameters are represented by an object of type [`GFit.Parameter`](@ref);
+- *Parameter*: a single floating point number characterizing a specific aspect for the evaluation of a component (e.g. the slope of a power law or the width of a Gaussian profile). The parameter values are automatically varied during the fitting process until the residuals between the global model evaluation and the empirical data are minimized.  A parameter can be fixed to a specific value, limited in an interval, and/or be dynamically calculated (patched) according to the values of other parameters.  All parameters are represented by an object of type [`GFit.Parameter`](@ref);
 
 - *Model*: is the overall model description, whose evaluation is supposed to be compared to a single `Measures` objects and whose parameters are varied during fitting to reduce the residuals. All models are represented by an object of type [`Model`](@ref) containing a single `Domain` or `CartesianDomain` object representing the domain where the model will be evaluated, and one or more *components* characterizing the model itself.  Each component is identified by a unique name (actually a `Symbol`) within a model.
   - Component dependencies and *main component*: the evaluation of a component, say `A`, may use the output of another component, say `B`, to calculate its output.  In this case we say that `A` *depends* on `B`, and therefore `B` needs to be evaluated before `A` (circular dependencies are not allowed, and would raise an error if attempted).  The dependencies are automatically identified, and the last component being evaluated is dubbed *main component* since its output represent the overall model evaluation;
@@ -23,7 +23,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 - *λ-function*: is an anonymous function used in two different contexts within **GFit.jl**:
   - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models in a multi-model analysis;
   - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
-  In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous functions (e.g. `@λ x -> 2 .* x`).
+  In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous functions.
 
 - *Minimizer*: the **GFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
@@ -41,7 +41,6 @@ Multi-model (`multi`)
  |
  + -- Model 1 (`model`)
  |     |
- |     + -- Domain
  |     + -- Component1
  |     |     |
  |     |     + -- Param1
@@ -54,4 +53,4 @@ Multi-model (`multi`)
 ```
 
 E.g. the syntax to access the value of a parameter in a single model case is: `model[:Component1].Param1.val`.  In a multi-model case it is: `multi[1][:Component1].Param1.val`.
-```
+

@@ -57,11 +57,12 @@ A very simple example showing the above workflow is:
 ```@example abc
 using GFit
 
-# Prepare vectors with domain points, empirical measures an their uncertainties and
-# use them to create the GFit input objects:
+# Prepare vectors with domain points, empirical measures and their uncertainties
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]
 meas = [6.29, 7.27, 10.41, 18.67, 25.3]
 unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
+
+# Prepare GFit input objects
 dom  = Domain(x)
 data = Measures(dom, meas, unc)
 
@@ -104,4 +105,4 @@ println("Best fit value for the offset parameter: ",
 	"Reduced χ^2: ", res.fitstat)
 ```
 
-The above example is definitely a simple one, but even more complex ones follow the same workflow.
+The above example is definitely a simple one, but even more complex ones follow essentially the same workflow.
