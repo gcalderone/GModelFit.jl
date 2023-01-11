@@ -89,7 +89,8 @@ function mock(::Type{Measures}, model::Model; properr=0.01, rangeerr=0.05, abser
     range = ee[2] - ee[1]
     @assert range > 0
     err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
-    Measures(domain(model), values .+ err .* randn(rng, length(values)), err)
+    err .*= randn(rng, size(values))
+    Measures(domain(model), values .+ err, err)
 end
 mock(T, multi::MultiModel; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 
