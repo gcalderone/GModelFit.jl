@@ -128,13 +128,10 @@ ndims(d::AbstractMeasures) = ndims(domain(d))
 length(d::AbstractMeasures) = length(domain(d))
 size(d::AbstractMeasures) = size(domain(d))
 
-function original_shape(d::AbstractMeasures{N}, index=1) where N
-    if isa(domain(d), CartesianDomain)
-        out = fill(NaN, size(d))
-        out[domain(d).roi] .= values(d, index)
-        return out
-    end
-    out = values(d, index)
+reshape(d::Domain, v::Vector{Float64}) = v
+function reshape(d::CartesianDomain, v::Vector{Float64})
+    out = fill(NaN, size(d))
+    out[d.roi] .= v
     return out
 end
 
@@ -182,14 +179,14 @@ end
 
 Returns the measurement values as a `Vector{Float64}`.
 """
-values(d::Measures) = d.values[1]
+values(d::Measures) = reshape(d.domain, d.values[1])
 
 """
     uncerts(d::Measures)
 
 Returns the measurement uncertainties as a `Vector{Float64}`.
 """
-uncerts(d::Measures) = d.values[2]
+uncerts(d::Measures) = reshape(d.domain, d.values[2])
 Measures(dom::AbstractDomain, values::AbstractArray, uncert::Real) = Measures(dom, values, fill(uncert, size(values)))
 
 

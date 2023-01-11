@@ -532,21 +532,8 @@ domain(model::Model) = model.domain
 
 
 # Return model evaluations
-function (model::Model)()
-    out = model.cevals[find_maincomp(model)].buffer
-    if isa(domain(model), CartesianDomain)
-        return reshape(out, size(domain(model)))
-    end
-    return out
-end
-
-function (model::Model)(name::Symbol)
-    out = model.cevals[name].buffer
-    if isa(domain(model), CartesianDomain)
-        return reshape(out, size(domain(model)))
-    end
-    return out
-end
+(model::Model)() = reshape(domain(model), model.cevals[find_maincomp(model)].buffer)
+(model::Model)(name::Symbol) = reshape(domain(model), model.cevals[name].buffer)
 
 """
     select_maincomp!(model::Model, cname::Symbol)

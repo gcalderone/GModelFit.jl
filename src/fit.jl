@@ -28,7 +28,7 @@ function update!(fp::FitProblem, pvalues::Vector{Float64})
 end
 
 function update_residuals!(fp::FitProblem{Measures{N}}) where N
-    fp.resid .= (fp.model() .- values(fp.measures)) ./ uncerts(fp.measures)
+    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
 end
 fit_stat(fp::FitProblem{Measures{N}}) where N =
     sum(abs2, fp.resid) / fp.dof
