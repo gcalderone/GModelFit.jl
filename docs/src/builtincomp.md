@@ -181,7 +181,7 @@ The parameters are:
   - `centerY::Parameter`: the Y coordinate of the center of the Gaussian;
   - `sigmaX::Parameter`: the width the Gaussian along the X direction (when `angle=0`);
   - `sigmaY::Parameter`: the width the Gaussian along the Y direction (when `angle=0`);
-  - `angle::Parameter`: the rotation angle of the whole Gaussian function.
+  - `angle::Parameter`: the rotation angle (in degrees) of the Gaussian.
 
 
 
@@ -198,9 +198,15 @@ data = Measures(dom, [0, 0.3, 6.2, 25.4, 37.6, 23., 7.1, 0.4, 0], 0.6)
 res = fit!(model, data)
 ```
 
+
+A very common problem is to fit the histogram of a distribution with a Gaussian model. In the following example we will generate such distribution with `Random.randn`, and use the [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl/) package to calculate the histogram and display the plot:
 ```@example abc
 using Random, GFit, Gnuplot
+
+# Calculate histogram of the distribution
 hh = hist(randn(10000))
+
+# Prepare domain and data and fit a model
 dom = Domain(hh.bins)
 data = Measures(dom, hh.counts, 1.)
 model = Model(dom, GFit.Gaussian(1e3, 0, 1))
@@ -216,8 +222,55 @@ saveas("gaussian") # hide
 
 
 
+A similar problem in 2D can be handled as follows:
+
+```@example abc
+using Random, GFit, Gnuplot
+
+# Calculate histogram of the distribution
+hh = hist(1 .+ randn(10000), 2 .* randn(10000))
+
+# Prepare domain and data and fit a model
+dom = CartesianDomain(hh.bins1, hh.bins2)
+data = Measures(dom, hh.counts, 1.)
+model = Model(dom, GFit.Gaussian(1e3, 0, 0, 1, 1, 0))
+res = fit!(model, data)
+```
+
+
 
 
 
 
 ## SumReducer
+
+A component calculating the element-wise sum of a (potentially large) number of other components.
+
+The `SumReducer` constructor is defined as follows:
+```julia
+SumReducer(args::AbstractSet{Symbol})
+SumReducer(args::Vector{Symbol})
+SumReducer(args::Vararg{Symbol})
+```
+where the `Symbol`s represent the component names
+
+The `SumReducer` component has no parameter.
+
+#### Example
+```@example abc
+using GFit
+
+# Prepare domain and a linear model (with initial guess parameters)
+dom = Domain(1:5)
+model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+
+# Add a quadratic component to the model
+model[:quadratic] = @λ (x, p2=1) -> (p2 .* x.^2)
+
+# The total model is the sum of `linear` and `quadratic`
+model[:main] = SumReducer(:linear, :quadratic)
+
+# Fit model against data
+data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+res = fit!(model, data)
+```
