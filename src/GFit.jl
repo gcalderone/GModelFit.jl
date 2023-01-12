@@ -126,6 +126,7 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
 # Built-in components
 include("components/LComp.jl")
 include("components/OffsetSlope.jl")
+include("components/Polynomial.jl")
 include("components/Gaussian.jl")
 include("components/Lorentzian.jl")
 include("components/SumReducer.jl")
