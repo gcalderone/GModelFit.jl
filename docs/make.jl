@@ -10,6 +10,8 @@ makedocs(sitename="Gfit.jl",
              "Built-in components" => "builtincomp.md",
              "Custom components" => "customcomp.md",
              "Viewers" => "viewers.md",
+             "Multi-dataset fitting" => "multifit.md",
+             "Miscellaneous" => "misc.md",
              "Examples" => "examples.md",
              "API" => "api.md"
          ])
