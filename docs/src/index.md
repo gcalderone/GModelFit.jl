@@ -20,7 +20,7 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - multiple data sets can be fitted simultaneously against different models, whose parameters can optionally be patched;
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
 - user provided components can pre-compute quantities based on the model domain, and store them in reserved areas for re-use;
-- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least square](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization;
+- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization;
 - it provides several facilities for interactive fitting and result displaying.
 
 The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
@@ -92,7 +92,7 @@ Once done, you may plot the data and the best fit model with a plotting framewor
 ```@example abc
 using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
-@gp :- coords(domain(model)) model() "w l t 'Best fit model'"
+@gp :- coords(dom) model() "w l t 'Best fit model'"
 saveas("simple_example") # hide
 ```
 ![](assets/simple_example.png)

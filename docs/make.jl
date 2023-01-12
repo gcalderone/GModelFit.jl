@@ -8,6 +8,7 @@ makedocs(sitename="Gfit.jl",
              "Home" => "index.md",
              "Basic concepts and data types" => "concepts.md",
              "Built-in components" => "builtincomp.md",
+             "Custom components" => "customcomp.md",
              "Viewers" => "viewers.md",
              "Examples" => "examples.md",
              "API" => "api.md"
