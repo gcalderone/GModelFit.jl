@@ -1,3 +1,14 @@
+```@setup abc
+using Gnuplot
+Gnuplot.quitall()
+mkpath("assets")
+Gnuplot.options.term = "unknown"
+empty!(Gnuplot.options.init)
+push!( Gnuplot.options.init, linetypes(:Set1_5, lw=2.5, ps=1.5))
+saveas(file) = save(term="pngcairo size 550,350 fontscale 0.8", output="assets/$(file).png")
+```
+
+
 # Built-in components
 
 The **GFit.jl** provides several built-in components which may be used to build arbitrarily complex models.
@@ -22,7 +33,7 @@ The `λComp` constructor is defined as follows:
 however there is no need to explicitly invoke such constructor since a `λComp` object is automatically created whenever a `λFunct` is added to the model. This components works with domains of any dimensionality.
 
 
-### Example
+#### Examples
 ```@example abc
 using GFit
 
@@ -54,7 +65,7 @@ println("p2: ", res.bestfit[:quadratic].p2.val, " ± ", res.bestfit[:quadratic].
 
 ## OffsetSlope
 
-An offset and slope component for 1D and 2D domains.  In 2D it represents a tilted plane.
+An offset and slope component for 1D and 2D domains.
 
 The constructors are defined as follows:
 
@@ -75,7 +86,7 @@ The parameters are:
   - `slopeY::Parameter` (only 2D): the slope of the plane along the Y direction;
 
 
-### Example
+#### Examples
 ```@example abc
 using GFit
 
@@ -88,15 +99,10 @@ data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 res = fit!(model, data)
 ```
 
-Note that the numerical results are identical to the previous example (where an explicit mathematical expression for the `:linear` component was used).  Also, in this case, you may simply add a new quadratic term:
-```@example abc
-model[:quadratic] = @λ (x, linear, p2=1) -> (linear .+ p2 .* x.^2)
-res = fit!(model, data)
-```
+Note that the numerical results are identical to the previous example (where an explicit mathematical expression for the `:linear` component was used).
 
 
-
-
+A similar example in 2D is as follows:
 ```@example abc
 using GFit
 
@@ -118,20 +124,39 @@ res = fit!(model, data)
 
 
 
-### Polynomial
+## Polynomial
 
-A n-th degree polynomial function (n > 1) for 1D domains.
+A *n*-th degree polynomial function (*n > 1*) for 1D domains.
 
 The constructor is defined as follows:
 
-- `GFit.Components.Polynomial(args...)`;
-  where `args...` is a list of numbers.
+- `GFit.Polynomial(p1, p2, ...)`;
+  where `p1`, `p2`, etc. are the guess values for the coefficients of each degree of the polynomial.
 
-The parameters are:
+The parameters are labelled: `p1`, `p2`, etc.
 
-- `coeff::Vector{Parameter}`: vector of polynomial coefficients.
+#### Examples
+```@example abc
+using GFit
 
-### Gaussian
+# Prepare domain and a linear model using the Polynomial component
+dom = Domain(1:5)
+model = Model(dom, GFit.Polynomial(2, 0.5))
+
+# Fit model against data
+data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+res = fit!(model, data)
+```
+
+Note again that the numerical results are identical to the previous examples.  Also note that the default name for a component (if none is provided) is `:main`.  To use a 2nd degree polynomial we can simply replace the `:main` component with a new one:
+```@example abc
+model[:main] = GFit.Polynomial(2, 0.5, 1)
+res = fit!(model, data)
+```
+
+
+
+## Gaussian
 
 A normalized Gaussian component for 1D and 2D domains.
 
@@ -158,27 +183,41 @@ The parameters are:
   - `sigmaY::Parameter`: the width the Gaussian along the Y direction (when `angle=0`);
   - `angle::Parameter`: the rotation angle of the whole Gaussian function.
 
-### Lorentzian
 
-A Lorentzian component for 1D and 2D domains.
 
-The constructors are defined as follows:
+#### Examples
+```@example abc
+using GFit
 
-- 1D: `GFit.Components.Lorentzian(norm, center, fwhm)`;
-- 2D: `GFit.Components.Lorentzian(norm, centerX, centerY, fwhmX, fwhmY)`;
+# Prepare domain and model
+dom = Domain(1:0.5:5)
+model = Model(dom, GFit.Gaussian(1, 3, 0.5))
 
-The parameters are:
+# Fit model against data
+data = Measures(dom, [0, 0.3, 6.2, 25.4, 37.6, 23., 7.1, 0.4, 0], 0.6)
+res = fit!(model, data)
+```
 
-- 1D:
-  
-  - `norm::Parameter`: the area below the Lorentzian function;
-  - `center::Parameter`: the location of the center of the Lorentzian;
-  - `fwhm::Parameter`: the full-width at half maximum of the Lorentzian;
+```@example abc
+using Random, GFit, Gnuplot
+hh = hist(randn(10000))
+dom = Domain(hh.bins)
+data = Measures(dom, hh.counts, 1.)
+model = Model(dom, GFit.Gaussian(1e3, 0, 1))
+res = fit!(model, data)
+```
 
-- 2D:
-  
-  - `norm::Parameter`: the volume below the Lorentzian function;
-  - `centerX::Parameter`: the X coordinate of the center of the Lorentzian;
-  - `centerY::Parameter`: the Y coordinate of the center of the Lorentzian;
-  - `fwhmX::Parameter`: the full-width at half maximum of the Lorentzian along the X direction (when `angle=0`);
-  - `fwhmY::Parameter`: the full-width at half maximum of the Lorentzian along the Y direction (when `angle=0`).
+
+```@example abc
+@gp hh coords(dom) model() "w l t 'Model' lw 3"
+saveas("gaussian") # hide
+```
+![](assets/gaussian.png)
+
+
+
+
+
+
+
+## SumReducer
