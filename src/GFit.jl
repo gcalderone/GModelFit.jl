@@ -99,8 +99,9 @@ end
 #
 # A *component* is a generic implementation of a building block for a
 # model. It must inherit `AbstractComponent` and implement the
-# `evaluate!` method (optionally also `prepare!`).  The structure may
-# contain zero or more field of type Parameter (see above)
+# `evaluate!` method.  The structure may
+# contain zero or more field of type Parameter, or a single field of
+# type OrderedDict{Symbol, Parameter}()
 abstract type AbstractComponent end
 
 # Fall back methods

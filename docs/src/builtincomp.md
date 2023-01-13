@@ -204,7 +204,7 @@ A very common problem is to fit the histogram of a distribution with a Gaussian 
 using Random, GFit, Gnuplot
 
 # Calculate histogram of the distribution
-hh = hist(randn(10000))
+hh = hist(randn(10000), bs=0.25)
 
 # Prepare domain and data and fit a model
 dom = Domain(hh.bins)
