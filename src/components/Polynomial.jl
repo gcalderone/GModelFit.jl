@@ -1,8 +1,8 @@
 mutable struct Polynomial <: AbstractComponent
-    coeff::HashVector{Parameter}
+    coeff::OrderedDict{Symbol, Parameter}
 
     function Polynomial(args...)
-        coeff = HashVector{Parameter}()
+        coeff = OrderedDict{Symbol, Parameter}()
         for i in 1:length(args)
             coeff[Symbol.(:p, i)] = Parameter(args[i])
         end
@@ -11,16 +11,8 @@ mutable struct Polynomial <: AbstractComponent
 end
 
 # Allow access to parameters as `comp.parname`
-propertynames(comp::Polynomial) = collect(keys(getfield(getfield(comp, :coeff), :dict)))
-getproperty(comp::Polynomial, key::Symbol) = getproperty(getfield(comp, :coeff), key)
-
-function getparams(comp::Polynomial)
-    out = OrderedDict{Symbol, Parameter}()
-    for (key, val) in getfield(comp, :coeff)
-        out[key] = val
-    end
-    return out
-end
+propertynames(comp::Polynomial) = collect(keys(getfield(comp, :coeff)))
+getproperty(comp::Polynomial, key::Symbol) = getfield(comp, :coeff)[key]
 
 
 function evaluate!(buffer::Vector{Float64}, comp::Polynomial, x::AbstractDomain{1},

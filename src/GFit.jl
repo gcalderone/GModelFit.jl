@@ -107,9 +107,11 @@ abstract type AbstractComponent end
 function getparams(comp::AbstractComponent)
     out = OrderedDict{Symbol, Parameter}()
     for name in fieldnames(typeof(comp))
-        par = getfield(comp, name)
-        if isa(par, Parameter)
-            out[name] = par
+        field = getfield(comp, name)
+        if isa(field, Parameter)
+            out[name] = field
+        elseif isa(field, OrderedDict{Symbol, Parameter})
+            return field
         end
     end
     return out

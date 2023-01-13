@@ -1,11 +1,11 @@
 struct λComp <: AbstractComponent
     func::λFunct
     list::Vector{Symbol}
-    hash::HashVector{Parameter}
+    params::OrderedDict{Symbol, Parameter}
 
     function λComp(f::λFunct, args...)
         list = deepcopy(f.args)
-        params = HashVector{Parameter}()
+        params = OrderedDict{Symbol, Parameter}()
         for i in 1:length(f.optargs)
             @assert f.optargs[1].head != :... "Splat not allowed in LComp"
             @assert f.optargs[i].head == :(=)
@@ -18,19 +18,10 @@ struct λComp <: AbstractComponent
 end
 
 # Allow access to parameters as `comp.parname`
-propertynames(comp::λComp) = collect(keys(getfield(getfield(comp, :hash), :dict)))
-getproperty(comp::λComp, key::Symbol) = getproperty(getfield(comp, :hash), key)
+propertynames(comp::λComp) = collect(keys(getfield(comp, :params)))
+getproperty(comp::λComp, key::Symbol) = getfield(comp, :params)[key]
 
 dependencies(comp::λComp) = getfield(comp, :list)
-
-
-function getparams(comp::λComp)
-    out = OrderedDict{Symbol, Parameter}()
-    for (key, val) in getfield(comp, :hash)
-        out[key] = val
-    end
-    return out
-end
 
 
 function prepare!(comp::λComp, domain::AbstractDomain)
