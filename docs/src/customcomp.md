@@ -96,7 +96,7 @@ end
 println() # hide
 ```
 
-We wll now prepare a `Model` object to account for the interpolated theoretical model, and for a possible background introduced by the detector used to obtain empirical data.
+The following code shows how to prepare a `Model` including the interpolated theoretical model, and to take into account the possible background introduced by the detector used to obtain empirical data:
 ```@example abc
 dom = Domain(obs_x)
 model = Model(dom, :theory => Interpolator(theory_x, theory_y),

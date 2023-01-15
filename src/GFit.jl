@@ -70,7 +70,7 @@ end
 A structure representing a model parameter.
 
 # Fields:
- - `val::Float64`: parameter value (either initial guess when set before fitting, or best fit one after fitting);
+ - `val::Float64`: parameter value (initial guess before fitting, or best fit one after fitting);
  - `low::Float64`: lower limit for the value (default: `-Inf`);
  - `high::Float64`: upper limit for the value (default: `+Inf`);
  - `fixed::Bool`: whether the parameter is fixed during fitting (default: `false`);

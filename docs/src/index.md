@@ -15,13 +15,12 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - it handles datasets of any dimensionality;
 - the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit!()` and the object constructors (see [Basic concepts and data types](@ref));
 - the fitting model is evaluated on a user defined domain, and is the result of a combination of *model components* or mathematical expressions (in the form of [lambda functions](https://en.wikipedia.org/wiki/Anonymous_function)), or any arbitrary mixture of the two;
-- it allows to define new model components to suit specific needs;
-- model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters;
-- multiple data sets can be fitted simultaneously against different models, whose parameters can optionally be patched;
+- it provides several ready-to-use [Built-in components](@ref), and it also allows to define new components to suit specific needs ([Custom components](@ref));
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
-- user provided components can pre-compute quantities based on the model domain, and store them in reserved areas for re-use;
-- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization;
-- it provides several facilities for interactive fitting and result displaying.
+- model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters (see [Parameter constraints](@ref));
+- multiple data sets can be fitted simultaneously against different models whose parameters can be patched (see [Multi-dataset fitting](@ref));
+- it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Minimizers](@ref));
+- it provides several facilities for interactive fitting and result displaying (see [Viewers](@ref)).
 
 The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
 
