@@ -2,5 +2,5 @@
 
 ## Save a snapshot
 
-## Mock a dataset
+## Generate mock datasets
 

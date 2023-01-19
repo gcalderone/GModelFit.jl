@@ -20,7 +20,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Fit results*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitResult`](@ref) structure.
 
-- *λ-function*: is an anonymous function used in two different contexts within **GFit.jl**:
+- *λ-function* ([`GFit.λFunct`](@ref)): is an anonymous function used in two different contexts within **GFit.jl**:
   - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models in a multi-model analysis;
   - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
   In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous functions.
