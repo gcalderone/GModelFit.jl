@@ -37,7 +37,7 @@ include("domain.jl")
 """
     λFunct
 
-A representation for a λ function, containing a reference to the function itself, a string representation of its source code (for displaying purposes) and a list of its arguments.
+A representation for a λ-function, containing a reference to the function itself, a string representation of its source code (for displaying purposes) and a list of arguments.  It is typically created using the @λ macro.
 """
 struct λFunct
     funct::Function
@@ -343,13 +343,14 @@ function eval_step0(model::Model)
             end
             model.params[ cname][pname] = par
             model.pvalues[cname][pname] = par.val
-            model.actual[cname][pname] = par.val
+            model.actual[ cname][pname] = par.val
 
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
                     par.fixed = true
                 else                       # invoke a patch function
+                    @assert length(par.patch.args) in [1,2]
                     if length(par.patch.args) == 1
                         par.fixed = true
                     else
@@ -358,6 +359,7 @@ function eval_step0(model::Model)
                 end
             elseif !isnothing(par.mpatch)
                 @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
+                @assert length(par.mpatch.args) in [1,2]
                 if length(par.mpatch.args) == 1
                     par.fixed = true
                 else
@@ -407,7 +409,7 @@ function eval_step2(model::Model)
                     if length(par.patch.args) == 1
                         model.actual[cname][pname] = par.patch(model.pvalues)
                     else
-                        model.actual[cname][pname] = par.patch(model.pvalues[cname][pname], model.pvalues)
+                        model.actual[cname][pname] = par.patch(model.pvalues, model.pvalues[cname][pname])
                     end
                 end
             elseif !isnothing(par.mpatch)
@@ -415,7 +417,7 @@ function eval_step2(model::Model)
                 if length(par.mpatch.args) == 1
                     model.actual[cname][pname] = par.mpatch(model.parent.pvalues)
                 else
-                    model.actual[cname][pname] = par.mpatch(model.pvalues[cname][pname], model.parent.pvalues)
+                    model.actual[cname][pname] = par.mpatch(model.parent.pvalues, model.pvalues[cname][pname])
                 end
             end
         end
