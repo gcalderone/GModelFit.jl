@@ -20,7 +20,7 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 <span class="sgr32">Fit results:</span>
     #Data :        5              #Free params  :          2
     DOF   :        3              Red. fit stat.:     31.671
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :          0 s
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.001 s
 </span></code></pre><p>The evaluation of a <code>λComp</code> component may also involve the outcomes from other components. Continuing from previous example, whose fit was clearly a poor one, we may add a quadratic term to the previously defined <code>linear</code> component:</p><pre><code class="language-julia hljs">model[:quadratic] = @λ (x, linear, p2=1) -&gt; (linear .+ p2 .* x.^2)
 res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Best fit parameters:</span></span><span class="sgr1">
 ╭───────────┬────────┬───────┬───────────┬───────────┬────────┬───────╮
@@ -34,7 +34,7 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 <span class="sgr32">Fit results:</span>
     #Data :        5              #Free params  :          3
     DOF   :        2              Red. fit stat.:    0.70582
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.001 s
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.003 s
 </span></code></pre><p>Note that the keywords given when defining the function are interpreted as component parameters, hence their properties can be retrieved with:</p><pre><code class="language-julia hljs">println(&quot;Best fit values:&quot;)
 println(&quot;b:  &quot;, res.bestfit[:linear].b.val , &quot; ± &quot;, res.bestfit[:linear].b.unc)
 println(&quot;m:  &quot;, res.bestfit[:linear].m.val , &quot; ± &quot;, res.bestfit[:linear].m.unc)
@@ -86,7 +86,7 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 <span class="sgr32">Fit results:</span>
     #Data :       25              #Free params  :          3
     DOF   :       22              Red. fit stat.:    0.98794
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.132 s
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.001 s
 </span></code></pre><h2 id="Polynomial"><a class="docs-heading-anchor" href="#Polynomial">Polynomial</a><a id="Polynomial-1"></a><a class="docs-heading-anchor-permalink" href="#Polynomial" title="Permalink"></a></h2><p>A <em>n</em>-th degree polynomial function (<em>n &gt; 1</em>) for 1D domains.</p><p>The constructor is defined as follows:</p><ul><li><code>GFit.Polynomial(p1, p2, ...)</code>; where <code>p1</code>, <code>p2</code>, etc. are the guess values for the coefficients of each degree of the polynomial.</li></ul><p>The parameters are labelled: <code>p1</code>, <code>p2</code>, etc.</p><h4 id="Examples-3"><a class="docs-heading-anchor" href="#Examples-3">Examples</a><a class="docs-heading-anchor-permalink" href="#Examples-3" title="Permalink"></a></h4><pre><code class="language-julia hljs">using GFit
 
 # Prepare domain and a linear model using the Polynomial component
@@ -138,7 +138,7 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 <span class="sgr32">Fit results:</span>
     #Data :        9              #Free params  :          3
     DOF   :        6              Red. fit stat.:     1.0251
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.003 s
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.002 s
 </span></code></pre><p>A very common problem is to fit the histogram of a distribution with a Gaussian model. In the following example we will generate such distribution with <code>Random.randn</code>, and use the <a href="https://github.com/gcalderone/Gnuplot.jl/">Gnuplot.jl</a> package to calculate the histogram and display the plot:</p><pre><code class="language-julia hljs">using Random, GFit, Gnuplot
 
 # Calculate histogram of the distribution
@@ -152,13 +152,13 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 ╭───────────┬────────┬───────┬───────────┬───────────┬────────┬───────╮
 │ Component │ Param. │ Range │ Value     │ Uncert.   │ Actual │ Patch │
 ├───────────┼────────┼───────┼───────────┼───────────┼────────┼───────┤
-│ main      │ norm   │ 0:Inf │      2494 │     15.89 │        │       │
-│           │ center │       │ -0.002637 │  0.007303 │        │       │
-│           │ sigma  │ 0:Inf │    0.9927 │  0.007303 │        │       │
+│ main      │ norm   │ 0:Inf │      2506 │     18.55 │        │       │
+│           │ center │       │ -0.006522 │  0.008695 │        │       │
+│           │ sigma  │ 0:Inf │     1.017 │  0.008695 │        │       │
 ╰───────────┴────────┴───────┴───────────┴───────────┴────────┴───────╯
 <span class="sgr32">Fit results:</span>
-    #Data :       33              #Free params  :          3
-    DOF   :       30              Red. fit stat.:     191.29
+    #Data :       34              #Free params  :          3
+    DOF   :       31              Red. fit stat.:     254.59
     Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.001 s
 </span></code></pre><pre><code class="language-julia hljs">@gp hh coords(dom) model() &quot;w l t &#39;Model&#39; lw 3&quot;</code></pre><p><img src="assets/gaussian.png" alt/></p><p>A similar problem in 2D can be handled as follows:</p><pre><code class="language-julia hljs">using Random, GFit, Gnuplot
 
@@ -173,17 +173,17 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 ╭───────────┬─────────┬───────┬───────────┬───────────┬────────┬───────╮
 │ Component │ Param.  │ Range │ Value     │ Uncert.   │ Actual │ Patch │
 ├───────────┼─────────┼───────┼───────────┼───────────┼────────┼───────┤
-│ main      │ norm    │ 0:Inf │      5022 │     32.84 │        │       │
-│           │ centerX │       │     1.017 │   0.00665 │        │       │
-│           │ centerY │       │  0.004097 │   0.01309 │        │       │
-│           │ sigmaX  │ 0:Inf │     2.002 │   0.01309 │        │       │
-│           │ sigmaY  │ 0:Inf │     1.017 │  0.006646 │        │       │
-│           │ angle   │       │    -271.1 │    0.3623 │        │       │
+│ main      │ norm    │ 0:Inf │      9986 │     53.93 │        │       │
+│           │ centerX │       │    0.9977 │  0.005588 │        │       │
+│           │ centerY │       │  0.009799 │   0.01071 │        │       │
+│           │ sigmaX  │ 0:Inf │     1.036 │  0.005616 │        │       │
+│           │ sigmaY  │ 0:Inf │     1.985 │   0.01071 │        │       │
+│           │ angle   │       │   0.09593 │    0.3134 │        │       │
 ╰───────────┴─────────┴───────┴───────────┴───────────┴────────┴───────╯
 <span class="sgr32">Fit results:</span>
-    #Data :      272              #Free params  :          6
-    DOF   :      266              Red. fit stat.:     42.149
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.004 s
+    #Data :      160              #Free params  :          6
+    DOF   :      154              Red. fit stat.:     56.163
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.002 s
 </span></code></pre><h2 id="SumReducer"><a class="docs-heading-anchor" href="#SumReducer">SumReducer</a><a id="SumReducer-1"></a><a class="docs-heading-anchor-permalink" href="#SumReducer" title="Permalink"></a></h2><p>A component calculating the element-wise sum of a (potentially large) number of other components.</p><p>The <code>SumReducer</code> constructor is defined as follows:</p><pre><code class="language-julia hljs">SumReducer(args::AbstractSet{Symbol})
 SumReducer(args::Vector{Symbol})
 SumReducer(args::Vararg{Symbol})</code></pre><p>where the <code>Symbol</code>s represent the component names</p><p>The <code>SumReducer</code> component has no parameter.</p><h4 id="Example"><a class="docs-heading-anchor" href="#Example">Example</a><a id="Example-1"></a><a class="docs-heading-anchor-permalink" href="#Example" title="Permalink"></a></h4><pre><code class="language-julia hljs">using GFit
@@ -212,5 +212,5 @@ res = fit!(model, data)</code></pre><pre class="documenter-example-output"><code
 <span class="sgr32">Fit results:</span>
     #Data :        5              #Free params  :          3
     DOF   :        2              Red. fit stat.:    0.70582
-    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.003 s
-</span></code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="concepts.html">« Basic concepts and data types</a><a class="docs-footer-nextpage" href="customcomp.html">Custom components »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Thursday 19 January 2023 09:31">Thursday 19 January 2023</span>. Using Julia version 1.8.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    Status: <span class="sgr32">      OK</span>              Elapsed time  :      0.001 s
+</span></code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="concepts.html">« Basic concepts and data types</a><a class="docs-footer-nextpage" href="customcomp.html">Custom components »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Friday 20 January 2023 12:35">Friday 20 January 2023</span>. Using Julia version 1.8.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
