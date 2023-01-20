@@ -10,7 +10,7 @@ saveas(file) = save(term="pngcairo size 550,350 fontscale 0.8", output="assets/$
 
 # Parameter constraints
 
-Models are characterized by *parameters* (see [Basic concepts and data types](@ref)) whose values are modified during fitting until a convergence criterion is met, and the *best fit* values are identified.  In many cases, however, the parameters can not vary arbitrarily but should satisfy some constraints for their values to be meaningful.  **GFit.jl** supports the definition of constraints by fixing the parameter to a specific value, limiting the value in a user defined range, or by dynamically calculating its value using a mathematical expression and the other parameter values. In the latter case the parameter is said to be *patched* through a mathematical relationship. Finally, **GFit.jl** also supports the definition of parametrized patch expressions, involving both the patched parameter as well as other ones.
+Models are characterized by *parameters* (see [Basic concepts and data types](@ref)) whose values are modified during fitting until a convergence criterion is met, and the *best fit* values are identified.  In many cases, however, the parameters can not vary arbitrarily but should satisfy some constraints for their values to be meaningful.  **GFit.jl** supports the definition of constraints by fixing the parameter to a specific value, limiting the value in a user defined range, or by dynamically calculating its value using a mathematical expression involving other parameter values.  In the latter case the parameter is not free to vary in the fit since its actual value is determined by the patch constraint, hence it is dubbed a *patched* parameter.  Such unused parameter can optionally be repurposed as a new free parameter in a *parametrized patch expression* (see example below).
 
 An important concept to bear in mind is that the [`GFit.Parameter`](@ref) structure provides two field for the associated numerical value:
 - `val`: is the parameter value which is being varied by the minimizer during fitting.  The value set before the fitting is the *guess* value.  The value after fitting is the *best fit* one;
@@ -20,9 +20,9 @@ A parameter constraint is defined by explicitly modifiying the fields of the cor
 1. to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
 1. to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
 1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`).  In this case the parameter is assumed to be fixed;
-1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@λ`](@ref) macro) which must accept a single argument (a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
-1. to use a parametrized patch expression simply create a a λ-function with two arguments: the first has the same meaning as in the previous case, and the second will be the parameter value.  Note that in this case the patched parameter loses its original meaning, and becomes the parameter of the patch expression.
-1. if the patch expression involves parameters from another model in a [Multi-dataset fitting](@ref) scenario simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the [`MultiModel`](@ref) object.
+1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@λ`](@ref) macro) which must accept a single argument (which can be used as a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
+1. to define a parametrized patch expression: create a a λ-function with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
+1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the [`MultiModel`](@ref) object.
 
 The following examples show how to define constraints for each of the afore-mentioned cases.
 
@@ -60,7 +60,7 @@ println() # hide
 model[:l2].sigma.patch = @λ m -> 2 * m[:l1].sigma
 println() # hide
 ```
-- the center of `l2` must be at a larger coordinate than the center of `l1`.  In this case we create a parametrized patch expression where the parameter is reinterpreted as the distance between the two centers:
+- the center of `l2` must be at a larger coordinate with respect to the center of `l1`.  In this case we re-interpret the `model[:l2].center` parameter as the distance between the two centers, and create a parametrized patch expression to calculate the actual center value of `l2`:
 ```@example abc
 model[:l2].center.patch = @λ (m, v) -> v + m[:l1].center
 model[:l2].center.val = 1   # guess value for the distance between the centers
@@ -81,3 +81,6 @@ using Gnuplot
 saveas("example_patch1") # hide
 ```
 ![](assets/example_patch1.png)
+
+
+See [Multi-dataset fitting](@ref) for an example on how to create a patch epression involving multiple models.
