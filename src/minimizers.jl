@@ -6,6 +6,9 @@ abstract type AbstractMinimizerStatus end
 
 
 # --------------------------------------------------------------------
+struct MinimizerStatusDry <: AbstractMinimizerStatus
+end
+
 struct MinimizerStatusOK <: AbstractMinimizerStatus
     internal
 end
@@ -20,7 +23,6 @@ struct MinimizerStatusError <: AbstractMinimizerStatus
     internal
 end
 
-as_string(::Nothing) = (crayon"bold red", "DRY", "")
 function as_string(status::AbstractMinimizerStatus)
     if isa(status, MinimizerStatusOK)
         return (crayon"green", "OK", "")
@@ -28,11 +30,24 @@ function as_string(status::AbstractMinimizerStatus)
         return (crayon"bold yellow", "WARNING", status.message)
     elseif isa(status, MinimizerStatusError)
         return (crayon"bold red", "ERROR", status.message)
+    elseif isa(status, MinimizerStatusDry)
+        return (crayon"bold red", "DRY", "")
     else
         error("Unsupported type: $(typeof(status))")
     end
 end
 
+
+# --------------------------------------------------------------------
+struct dry <: AbstractMinimizer; end
+function fit!(minimizer::dry, fp::AbstractFitProblem)
+    params = free_params(fp)
+    println(params)
+    finalize!(fp,
+              getfield.(params, :val),
+              fill(NaN, length(params)))
+    return MinimizerStatusDry()
+end
 
 
 # --------------------------------------------------------------------

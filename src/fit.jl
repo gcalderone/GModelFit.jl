@@ -179,3 +179,21 @@ function fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractM
     status = fit!(minimizer, fp)
     return FitResult(ts, fp, status)
 end
+
+
+"""
+    fit!(model::Model; minimizer::AbstractMinimizer=lsqfit())
+    fit!(model::MultiModel; minimizer::AbstractMinimizer=lsqfit())
+
+Fit a model against dataset(s) of zeros.
+"""
+fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
+    fit!(model,
+         Measures(domain(model), fill(0., length(domain(model))), 1.);
+         minimizer=minimizer)
+
+fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
+    fit!(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
+         minimizer=minimizer)
+
+
