@@ -183,7 +183,7 @@ function tabledeps(model::Model, cname::Symbol, level::Int)
                 model.cevals[cname].counter,
                 minimum(v), maximum(v), mean(v),
                 count(isnan.(result)) + count(isinf.(result))))
-    deps = dependencies(model[cname])
+    deps = dependencies(model, cname)
     for i in 1:length(deps)
         append!(out, tabledeps(model, deps[i], level+1))
     end

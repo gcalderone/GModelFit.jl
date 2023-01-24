@@ -310,8 +310,7 @@ function find_maincomp(model::Model)
 
     maincomps = collect(keys(model.cevals))
     for (cname, ceval) in model.cevals
-        for d in dependencies(ceval.comp)
-            @assert d in maincomps "$cname depends on $d, but the latter is not a component in the model."
+        for d in dependencies(model, cname)
             i = findfirst(maincomps .== d)
             deleteat!(maincomps, i)
         end
@@ -320,7 +319,7 @@ function find_maincomp(model::Model)
     if length(maincomps) > 1
         # Ignoring components with no dependencies
         for (cname, ceval) in model.cevals
-            if length(dependencies(ceval.comp)) == 0
+            if length(dependencies(model, cname)) == 0
                 i = findfirst(maincomps .== cname)
                 if !isnothing(i)
                     deleteat!(maincomps, i)
@@ -336,6 +335,27 @@ function find_maincomp(model::Model)
 
     return maincomps[end]
 end
+
+
+function dependencies(model::Model, cname::Symbol; select_domain=false)
+    domdeps = Vector{Symbol}()
+    compdeps = Vector{Symbol}()
+
+    for d in dependencies(model.cevals[cname].comp)
+        if haskey(model.cevals, d)
+            # Dependencies with known name
+            push!(compdeps, d)
+        else
+            # Dependencies with unknown name is intended as a domain dimension
+            @assert length(compdeps) == 0 "Domain dependencies must be listed first"
+            @assert length(domdeps) <= ndims(domain(model)) "$cname depends on $d, but the latter is not a component in the model."
+            push!(domdeps, d)
+        end
+    end
+
+    return (select_domain ? domdeps : compdeps)
+end
+
 
 
 """
@@ -408,7 +428,11 @@ function eval_step0(model::Model)
         end
 
         empty!(ceval.deps)
-        for d in dependencies(ceval.comp)
+        i = 1
+        for d in dependencies(model, cname, select_domain=true)
+            push!(ceval.deps, coords(domain(model), i))
+        end
+        for d in dependencies(model, cname, select_domain=false)
             push!(ceval.deps, model.buffers[d])
         end
     end
@@ -462,7 +486,7 @@ end
 eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
 function eval_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
-    for d in dependencies(model.cevals[cname].comp)
+    for d in dependencies(model, cname)
         eval_step3(model, d)
     end
     evaluate!(model.cevals[cname], model.domain, values(model.actual[cname]))

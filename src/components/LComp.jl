@@ -33,24 +33,13 @@ getproperty(comp::λComp, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::λComp) = getfield(comp, :deps)
 
 
-function prepare!(comp::λComp, domain::AbstractDomain)
-    # Discard as many arguments as the number of dimensions in the domain
-    deps = getfield(comp, :deps)
-    for i in 1:ndims(domain)
-        if length(deps) > 0
-            deleteat!(deps, 1)
-        end
-    end
-    fill(NaN, length(domain))
-end
-
 # We need to implement two evaluate! methods, with/without deps argument respectively
 function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    params...)
-    buffer .= getfield(comp, :func)(domain..., params...)
+    buffer .= getfield(comp, :func)(params...)
 end
 
 function evaluate!(buffer::Vector{Float64}, comp::λComp, domain::AbstractDomain,
                    deps, params...)
-    buffer .= getfield(comp, :func)(domain..., deps..., params...)
+    buffer .= getfield(comp, :func)(deps..., params...)
 end
