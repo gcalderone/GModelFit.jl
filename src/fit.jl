@@ -192,7 +192,7 @@ fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
          Measures(domain(model), fill(0., length(domain(model))), 1.);
          minimizer=minimizer)
 
-fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
+fit!(model::MultiModel; minimizer::AbstractMinimizer=lsqfit()) =
     fit!(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
          minimizer=minimizer)
 
