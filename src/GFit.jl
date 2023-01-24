@@ -99,25 +99,56 @@ end
 #
 # A *component* is a generic implementation of a building block for a
 # model. It must inherit `AbstractComponent` and implement the
-# `evaluate!` method.  The structure may
-# contain zero or more field of type Parameter, or a single field of
-# type OrderedDict{Symbol, Parameter}()
+# `evaluate!` method.  The structure may contain zero or more field of
+# type Parameter, a Vector{Parameter}, or have all parameters
+# collected in a single field of type OrderedDict{Symbol, Parameter}()
 abstract type AbstractComponent end
 
-# Fall back methods
+# Note: this function must mirror setparams!()
 function getparams(comp::AbstractComponent)
     out = OrderedDict{Symbol, Parameter}()
     for name in fieldnames(typeof(comp))
         field = getfield(comp, name)
         if isa(field, Parameter)
             out[name] = field
+        elseif isa(field, Vector{Parameter})
+            for i in 1:length(field)
+                iname = Symbol(name, "[", i, "]")
+                out[iname] = field[i]
+            end
         elseif isa(field, OrderedDict{Symbol, Parameter})
+            @assert length(out) == 0  # avoid parameter name clash
             return field
         end
     end
     return out
 end
 
+# Note: this function must mirror getparams()
+function setparams!(comp::AbstractComponent, params::HashVector{Parameter})
+    for name in fieldnames(typeof(comp))
+        field = getfield(comp, name)
+        if isa(field, Parameter)
+            field.val    = params[name].val
+            field.actual = params[name].actual
+        elseif isa(field, Vector{Parameter})
+            for i in 1:length(field)
+                iname = Symbol(name, "[", i, "]")
+                field[i].val    = params[iname].val
+                field[i].actual = params[iname].actual
+            end
+        elseif isa(field, OrderedDict{Symbol, Parameter})
+            for (name, par) in field
+                par.val    = params[name].val
+                par.actual = params[name].actual
+            end
+        end
+    end
+    nothing
+end
+
+
+# Fall back methods
 dependencies(comp::AbstractComponent) = Symbol[]
 
 prepare!(comp::AbstractComponent, domain::AbstractDomain) =
@@ -128,6 +159,7 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
 
 # Built-in components
 include("components/LComp.jl")
+include("components/FComp.jl")
 include("components/OffsetSlope.jl")
 include("components/Polynomial.jl")
 include("components/Gaussian.jl")
@@ -458,11 +490,7 @@ function eval_step4(model::Model, uncerts=Vector{Float64}[])
 
     # Also update Model's parameters
     for (cname, ceval) in model.cevals
-        for (pname, par) in getparams(ceval.comp)
-            par.val    = model.params[cname][pname].val
-            par.actual = model.params[cname][pname].actual
-            par.unc = NaN
-        end
+        setparams!(ceval.comp, model.params[cname])
     end
 end
 
