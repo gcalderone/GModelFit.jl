@@ -14,8 +14,8 @@ saveas(file) = save(term="pngcairo size 550,350 fontscale 0.8", output="assets/$
 The **GFit.jl** provides several built-in components which may be used to build arbitrarily complex models.
 
 
-## λComp
-The `λComp` component is a wrapper for a user defined lambda function (namely a [`GFit.λFunct`](@ref) object, as obtained by the [`@λ`](@ref) macro).  The function is typically a mathematical expression combining any number of parameters and/or other component evaluations within the same model.  The expression should be given in the form:
+## FComp
+The `FComp` component is a wrapper for a user defined lambda function (namely a [`GFit.λFunct`](@ref) object, as obtained by the [`@λ`](@ref) macro).  The function is typically a mathematical expression combining any number of parameters and/or other component evaluations within the same model.  The expression should be given in the form:
 ```
 @λ (x, [y, [further domain dimensions...],]
     [comp1, [comp2, [further components ...],]]
@@ -25,12 +25,12 @@ The `λComp` component is a wrapper for a user defined lambda function (namely a
 where the mathematical expression returns a `Vector{Float64}` with the same length as the model domain (regardless of the number of dimensions involved).
 
 
-The `λComp` constructor is defined as follows:
+The `FComp` constructor is defined as follows:
 
 ```julia
-λComp(f::λFunct)
+FComp(f::λFunct)
 ```
-however there is no need to explicitly invoke such constructor since a `λComp` object is automatically created whenever a `λFunct` is added to the model. This components works with domains of any dimensionality.
+however there is no need to explicitly invoke such constructor since a `FComp` object is automatically created whenever a `λFunct` is added to the model. This components works with domains of any dimensionality.
 
 
 #### Examples
@@ -46,7 +46,7 @@ data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 res = fit!(model, data)
 ```
 
-The evaluation of a `λComp` component may also involve the outcomes from other components. Continuing from previous example, whose fit was clearly a poor one, we may add a quadratic term to the previously defined `linear` component:
+The evaluation of a `FComp` component may also involve the outcomes from other components. Continuing from previous example, whose fit was clearly a poor one, we may add a quadratic term to the previously defined `linear` component:
 ```@example abc
 model[:quadratic] = @λ (x, linear, p2=1) -> (linear .+ p2 .* x.^2)
 res = fit!(model, data)
