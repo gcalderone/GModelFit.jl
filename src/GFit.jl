@@ -158,7 +158,6 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
     error("No evaluate!() method implemented for $T")
 
 # Built-in components
-include("components/LComp.jl")
 include("components/FComp.jl")
 include("components/OffsetSlope.jl")
 include("components/Polynomial.jl")
