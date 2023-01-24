@@ -267,7 +267,7 @@ mutable struct Model   # mutable because of parent and maincomp
                 if isa(arg[2], AbstractComponent)
                     out[arg[1]] = arg[2]
                 elseif isa(arg[2], λFunct)
-                    out[arg[1]] = λComp(arg[2])
+                    out[arg[1]] = FComp(arg[2])
                 # elseif isa(arg[2], Number)
                 #     out[arg[1]] = SimplePar(arg[2])
                 else
@@ -279,7 +279,7 @@ mutable struct Model   # mutable because of parent and maincomp
         end
 
         parse_args(arg::AbstractComponent) = parse_args(:main => arg)
-        parse_args(arg::λFunct) = parse_args(:main => λComp(arg))
+        parse_args(arg::λFunct) = parse_args(:main => FComp(arg))
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
@@ -520,7 +520,7 @@ end
 
 # User interface
 # setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
-setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, λComp(f), cname)
+setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, FComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
