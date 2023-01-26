@@ -339,19 +339,19 @@ end
 function dependencies(model::Model, cname::Symbol; select_domain=false)
     domdeps = Vector{Symbol}()
     compdeps = Vector{Symbol}()
-
+    nd = ndims(domain(model))
     for d in dependencies(model.cevals[cname].comp)
         if haskey(model.cevals, d)
-            # Dependencies with known name
+            # Dependency with known name
             push!(compdeps, d)
         else
-            # Dependencies with unknown name is intended as a domain dimension
+            # Dependency with unknown name is intended as a domain dimension
             @assert length(compdeps) == 0 "Domain dependencies must be listed first"
-            @assert length(domdeps) <= ndims(domain(model)) "$cname depends on $d, but the latter is not a component in the model."
+            @assert length(domdeps) < nd "Component $cname depends on $d, but the latter is not a component in the model."
             push!(domdeps, d)
         end
     end
-
+    @assert (length(domdeps) == 0)  ||  (length(domdeps) == nd) "Domain has $nd dimensions but only $(length(domdeps)) are listed as dependencies"
     return (select_domain ? domdeps : compdeps)
 end
 
