@@ -37,7 +37,7 @@ The following symbols are not exported by the **GFit.jl** package since they are
 
 ```@docs
 GFit.FitResult
-GFit.λFunct
+GFit.FunctDesc
 GFit.Parameter
 GFit.mock
 ```

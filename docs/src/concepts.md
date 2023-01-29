@@ -9,7 +9,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Measures*: a container for the N-dimensional empirical data and their associated $1\sigma$ Gaussian uncertainties, represented by an object of type [`Measures{N}`](@ref) (further options may be available in the future, such as Poisson counts);
 
-- *Model component*: the atomic building block of a (potentially very complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` representing the component evaluation.  A component is a structure inheriting from `GFit.AbstractComponent` and is typically characterized by one or more *parameters* (see below). One component's evaluation can also be used as input for another one's calculation, thus inducing a dependency between the two.  The **GFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user.  The memoization mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none of its parameter values has changed since last evaluation;
+- *Model component*: the atomic building block of a (potentially very complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` representing the component evaluation.  A component is a structure inheriting from `GFit.AbstractComponent` and is typically characterized by one or more *parameters* (see below). One component's evaluation can also be used as input for another one's calculation, thus inducing a dependency between the two.  The **GFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user (see [Custom components](@ref)).  The memoization mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none of its parameter values has changed since last evaluation;
 
 - *Parameter*: a single floating point number characterizing a specific aspect for the evaluation of a component (e.g. the slope of a power law or the width of a Gaussian profile). The parameter values are automatically varied during the fitting process until the residuals between the global model evaluation and the empirical data are minimized.  A parameter can be fixed to a specific value, limited in an interval, and/or be dynamically calculated (patched) according to the values of other parameters.  All parameters are represented by an object of type [`GFit.Parameter`](@ref);
 
@@ -20,10 +20,10 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Fit results*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitResult`](@ref) structure.
 
-- *λ-function* ([`GFit.λFunct`](@ref)): is an anonymous function used in two different contexts within **GFit.jl**:
-  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models in a multi-model analysis;
+- Standard Julia functions can be used by **GFit.jl** in two different contexts:
+  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when performing [Multi-dataset fitting](@ref);
   - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
-  In both cases the λ-function is generated using the [`@λ`](@ref) macro and the standard Julia syntax for anonymous functions.
+  In both cases the Julia function should be properly encapsulated in a [`GFit.FunctDesc`](@ref) structure, which is typically generated using the [`@λ`](@ref) convenience macro.
 
 - *Minimizer*: the **GFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
@@ -35,22 +35,14 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 ## How to access the data structures
 
-Many of the above mentioned data structures are accessible using indexing (as in dictionary or vectors) or a `struct`-like interface, starting from a single [`Model`](@ref) or a [`MultiModel`](@ref) object.  Hence it is important to keep in mind the relationships among these objects to be able to access them:
-```
-Multi-model (`multi`)
- |
- + -- Model 1 (`model`)
- |     |
- |     + -- Component1
- |     |     |
- |     |     + -- Param1
- |     |     + -- Param2
- |     |     + -- ...
- |     + -- Component2
- |     + -- etc.
- + -- Model 2
- + -- ...
-```
+**GFit.jl** interface aims to be easy to use and remember, and the number of exported function is purposely kept to a minimum.  As a consequence, many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or as field of a `struct`-like interface, starting from a single [`Model`](@ref) or a [`MultiModel`](@ref) object. In particular:
+- a `MultiModel` object can be considered as a vector of `Model`s, with the inidivudal element accessible via indexing with an integer number.  Also, the `length()` function will return the number of models in a `MultiModel`;
+- a `Model` object can be considered as a dictionary of components, with `Symbol` keys;
+- a component is a structure, either built-in (see [Built-in components](@ref)) or implemented by the user ([Custom components](@ref)).  The structure fields are supposed to represent the component parameters in one of the following forms:
+  - one or more `Parameter` structures;
+  - a single `OrderedDict{Symbol, Parameter}`;
+  - a single `Vector{Parameter}`.
+- The fields of a component structure, as well as the field of the [`GFit.Parameter`](@ref) structures are accessed using the standard dot (`.`) notation.
 
-E.g. the syntax to access the value of a parameter in a single model case is: `model[:Component1].Param1.val`.  In a multi-model case it is: `multi[1][:Component1].Param1.val`.
+As an example, the syntax to access the value of a parameter in a single model case is: `model[:Component1].Param1.val`.  In a multi-model case it is: `multi[1][:Component1].Param1.val`.
 
