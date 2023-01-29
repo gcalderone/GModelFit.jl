@@ -35,23 +35,46 @@ include("domain.jl")
 
 # ====================================================================
 """
-    λFunct
+    FunctDesc
 
-A representation for a λ-function, containing a reference to the function itself, a string representation of its source code (for displaying purposes) and a list of arguments.  It is typically created using the @λ macro.
+A "Julia function" descriptor containing the reference to the function itself, a string representation of its source code definition (for displaying purposes) and the lists of its arguments.  It can be invoked using the standard syntax for functions
+
+### Example:
+```
+julia> f = GFit.FunctDesc((x, p=0) -> x + p,    # actual function definition
+                          "(x, p=0) -> x + p",  # string representation
+                          [:x],                 # vector of argument namess
+                          [:(p = 0)])           # vector of `Expr` with arguments default values
+julia> f(1, 2)
+3
+```
+
+Note that it is unpractical to directly create a `FunctDescr` using its constructor, and the above results can be obtained using the @λ macro:
+```
+f = @λ (x, p=0) -> x + p
+```
+
 """
-struct λFunct
+struct FunctDesc
     funct::Function
     display::String
     args::Vector{Symbol}   # positional arguments
     optargs::Vector{Expr}  # optional arguments with default values
 end
-(f::λFunct)(args...; kws...) = f.funct(args...; kws...)
+(f::FunctDesc)(args...; kws...) = f.funct(args...; kws...)
 
 """
     @λ expr
 
-Macro to generate `λFunct` objects using the same syntax as in a standard Julia anonymous function.
-Example: `@λ (x, f) -> f .* x`
+Macro to generate a `FunctDesc` object using the same syntax as in a standard Julia anonymous function.
+
+### Example
+```
+julia> f = @λ (x, p=0) -> x + p
+
+julia> f(1, 2)
+3
+```
 """
 macro λ(_expr)
     @assert isexpr(longdef(_expr), :function)
@@ -59,7 +82,7 @@ macro λ(_expr)
     def  = splitdef(expr)
     args    = convert(Vector{Symbol}, filter(x -> isa(x, Symbol), def[:args]))
     optargs = convert(Vector{Expr}  , filter(x -> isa(x, Expr)  , def[:args]))
-    return esc(:(GFit.λFunct($expr, string($(QuoteNode(expr))), $args, $optargs)))
+    return esc(:(GFit.FunctDesc($expr, string($(QuoteNode(expr))), $args, $optargs)))
 end
 
 
@@ -74,8 +97,8 @@ A structure representing a model parameter.
  - `low::Float64`: lower limit for the value (default: `-Inf`);
  - `high::Float64`: upper limit for the value (default: `+Inf`);
  - `fixed::Bool`: whether the parameter is fixed during fitting (default: `false`);
- - `patch::Union{Nothing, Symbol, λFunct}`: patch prescription within the same model;
- - `mpatch::Union{Nothing, λFunct}`: patch prescription in a multi-model analysis;
+ - `patch::Union{Nothing, Symbol, FunctDesc}`: patch prescription within the same model;
+ - `mpatch::Union{Nothing, FunctDesc}`: patch prescription in a multi-model analysis;
  - `actual::Float64`: actual value for the parameter (i.e. after applying the patch prescription)`;
  - `unc::Float64`: 1σ uncertainty associated to the parameter value.
 
@@ -86,8 +109,8 @@ mutable struct Parameter
     low::Float64              # lower limit value
     high::Float64             # upper limit value
     fixed::Bool
-    patch::Union{Nothing, Symbol, λFunct}
-    mpatch::Union{Nothing, λFunct}
+    patch::Union{Nothing, Symbol, FunctDesc}
+    mpatch::Union{Nothing, FunctDesc}
     actual::Float64
     unc::Float64
     Parameter(value::Number) = new(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
@@ -223,7 +246,7 @@ Constructor is: `Model(domain::AbstractDomain, components...)`
 where the first argument is either a `Domain` or `CartesianDomain` object, and the remaining one(s) is (are) the model component(s), which may be given as:
 - a single `Dict{Symbol, AbstractComponent}`, where the keys are the names and the values the component objects;
 - a single component, which will have a default name is assigned (`:main`);
-- a single `λFunct`, which will be wrapped into an `LComp` component and a default name will be assigned (`:main`);
+- a single `FunctDesc`, which will be wrapped into an `LComp` component and a default name will be assigned (`:main`);
 - one or more `Pair{Symbol, AbstractComponent}`, where the first element is the name and the second is the component.
 
 You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same synatx.  Finally, you may use the `keys()` and `haskey()` functions with their usual meanings.
@@ -266,20 +289,20 @@ mutable struct Model   # mutable because of parent and maincomp
             for arg in args
                 if isa(arg[2], AbstractComponent)
                     out[arg[1]] = arg[2]
-                elseif isa(arg[2], λFunct)
+                elseif isa(arg[2], FunctDesc)
                     out[arg[1]] = FComp(arg[2])
                 # elseif isa(arg[2], Number)
                 #     out[arg[1]] = SimplePar(arg[2])
                 else
                     error("Unsupported data type: " * string(typeof(arg[2])) *
-                          ".  Must be an AbstractComponent, a λFunct or a real number.")
+                          ".  Must be an AbstractComponent, a FunctDesc or a real number.")
                 end
             end
             return parse_args(out)
         end
 
         parse_args(arg::AbstractComponent) = parse_args(:main => arg)
-        parse_args(arg::λFunct) = parse_args(:main => FComp(arg))
+        parse_args(arg::FunctDesc) = parse_args(:main => FComp(arg))
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
@@ -520,7 +543,7 @@ end
 
 # User interface
 # setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
-setindex!(model::Model, f::λFunct, cname::Symbol) = setindex!(model, FComp(f), cname)
+setindex!(model::Model, f::FunctDesc, cname::Symbol) = setindex!(model, FComp(f), cname)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval

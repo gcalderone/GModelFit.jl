@@ -118,8 +118,8 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         (range == "-Inf:Inf")  &&  (range = "")
         patch = ""
         isa(param.patch, Symbol)  &&  (patch = string(param.patch))
-        isa(param.patch, λFunct)  &&  (patch = param.patch.display)
-        isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
+        isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
+        isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
                      [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (patch == ""  ?  ""  :  param.actual) patch])
         push!(fixed, param.fixed)
@@ -141,7 +141,7 @@ function show(io::IO, comp::AbstractComponent)
 end
 
 
-function show(io::IO, red::λFunct)
+function show(io::IO, red::FunctDesc)
     println(io, red.display)
 end
 
@@ -255,8 +255,8 @@ function show(io::IO, bestfit::HashHashVector{Parameter})
             (range == "-Inf:Inf")  &&  (range = "")
             patch = ""
             isa(param.patch, Symbol)  &&  (patch = string(param.patch))
-            isa(param.patch, λFunct)  &&  (patch = param.patch.display)
-            isa(param.mpatch,λFunct)  &&  (patch = param.mpatch.display)
+            isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
+            isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
             table = vcat(table,
                          [scname parname range param.val param.unc (patch == ""  ?  ""  :  param.actual) patch])
             push!(fixed, param.fixed)

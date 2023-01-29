@@ -3,7 +3,7 @@ struct FComp <: AbstractComponent
     deps::Vector{Symbol}
     params::OrderedDict{Symbol, Parameter}
 
-    function FComp(f::λFunct)
+    function FComp(f::FunctDesc)
         deps = deepcopy(f.args)
         params = OrderedDict{Symbol, Parameter}()
         for i in 1:length(f.optargs)

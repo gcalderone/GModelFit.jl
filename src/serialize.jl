@@ -15,7 +15,7 @@ function evaluate!(buffer::Vector{Float64}, comp::DummyComp, domain::AbstractDom
     nothing
 end
 
-# Named function used to create serializable λFunct objects
+# Named function used to create serializable FunctDesc objects
 function dummyfunct(args...)
     @warn "Can't evaluate a dummy function!"
     nothing
@@ -24,15 +24,15 @@ end
 
 # The `serializable` methods are supposed to create copies of GFit
 # objects replacing all non-serializable items (such as
-# component instances and λFunct) with dummy ones.
-serializable(f::λFunct) = λFunct(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
+# component instances and FunctDesc) with dummy ones.
+serializable(f::FunctDesc) = FunctDesc(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
 
 
 function serializable!(par::Parameter)
-    if isa(par.patch, λFunct)
+    if isa(par.patch, FunctDesc)
         par.patch  = serializable(par.patch)
     end
-    if isa(par.mpatch, λFunct)
+    if isa(par.mpatch, FunctDesc)
         par.mpatch = serializable(par.mpatch)
     end
 end
@@ -101,7 +101,7 @@ end
 
 Save a binary snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel, `Domain`, `Measures`, etc using the standard `Serialization` package.  The snapshot can be restored in a later session, and the objects will be similar to the original ones, with the following notable differences:
 - in `Model` objects, all components are casted into `GFit.DummyComp` ones.  The original type is availble (as a string) via the `original_type()` function, while the content of the original structure is lost;
-- all `λFunct` objects retain their textual representation, but the original function is lost;
+- all `FunctDesc` objects retain their textual representation, but the original function is lost;
 - `Model` and `MultiModel` objects, as well as all the components, retain their last evaluated values but they can no longer be evaluated (an attempt to invoke `evaluate()` will result in an error);
 
 The reason to introduce such differences is to ensure that all data structures being serialized are defined within the `GFit` package with no further external depencency, and to overcome limitation of the `Serialization` package related to, e.g., anonymous functions.
@@ -149,7 +149,7 @@ function todict(vv)
     out = OrderedDict{Symbol, Any}()
     out[:_structtype] = string(tt)
     for fname in fieldnames(tt)
-        if  (tt == GFit.λFunct)  && 
+        if  (tt == GFit.FunctDesc)  && 
             (fname == :funct)
             out[fname] = nothing
         else
