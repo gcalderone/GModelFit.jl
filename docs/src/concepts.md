@@ -37,12 +37,9 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 **GFit.jl** interface aims to be easy to use and remember, and the number of exported function is purposely kept to a minimum.  As a consequence, many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or as field of a `struct`-like interface, starting from a single [`Model`](@ref) or a [`MultiModel`](@ref) object. In particular:
 - a `MultiModel` object can be considered as a vector of `Model`s, with the inidivudal element accessible via indexing with an integer number.  Also, the `length()` function will return the number of models in a `MultiModel`;
-- a `Model` object can be considered as a dictionary of components, with `Symbol` keys;
-- a component is a structure, either built-in (see [Built-in components](@ref)) or implemented by the user ([Custom components](@ref)).  The structure fields are supposed to represent the component parameters in one of the following forms:
-  - one or more `Parameter` structures;
-  - a single `OrderedDict{Symbol, Parameter}`;
-  - a single `Vector{Parameter}`.
-- The fields of a component structure, as well as the field of the [`GFit.Parameter`](@ref) structures are accessed using the standard dot (`.`) notation.
+- a `Model` object can be considered as a dictionary of components, with `Symbol` keys. The `keys()` function will return the name of components in the model;
+- a component is a structure, either built-in (see [Built-in components](@ref)) or implemented by the user ([Custom components](@ref)).  One or more structure fields are supposed to represent the component parameters (i.e. objects of type [`GFit.Parameter`](@ref));
+- The fields of a component structure, as well as the fields of the [`GFit.Parameter`](@ref)) structures are accessed using the standard dot (`.`) notation.
 
 As an example, the syntax to access the value of a parameter in a single model case is: `model[:Component1].Param1.val`.  In a multi-model case it is: `multi[1][:Component1].Param1.val`.
 
