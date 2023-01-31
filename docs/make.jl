@@ -14,7 +14,6 @@ makedocs(sitename="Gfit.jl",
              "Viewers" => "viewers.md",
              "Minimizers" => "minimizers.md",
              "Miscellaneous" => "misc.md",
-             "Examples" => "examples.md",
              "API" => "api.md"
          ])
 Gnuplot.quitall()

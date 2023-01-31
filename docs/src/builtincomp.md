@@ -16,7 +16,7 @@ The **GFit.jl** provides several built-in components which may be used to build 
 
 ## FComp
 
-The `FComp` component is a wrapper to use a standard Julia function as actual implementation for a component evaluation.  It comes in two flavours: `FComp` based on one or more named scalar parameters, and `FCompv` (see next section) based on a vector of unnamed parameters.  The `FComp` constructors are defined as follows:
+The `FComp` component is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  It comes in two flavours: `FComp` based on one or more named scalar parameters, and `FCompv` (see next section) based on a vector of unnamed parameters.  The `FComp` constructors are defined as follows:
 
 ```julia
 FComp(funct::Function, deps=Symbol[]; par1=guess1, par2=guess2, ...)
@@ -46,7 +46,7 @@ In the second constructor a [`GFit.FunctDesc`](@ref) object is accepted, as gene
 @λ (x, [y, [further domain dimensions...],]
     [comp1, [comp2, [further components ...],]]
     [par1=guess1, [par2=guess2, [further parameters]]]) ->
-	(mathematical expression)
+    (mathematical expression)
 ```
 where the mathematical expression returns a `Vector{Float64}` with the same length as the model domain (regardless of the number of dimensions involved).
 
@@ -83,8 +83,16 @@ println("p2: ", res.bestfit[:quadratic].p2.val, " ± ", res.bestfit[:quadratic].
 
 ## FCompv
 
+Just like `FComp`, also `FCompv` is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  However, `FCompv` parameters are stored in a vector, rather than being named ones.  The `FCompv` constructor is defined as follows:
 
+```julia
+FComp(funct::Function, deps=Symbol[], guess=Float64[])
+```
+where `funct` is the Julia function, `deps` is a vector of dependencies (either the domain dimensions or other component names) and `guess` is a vector of initial guess values.
 
+#### Example
+
+TODO
 
 
 ## OffsetSlope
@@ -145,9 +153,6 @@ res = fit!(model, data)
 
 
 
-
-
-
 ## Polynomial
 
 A *n*-th degree polynomial function (*n > 1*) for 1D domains.
@@ -157,7 +162,7 @@ The constructor is defined as follows:
 - `GFit.Polynomial(p1, p2, ...)`;
   where `p1`, `p2`, etc. are the guess values for the coefficients of each degree of the polynomial.
 
-The parameters are labelled: `p1`, `p2`, etc.
+The parameters are accessible via the `p` vector, as: `p[1]`, `p[2]`, etc.
 
 #### Examples
 ```@example abc

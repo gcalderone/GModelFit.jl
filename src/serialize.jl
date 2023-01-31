@@ -99,7 +99,7 @@ end
 """
     snapshot(filename::String, args...)
 
-Save a binary snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel, `Domain`, `Measures`, etc using the standard `Serialization` package.  The snapshot can be restored in a later session, and the objects will be similar to the original ones, with the following notable differences:
+Save a binary snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel`, `Domain`, `Measures`, etc using the standard `Serialization` package.  The snapshot can be restored in a later session, and the objects will be similar to the original ones, with the following notable differences:
 - in `Model` objects, all components are casted into `GFit.DummyComp` ones.  The original type is availble (as a string) via the `original_type()` function, while the content of the original structure is lost;
 - all `FunctDesc` objects retain their textual representation, but the original function is lost;
 - `Model` and `MultiModel` objects, as well as all the components, retain their last evaluated values but they can no longer be evaluated (an attempt to invoke `evaluate()` will result in an error);
