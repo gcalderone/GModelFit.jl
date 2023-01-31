@@ -83,16 +83,36 @@ println("p2: ", res.bestfit[:quadratic].p2.val, " ± ", res.bestfit[:quadratic].
 
 ## FCompv
 
-Just like `FComp`, also `FCompv` is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  However, `FCompv` parameters are stored in a vector, rather than being named ones.  The `FCompv` constructor is defined as follows:
+Just like `FComp`, also `FCompv` is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  However, `FCompv` parameters are stored in a vector, rather than being named ones.  The `FCompv` constructors are defined as follows:
 
 ```julia
-FComp(funct::Function, deps=Symbol[], guess=Float64[])
+FComp(funct::Function, guess::Vector{Float64})
+FComp(funct::Function, deps::Vector{Symbol}, guess::Vector{Float64})
 ```
-where `funct` is the Julia function, `deps` is a vector of dependencies (either the domain dimensions or other component names) and `guess` is a vector of initial guess values.
+where `funct` is the Julia function, `deps` is an optional vector of dependencies (either the domain dimensions or other component names) and `guess` is a vector of initial guess values.
 
 #### Example
+In the following example we will estimate the vector `x` satisfying the linear equation `Ax = b`, where `A` and `b` are:
+```@example abc
+A = [1.43  2.17 -0.38
+     0.21 -0.33 -1.71
+    -1.23 -1.16  0.83
+    -2.09  0.44  0.64]
+b = [3.14, -8.48, 0.53, 0.54]
+println() # hide
+```
 
-TODO
+To define the model we will rewrite the equation as `Ax - b = 0`, and define a model as follows
+```@example abc
+dom = Domain(length(b))  # dummy domain
+model = Model(dom, GFit.FCompv(x -> A*x - b,
+                               [1, 1, 1]))
+println() # hide
+```
+where `x = [1, 1, 1]` are the initial guess values for the three parameters in the fit.  In this case there is no *empirical data* to compare the model to since we already inserted the data into the model.  When the `fit!` function is invoked with just one argument (the model) the data are assumed to zeros, with equal weights (i.e. all uncertainties are 1);
+```@example abc
+res = fit!(model)
+```
 
 
 ## OffsetSlope
