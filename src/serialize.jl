@@ -160,6 +160,7 @@ function todict(vv)
 
     # Add :show key
     plain = GFit.showsettings.plain
+    GFit.showsettings.plain = true
     try
         io = IOBuffer()
         show(io, vv)
