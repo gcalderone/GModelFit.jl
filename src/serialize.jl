@@ -62,6 +62,7 @@ function serializable(source::Model)
     for (cname, ceval) in source.cevals
         model.cevals[cname] = serializable(ceval, model.domain)
     end
+    model.maincomp = find_maincomp(source)
     return model
 end
 
@@ -142,7 +143,7 @@ end
 function todict(vv)
     tt = typeof(vv)
     @assert isstructtype(tt) "Unsupported type: $(string(tt))"
-    @assert parentmodule(tt) == GFit
+    # @assert parentmodule(tt) == GFit
     if tt <: AbstractComponent
         @assert tt == DummyComp "Can't serialize instances of $(string(tt))"
     end
@@ -156,6 +157,18 @@ function todict(vv)
             out[fname] = todict(getfield(vv, fname))
         end
     end
+
+    # Add :show key
+    plain = GFit.showsettings.plain
+    try
+        io = IOBuffer()
+        show(io, vv)
+        out[:show] = String(take!(io))
+    catch err
+        @warn "Expception while invoking show($(tt))"
+        println(err)
+    end
+    GFit.showsettings.plain = plain
     return out
 end
 
@@ -169,6 +182,7 @@ function todict(vv::AbstractDict{Symbol,T}) where {T <: Any}
 end
 
 todict(::Nothing) = nothing
+todict(v::DateTime) = string(v)
 todict(v::String) = v
 todict(v::Symbol) = string(v)
 todict(v::Number) = v
