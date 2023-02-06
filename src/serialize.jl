@@ -166,7 +166,7 @@ function todict(vv)
         show(io, vv)
         out[:show] = String(take!(io))
     catch err
-        @warn "Expception while invoking show($(tt))"
+        @warn "Exception caught while invoking show($(tt))"
         println(err)
     end
     GFit.showsettings.plain = plain
