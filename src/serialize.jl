@@ -13,26 +13,26 @@ _serialize(v::Tuple) = [_serialize.(v)...]
 _serialize(v::Number) = (isnan(v)  ||  isinf(v)  ?  "_TN_" * string(v)  :  v)
 
 function _serialize(vv::AbstractDict{Symbol,T}) where {T <: Any}
-    out = OrderedDict{Symbol, Any}()
+    out = OrderedDict{String, Any}()
     for (key, val) in vv
-        out[key] = _serialize(val)
+        out[String(key)] = _serialize(val)
     end
     return out
 end
 
 function _serialize_struct(vv; add_show=false)
-    out = OrderedDict{Symbol, Any}()
-    out[:_structtype] = string(typeof(vv))
+    out = OrderedDict{String, Any}()
+    out["_structtype"] = string(typeof(vv))
     for field in fieldnames(typeof(vv))
         ff = getfield(vv, field)
         if hasmethod(_serialize, (typeof(ff),))
-            out[field] = _serialize(ff)
+            out[String(field)] = _serialize(ff)
         end
     end
     if add_show
         io = IOBuffer()
         show(io, vv)
-        out[:show] = String(take!(io))
+        out["show"] = String(take!(io))
     end
     return out
 end
@@ -81,62 +81,62 @@ function _deserialize(dd::AbstractDict)
         nothing
     end
 
-    if :_structtype in keys(dd)
-        if dd[:_structtype] == "GFit.HashVector{GFit.Parameter}"
-            out = HashVector{Parameter}(_deserialize(dd[:data]))
-            for (k, v) in dd[:dict]
-                getfield(out, :dict)[k] = _deserialize(v)
+    if "_structtype" in keys(dd)
+        if dd["_structtype"] == "GFit.HashVector{GFit.Parameter}"
+            out = HashVector{Parameter}(_deserialize(dd["data"]))
+            for (k, v) in dd["dict"]
+                getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
             return out
-        elseif dd[:_structtype] == "GFit.HashHashVector{GFit.Parameter}"
+        elseif dd["_structtype"] == "GFit.HashHashVector{GFit.Parameter}"
             out = HashHashVector{Parameter}()
-            for (k, v) in dd[:dict]
-                getfield(out, :dict)[k] = _deserialize(v)
+            for (k, v) in dd["dict"]
+                getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
-            append!(getfield(out, :data), _deserialize(dd[:data]))
+            append!(getfield(out, :data), _deserialize(dd["data"]))
             return out
-        elseif dd[:_structtype] == "GFit.FunctDesc"
+        elseif dd["_structtype"] == "GFit.FunctDesc"
             return FunctDesc(deserialized_function,
-                             _deserialize(dd[:display]),
-                             _deserialize(dd[:args]),
-                             _deserialize(dd[:optargs]))
-        elseif dd[:_structtype] == "GFit.Parameter"
-            return Parameter(_deserialize(dd[:val]),
-                             _deserialize(dd[:low]),
-                             _deserialize(dd[:high]),
-                             _deserialize(dd[:fixed]),
-                             _deserialize(dd[:patch]),
-                             _deserialize(dd[:mpatch]),
-                             _deserialize(dd[:actual]),
-                             _deserialize(dd[:unc]))
-        elseif dd[:_structtype] == "GFit.ModelBuffers"
-            return ModelBuffers(_deserialize(dd[:domain]),
-                                _deserialize(dd[:buffers]),
-                                _deserialize(dd[:maincomp]),
-                                _deserialize(dd[:show]))
-        elseif dd[:_structtype] == "GFit.FitResult"
-            return FitResult(_deserialize(dd[:timestamp]),
-                             _deserialize(dd[:elapsed]),
-                             _deserialize(dd[:ndata]),
-                             _deserialize(dd[:nfree]),
-                             _deserialize(dd[:dof]),
-                             _deserialize(dd[:fitstat]),
-                             _deserialize(dd[:status]),
-                             _deserialize(dd[:bestfit]))
-        elseif dd[:_structtype] == "GFit.MinimizerStatus"
-            return MinimizerStatus(MinimizerStatusCode(_deserialize(dd[:code])),
-                                   _deserialize(dd[:message]),
-                                   _deserialize(dd[:internal]))
-        elseif !isnothing(findfirst("CartesianDomain", dd[:_structtype]))
-            axis = _deserialize(dd[:axis])
-            roi =  _deserialize(dd[:roi])
+                             _deserialize(dd["display"]),
+                             _deserialize(dd["args"]),
+                             _deserialize(dd["optargs"]))
+        elseif dd["_structtype"] == "GFit.Parameter"
+            return Parameter(_deserialize(dd["val"]),
+                             _deserialize(dd["low"]),
+                             _deserialize(dd["high"]),
+                             _deserialize(dd["fixed"]),
+                             _deserialize(dd["patch"]),
+                             _deserialize(dd["mpatch"]),
+                             _deserialize(dd["actual"]),
+                             _deserialize(dd["unc"]))
+        elseif dd["_structtype"] == "GFit.ModelBuffers"
+            return ModelBuffers(_deserialize(dd["domain"]),
+                                _deserialize(dd["buffers"]),
+                                _deserialize(dd["maincomp"]),
+                                _deserialize(dd["show"]))
+        elseif dd["_structtype"] == "GFit.FitResult"
+            return FitResult(_deserialize(dd["timestamp"]),
+                             _deserialize(dd["elapsed"]),
+                             _deserialize(dd["ndata"]),
+                             _deserialize(dd["nfree"]),
+                             _deserialize(dd["dof"]),
+                             _deserialize(dd["fitstat"]),
+                             _deserialize(dd["status"]),
+                             _deserialize(dd["bestfit"]))
+        elseif dd["_structtype"] == "GFit.MinimizerStatus"
+            return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
+                                   _deserialize(dd["message"]),
+                                   _deserialize(dd["internal"]))
+        elseif !isnothing(findfirst("CartesianDomain", dd["_structtype"]))
+            axis = _deserialize(dd["axis"])
+            roi =  _deserialize(dd["roi"])
             return CartesianDomain(axis..., roi=roi)
-        elseif !isnothing(findfirst("Domain", dd[:_structtype]))
-            axis = _deserialize(dd[:axis])
+        elseif !isnothing(findfirst("Domain", dd["_structtype"]))
+            axis = _deserialize(dd["axis"])
             return Domain(axis...)
-        elseif !isnothing(findfirst("Measures", dd[:_structtype]))
-            tmp = _deserialize(dd[:values])
-            return Measures(_deserialize(dd[:domain]), tmp[1], tmp[2])
+        elseif !isnothing(findfirst("Measures", dd["_structtype"]))
+            tmp = _deserialize(dd["values"])
+            return Measures(_deserialize(dd["domain"]), tmp[1], tmp[2])
         end
     else
         out = OrderedDict{Symbol, Any}()
