@@ -194,7 +194,7 @@ end
 
 
 function deserialize(filename::String)
-    if filename[end-2:end] == "gz"
+    if filename[end-2:end] == ".gz"
         io = GZip.open(filename)
     else
         io = open(filename)
