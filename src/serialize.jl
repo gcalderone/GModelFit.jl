@@ -80,7 +80,7 @@ function _deserialize(dd::AbstractDict)
         @warn "Can't evaluate a deserialized function"
         nothing
     end
- 
+
     if :_structtype in keys(dd)
         if dd[:_structtype] == "GFit.HashVector{GFit.Parameter}"
             out = HashVector{Parameter}(_deserialize(dd[:data]))
@@ -171,7 +171,7 @@ data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 res = fit!(model, data)
 
 # Save a snapshot
-GFit.serialize("my_snapshot.json", model, data, res)
+GFit.serialize("my_snapshot.json", [model, data, res])
 
 # Restore snapshot (possibly in a different Julia session)
 using Serialization, GFit
@@ -202,5 +202,6 @@ function deserialize(filename::String)
         io = open(filename)
     end
     j = JSON.parse(io, dicttype=OrderedDict)
+    close(io)
     return _deserialize(j)
 end
