@@ -44,6 +44,8 @@ _serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _seria
 _serialize(vv::Model) = _serialize(ModelBuffers(vv))
 _serialize(vv::ModelBuffers) = _serialize_struct(vv, add_show=true)
 _serialize(vv::FitResult) = _serialize_struct(vv, add_show=true)
+_serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
+_serialize(vv::MinimizerStatusCode) = Int(vv)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
@@ -121,8 +123,12 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd[:nfree]),
                              _deserialize(dd[:dof]),
                              _deserialize(dd[:fitstat]),
-                             MinimizerStatusUnknown(),
+                             _deserialize(dd[:status]),
                              _deserialize(dd[:bestfit]))
+        elseif dd[:_structtype] == "GFit.MinimizerStatus"
+            return MinimizerStatus(MinimizerStatusCode(_deserialize(dd[:code])),
+                                   _deserialize(dd[:message]),
+                                   _deserialize(dd[:internal]))
         elseif dd[:_structtype] == "GFit.AbstractDomain"
             # TODO
         elseif dd[:_structtype] == "GFit.AbstractMeasures"

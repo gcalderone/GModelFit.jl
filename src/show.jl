@@ -272,6 +272,32 @@ function show(io::IO, bestfit::HashHashVector{Parameter})
 end
 
 
+function show(io::IO, status::MinimizerStatus)
+    print(io,            "    Status: ")
+    if status.code == MinOK
+        ss = (crayon"green", "OK")
+    elseif status.code == MinWARN
+        ss = (crayon"bold yellow", "WARNING")
+    elseif status.code == MinERROR
+        ss = (crayon"bold red", "ERROR")
+    elseif status.code == MinDRY
+        ss = (crayon"bold red", "DRY")
+    else
+        error("Unsupported minimizer status code: $(status.code)")
+    end
+
+    if showsettings.plain
+        print(io, @sprintf("%8s", ss[2]))
+    else
+        print(io, ss[1], @sprintf("%8s", ss[2]), crayon"default")
+    end
+    if status.message != ""
+        print(io, ss[1], ": ", status.message, crayon"default")
+    end
+    println(io)
+end
+
+
 function show(io::IO, res::FitResult)
     section(io, "Best fit parameters:")
     show(io, res.bestfit)
@@ -280,29 +306,6 @@ function show(io::IO, res::FitResult)
 
     println(io, @sprintf("    #Data : %8d              #Free params  : %10d"    , res.ndata, res.nfree))
     println(io, @sprintf("    DOF   : %8d              Red. fit stat.: %10.5g", res.dof, res.fitstat))
-    print(io,            "    Status: ")
-
-
-    if res.status.code == MinOK
-        ss = (crayon"green", "OK")
-    elseif res.status.code == MinWARN
-        ss = (crayon"bold yellow", "WARNING")
-    elseif res.status.code == MinERROR
-        ss = (crayon"bold red", "ERROR")
-    elseif res.status.code == MinDRY
-        ss = (crayon"bold red", "DRY")
-    else
-        error("Unsupported minimizer status code: $(res.status.code)")
-    end
-
-    if showsettings.plain
-        print(io, @sprintf("%8s", ss[2]))
-    else
-        print(io, ss[1], @sprintf("%8s", ss[2]), crayon"default")
-    end
-    println(io, @sprintf("              Elapsed time  : %10.4g s", res.elapsed))
-
-    if res.status.message != ""
-        println(io, ss[1], res.status.message, crayon"default")
-    end
+    show(io, res.status)
+    println(io, @sprintf("    Elapsed time: %-10.4g s", res.elapsed))
 end
