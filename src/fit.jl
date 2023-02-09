@@ -151,6 +151,14 @@ struct FitResult
             length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
             status, bestfit)
     end
+
+    # Deserialization
+    function FitResult(d::AbstractDict)
+        @assert d[:_structtype] == "GFit.FitResult"
+        new(d[:timestamp], d[:elapsed], d[:ndata],
+            d[:nfree], d[:dof], d[:fitstat],
+            MinimizerStatusUnknown(), d[:bestfit])
+    end
 end
 
 
