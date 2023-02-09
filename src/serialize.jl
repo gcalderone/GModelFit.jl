@@ -30,12 +30,9 @@ function _serialize_struct(vv; add_show=false)
         end
     end
     if add_show
-        plain = GFit.showsettings.plain
-        GFit.showsettings.plain = false
         io = IOBuffer()
         show(io, vv)
         out[:show] = String(take!(io))
-        GFit.showsettings.plain = plain
     end
     return out
 end
@@ -115,7 +112,8 @@ function _deserialize(dd::AbstractDict)
         elseif dd[:_structtype] == "GFit.ModelBuffers"
             return ModelBuffers(_deserialize(dd[:domain]),
                                 _deserialize(dd[:buffers]),
-                                _deserialize(dd[:maincomp]))
+                                _deserialize(dd[:maincomp]),
+                                _deserialize(dd[:show]))
         elseif dd[:_structtype] == "GFit.FitResult"
             return FitResult(_deserialize(dd[:timestamp]),
                              _deserialize(dd[:elapsed]),

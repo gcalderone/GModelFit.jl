@@ -629,9 +629,17 @@ struct ModelBuffers
     domain::AbstractDomain
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
+    show::String
 end
-ModelBuffers(model::Model) = ModelBuffers(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model))
+function ModelBuffers(model::Model)
+    io = IOBuffer()
+    show(io, model)
+    s = String(take!(io))
+    ModelBuffers(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model), s)
+end
+
 domain(model::ModelBuffers) = model.domain
+Base.keys(model::ModelBuffers) = collect(keys(model.buffers))
 (model::ModelBuffers)() = reshape(domain(model), model.buffers[model.maincomp])
 (model::ModelBuffers)(name::Symbol) = reshape(domain(model), model.buffers[name])
 

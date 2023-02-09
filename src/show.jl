@@ -309,3 +309,8 @@ function show(io::IO, res::FitResult)
     print(  io, @sprintf("    DOF   : %8d       ", res.dof))
     show(io, res.status)
 end
+
+
+function show(io::IO, mb::ModelBuffers)
+    println(io, mb.show)
+end
