@@ -1,111 +1,141 @@
-# DummyComp is used to create serializable snapshots of actual components
-struct DummyComp <: AbstractComponent
-    tname::String
-    deps::Vector{Symbol}
-    params::OrderedDict{Symbol, Parameter}
-end
+#=
+Serialization methods: output must be suitable to be stored in a file using the JSON format.
+=#
+_serialize(::Nothing) = nothing
+_serialize(::Function) = nothing
+_serialize(v::Expr) = "_TE_" * string(v)
+_serialize(v::Date) = "_TD_" * string(v)
+_serialize(v::DateTime) = "_TDT" * string(v)
+_serialize(v::String) = v
+_serialize(v::Symbol) = "_TS_" * string(v)
+_serialize(v::AbstractVector) = _serialize.(v)
+_serialize(v::Tuple) = _serialize.(v)
+_serialize(v::Number) = (isnan(v)  ||  isinf(v)  ?  "_TN_" * string(v)  :  v)
 
-getproperty(comp::DummyComp, pname::Symbol) = getfield(comp, :params)[pname]
-getparams(comp::DummyComp) = getfield(comp, :params)
-dependencies(comp::DummyComp) = getfield(comp, :deps)
-original_type(comp::DummyComp) = getfield(comp, :tname)
-
-function evaluate!(buffer::Vector{Float64}, comp::DummyComp, domain::AbstractDomain, pars...)
-    @warn "Can't evaluate a dummy component!"
-    nothing
-end
-
-# Named function used to create serializable FunctDesc objects
-function dummyfunct(args...)
-    @warn "Can't evaluate a dummy function!"
-    nothing
-end
-
-
-# The `serializable` methods are supposed to create copies of GFit
-# objects replacing all non-serializable items (such as
-# component instances and FunctDesc) with dummy ones.
-serializable(f::FunctDesc) = FunctDesc(dummyfunct, f.display, deepcopy(f.args), deepcopy(f.optargs))
-
-
-function serializable!(par::Parameter)
-    if isa(par.patch, FunctDesc)
-        par.patch  = serializable(par.patch)
-    end
-    if isa(par.mpatch, FunctDesc)
-        par.mpatch = serializable(par.mpatch)
-    end
-end
-
-
-function serializable(ceval::CompEval, domain::AbstractDomain)
-    tname = collect(split(string(typeof(ceval)), ['{', ',']))[2]
-    (tname == "DummyComp")  &&  (return tname)
-
-    deps = deepcopy(dependencies(ceval.comp))
-    params = deepcopy(getparams(ceval.comp))
-    for (pname, par) in params
-        serializable!(par)
-    end
-    out = CompEval(DummyComp(tname, deps, params), domain)
-    for fname in fieldnames(typeof(ceval))
-        (fname == :comp)  &&  continue
-        setfield!(out, fname, getfield(ceval, fname))
+function _serialize(vv::AbstractDict{Symbol,T}) where {T <: Any}
+    out = OrderedDict{Symbol, Any}()
+    out[:_dicttype] = string(typeof(vv))
+    for (key, val) in vv
+        out[key] = _serialize(val)
     end
     return out
 end
 
-
-function serializable(source::Model)
-    model = deepcopy(source)
-    model.parent = nothing
-    for (cname, ceval) in source.cevals
-        model.cevals[cname] = serializable(ceval, model.domain)
+function _serialize_struct(vv; add_show=false)
+    out = OrderedDict{Symbol, Any}()
+    out[:_structtype] = string(typeof(vv))
+    for field in fieldnames(typeof(vv))
+        ff = getfield(vv, field)
+        if hasmethod(_serialize, (typeof(ff),))
+            out[field] = _serialize(ff)
+        end
     end
-    model.maincomp = find_maincomp(source)
-    return model
+    if add_show
+        plain = GFit.showsettings.plain
+        GFit.showsettings.plain = false
+        io = IOBuffer()
+        show(io, vv)
+        out[:show] = String(take!(io))
+        GFit.showsettings.plain = plain
+    end
+    return out
 end
 
+_serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _serialize_struct(vv)
+_serialize(vv::Model) = _serialize(ModelBuffers(vv))
+_serialize(vv::ModelBuffers) = _serialize_struct(vv, add_show=true)
+_serialize(vv::FitResult) = _serialize_struct(vv, add_show=true)
+_serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
+_serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
-function serializable(source::MultiModel)
-    model = deepcopy(source)
-    for i in 1:length(model)
-        model.models[i] = serializable(source[i])
+
+
+# Deserialization methods
+_deserialize(::Nothing) = nothing
+_deserialize(v::AbstractVector) = _deserialize.(v)
+_deserialize(v::Number) = v
+
+function _deserialize(v::String)
+    if length(v) > 4
+        magic = v[1:4]
+        if magic == "_TE_"
+            return Meta.parse(v)
+        elseif magic == "_TD_"
+            return Date(v[5:end])
+        elseif magic == "_TDT"
+            return DateTime(v[5:end])
+        elseif magic == "_TS_"
+            return Symbol(v[5:end])
+        elseif v == "_TN_Inf"
+            return +Inf
+        elseif v == "_TN_-Inf"
+            return -Inf
+        elseif v == "_TN_NaN"
+            return NaN
+        end
     end
-    return model
+    return v
 end
 
+function _deserialize(dict::AbstractDict)
+    function deserialized_function(args...)
+        @warn "Can't evaluate a deserialized function"
+        nothing
+    end
 
-serializable(v::AbstractDomain) = v
-serializable(v::AbstractMeasures) = v
-function serializable(source::FitResult)
-    res = deepcopy(source)
-    if isa(res.bestfit, Vector)
-        for i in 1:length(res.bestfit)
-            bb = res.bestfit[i]
-            for p in getfield(bb, :data)
-                serializable!(p)
+    dd = OrderedDict{Symbol, Any}()
+    for (kk, vv) in dict
+        dd[Symbol(kk)] = _deserialize(vv)
+    end
+    if :_structtype in keys(dd)
+        println()
+        @info dd[:_structtype]
+        dump(dd)
+        println()
+        if dd[:_structtype] == "GFit.HashVector{GFit.Parameter}"
+            tmp = HashVector{Parameter}(dd[:data])
+            for (k, v) in dd[:dict]
+                @info k
+                @info v
+                getfield(tmp, :dict)[k] = v
             end
-        end
-    else
-        bb = res.bestfit
-        for p in getfield(bb, :data)
-            serializable!(p)
+            return tmp
+        elseif dd[:_structtype] == "GFit.HashHashVector{GFit.Parameter}"
+            tmp = HashHashVector{Parameter}()
+            for (k, v) in dd[:dict]
+                getfield(tmp, :dict)[k] = v
+            end
+            append!(getfield(tmp, :data), dd[:data])
+            return tmp
+        elseif dd[:_structtype] == "GFit.FunctDesc"
+            return FunctDesc(deserialized_function, dd[:display], dd[:args], d[:optargs])
+        elseif dd[:_structtype] == "GFit.Parameter"
+            return Parameter(dd[:val], dd[:low], dd[:high], dd[:fixed],
+                             dd[:patch], dd[:mpatch], dd[:actual], dd[:unc])
+        elseif dd[:_structtype] == "GFit.ModelBuffers"
+            return ModelBuffers(dd[:domain], dd[:buffers], dd[:maincomp])
+        elseif dd[:_structtype] == "GFit.FitResult"
+            return FitResult(dd)
+        elseif dd[:_structtype] == "GFit.AbstractDomain"
+            # TODO
+        elseif dd[:_structtype] == "GFit.AbstractMeasures"
+            # TODO
         end
     end
-    return res
+    return dd
 end
+
 
 
 """
-    snapshot(filename::String, args...)
+    serialize(filename::String, args...; compress=false)
 
-Save a binary snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel`, `Domain`, `Measures`, etc using the standard `Serialization` package.  The snapshot can be restored in a later session, and the objects will be similar to the original ones, with the following notable differences:
+Save a snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel`, `Domain`, `Measures`, etc using the JSON format.  The snapshot can be restored in a later session with `deserialize`, and the objects will be similar to the original ones, with the following notable differences:
 - in `Model` objects, all components are casted into `GFit.DummyComp` ones.  The original type is availble (as a string) via the `original_type()` function, while the content of the original structure is lost;
 - all `FunctDesc` objects retain their textual representation, but the original function is lost;
 - `Model` and `MultiModel` objects, as well as all the components, retain their last evaluated values but they can no longer be evaluated (an attempt to invoke `evaluate()` will result in an error);
 
-The reason to introduce such differences is to ensure that all data structures being serialized are defined within the `GFit` package with no further external depencency, and to overcome limitation of the `Serialization` package related to, e.g., anonymous functions.
+The reason to introduce such differences is to ensure that all data structures can be serialized to a JSON format and can be safely eserialized.
 
 ## Example:
 ```julia-repl
@@ -117,90 +147,36 @@ data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 res = fit!(model, data)
 
 # Save a snapshot
-GFit.snapshot("my_snapshot.dat", (model, data, res))
+GFit.serialize("my_snapshot.json", model, data, res)
 
 # Restore snapshot (possibly in a different Julia session)
 using Serialization, GFit
-(model, data, res) = deserialize("my_snapshot.dat")
+(model, data, res) = deserialize("my_snapshot.json")
 ```
 
 !!! note
     The GFit binary serialization facility is **experimental**,
-
-See also `GFit.snapshot_json()`.
 """
-function snapshot(filename::String, arg)
-    serialize(filename, serializable(args))
-    return filename
-end
-
-function snapshot(filename::String, args::Tuple)
-    serialize(filename, serializable.(args))
-    return filename
-end
-
-
-function todict(vv)
-    tt = typeof(vv)
-    @assert isstructtype(tt) "Unsupported type: $(string(tt))"
-    # @assert parentmodule(tt) == GFit
-    if tt <: AbstractComponent
-        @assert tt == DummyComp "Can't serialize instances of $(string(tt))"
-    end
-    out = OrderedDict{Symbol, Any}()
-    out[:_structtype] = string(tt)
-    for fname in fieldnames(tt)
-        if  (tt == GFit.FunctDesc)  && 
-            (fname == :funct)
-            out[fname] = nothing
-        else
-            out[fname] = todict(getfield(vv, fname))
-        end
-    end
-
-    # Add :show key
-    plain = GFit.showsettings.plain
-    GFit.showsettings.plain = true
-    try
-        io = IOBuffer()
-        show(io, vv)
-        out[:show] = String(take!(io))
-    catch err
-        @warn "Exception caught while invoking show($(tt))"
-        println(err)
-    end
-    GFit.showsettings.plain = plain
-    return out
-end
-
-function todict(vv::AbstractDict{Symbol,T}) where {T <: Any}
-    out = OrderedDict{Symbol, Any}()
-    out[:_dicttype] = string(typeof(vv))
-    for (key, val) in vv
-        out[key] = todict(val)
-    end
-    return out
-end
-
-todict(::Nothing) = nothing
-todict(v::DateTime) = string(v)
-todict(v::String) = v
-todict(v::Symbol) = string(v)
-todict(v::Number) = v
-todict(v::AbstractArray) = todict.(v)
-todict(v::Tuple) = todict.(v)
-
-
-function snapshot_json(filename::String, args...; compress=false)
+function serialize(filename::String, arg; compress=false)
     filename = ensure_file_extension(filename, "json")
     if compress
         filename = ensure_file_extension(filename, "gz")
         io = GZip.open(filename, "w")
     else
-        io = open(filename, "w")  # io = IOBuffer()
+        io = open(filename, "w")
     end
-    JSON.print(io, todict(serializable.(args)))
-    close(io)                     # String(take!(io))
+    JSON.print(io, _serialize(args))
+    close(io)
     return filename
 end
 
+
+function deserialize(filename::String)
+    if filename[end-2:end] == "gz"
+        io = GZip.open(filename)
+    else
+        io = open(filename)
+    end
+    j = JSON.parse(io, dicttype=OrderedDict)
+    return _deserialize(j)
+end
