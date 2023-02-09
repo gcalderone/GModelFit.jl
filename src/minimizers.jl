@@ -6,6 +6,9 @@ abstract type AbstractMinimizerStatus end
 
 
 # --------------------------------------------------------------------
+struct MinimizerStatusUnknown <: AbstractMinimizerStatus
+end
+
 struct MinimizerStatusDry <: AbstractMinimizerStatus
 end
 
