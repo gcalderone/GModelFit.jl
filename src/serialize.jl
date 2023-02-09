@@ -77,52 +77,74 @@ function _deserialize(v::String)
     return v
 end
 
-function _deserialize(dict::AbstractDict)
+function _deserialize(dd::AbstractDict)
     function deserialized_function(args...)
         @warn "Can't evaluate a deserialized function"
         nothing
     end
 
-    dd = OrderedDict{Symbol, Any}()
-    for (kk, vv) in dict
-        dd[Symbol(kk)] = _deserialize(vv)
+    if :_dicttype in keys(dd)
+        out = OrderedDict{Symbol, Any}()
+        for (kk, vv) in dd
+            out[Symbol(kk)] = _deserialize(vv)
+        end
+        return out
     end
+ 
     if :_structtype in keys(dd)
         println()
         @info dd[:_structtype]
         dump(dd)
         println()
         if dd[:_structtype] == "GFit.HashVector{GFit.Parameter}"
-            tmp = HashVector{Parameter}(dd[:data])
+            out = HashVector{Parameter}(dd[:data])
             for (k, v) in dd[:dict]
-                @info k
-                @info v
-                getfield(tmp, :dict)[k] = v
+                getfield(out, :dict)[k] = _deserialize(v)
             end
-            return tmp
+            return out
         elseif dd[:_structtype] == "GFit.HashHashVector{GFit.Parameter}"
-            tmp = HashHashVector{Parameter}()
+            out = HashHashVector{Parameter}()
             for (k, v) in dd[:dict]
-                getfield(tmp, :dict)[k] = v
+                dump(v)
+                getfield(out, :dict)[k] = _deserialize(v)
             end
-            append!(getfield(tmp, :data), dd[:data])
-            return tmp
+            append!(getfield(out, :data), dd[:data])
+            return out
         elseif dd[:_structtype] == "GFit.FunctDesc"
-            return FunctDesc(deserialized_function, dd[:display], dd[:args], d[:optargs])
+            return FunctDesc(deserialized_function,
+                             _deserialize(dd[:display]),
+                             _deserialize(dd[:args]),
+                             _deserialize(dd[:optargs]))
         elseif dd[:_structtype] == "GFit.Parameter"
-            return Parameter(dd[:val], dd[:low], dd[:high], dd[:fixed],
-                             dd[:patch], dd[:mpatch], dd[:actual], dd[:unc])
+            return Parameter(_deserialize(dd[:val]),
+                             _deserialize(dd[:low]),
+                             _deserialize(dd[:high]),
+                             _deserialize(dd[:fixed]),
+                             _deserialize(dd[:patch]),
+                             _deserialize(dd[:mpatch]),
+                             _deserialize(dd[:actual]),
+                             _deserialize(dd[:unc]))
         elseif dd[:_structtype] == "GFit.ModelBuffers"
-            return ModelBuffers(dd[:domain], dd[:buffers], dd[:maincomp])
+            return ModelBuffers(_deserialize(dd[:domain]),
+                                _deserialize(dd[:buffers]),
+                                _deserialize(dd[:maincomp]))
         elseif dd[:_structtype] == "GFit.FitResult"
-            return FitResult(dd)
+            return FitResult(_deserialize(dd[:timestamp]),
+                             _deserialize(dd[:elapsed]),
+                             _deserialize(dd[:ndata]),
+                             _deserialize(dd[:nfree]),
+                             _deserialize(dd[:dof]),
+                             _deserialize(dd[:fitstat]),
+                             MinimizerStatusUnknown(),
+                             _deserialize(dd[:bestfit]))
         elseif dd[:_structtype] == "GFit.AbstractDomain"
             # TODO
         elseif dd[:_structtype] == "GFit.AbstractMeasures"
             # TODO
         end
     end
-    return dd
+
+    error("qui")
 end
 
 
