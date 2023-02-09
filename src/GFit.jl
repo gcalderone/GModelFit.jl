@@ -8,8 +8,7 @@ using MacroTools
 using Dates
 using ProgressMeter
 using Random
-using Serialization, JSON, GZip
-using Pkg
+using JSON, GZip
 
 import Base.show
 import Base.ndims
@@ -113,8 +112,8 @@ mutable struct Parameter
     mpatch::Union{Nothing, FunctDesc}
     actual::Float64
     unc::Float64
-    Parameter(value::Number) = new(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 end
+Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 
 
 # ====================================================================
@@ -624,6 +623,19 @@ function select_maincomp!(model::Model, cname::Symbol)
     @assert haskey(model, cname)
     model.maincomp = cname
 end
+
+
+struct ModelBuffers
+    domain::AbstractDomain
+    buffers::OrderedDict{Symbol, Vector{Float64}}
+    maincomp::Symbol
+end
+ModelBuffers(model::Model) = ModelBuffers(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model))
+domain(model::ModelBuffers) = model.domain
+(model::ModelBuffers)() = reshape(domain(model), model.buffers[model.maincomp])
+(model::ModelBuffers)(name::Symbol) = reshape(domain(model), model.buffers[name])
+
+
 
 include("multimodel.jl")
 
