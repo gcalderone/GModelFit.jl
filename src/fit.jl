@@ -136,29 +136,21 @@ struct FitResult
     # log10testprob::Float64
     status::AbstractMinimizerStatus
     bestfit::Union{Vector{HashHashVector{Parameter}}, HashHashVector{Parameter}}
+end
 
-    function FitResult(timestamp::DateTime, fp::AbstractFitProblem, status::AbstractMinimizerStatus)
-        # gof_stat = sum(abs2, residuals(fp))
-        # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
+function FitResult(timestamp::DateTime, fp::AbstractFitProblem, status::AbstractMinimizerStatus)
+    # gof_stat = sum(abs2, residuals(fp))
+    # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
 
-        if isa(fp, FitProblem)
-            bestfit = deepcopy(fp.model.params)
-        else
-            bestfit = [deepcopy(fp.model.params) for fp in fp.fp]
-        end
-
-        new(timestamp, (now() - timestamp).value / 1e3,
-            length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
-            status, bestfit)
+    if isa(fp, FitProblem)
+        bestfit = deepcopy(fp.model.params)
+    else
+        bestfit = [deepcopy(fp.model.params) for fp in fp.fp]
     end
 
-    # Deserialization
-    function FitResult(d::AbstractDict)
-        @assert d[:_structtype] == "GFit.FitResult"
-        new(d[:timestamp], d[:elapsed], d[:ndata],
-            d[:nfree], d[:dof], d[:fitstat],
-            MinimizerStatusUnknown(), d[:bestfit])
-    end
+    new(timestamp, (now() - timestamp).value / 1e3,
+        length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
+        status, bestfit)
 end
 
 
@@ -203,5 +195,3 @@ fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
 fit!(model::MultiModel; minimizer::AbstractMinimizer=lsqfit()) =
     fit!(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
          minimizer=minimizer)
-
-
