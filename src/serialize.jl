@@ -14,7 +14,6 @@ _serialize(v::Number) = (isnan(v)  ||  isinf(v)  ?  "_TN_" * string(v)  :  v)
 
 function _serialize(vv::AbstractDict{Symbol,T}) where {T <: Any}
     out = OrderedDict{Symbol, Any}()
-    out[:_dicttype] = string(typeof(vv))
     for (key, val) in vv
         out[key] = _serialize(val)
     end
@@ -82,22 +81,10 @@ function _deserialize(dd::AbstractDict)
         @warn "Can't evaluate a deserialized function"
         nothing
     end
-
-    if :_dicttype in keys(dd)
-        out = OrderedDict{Symbol, Any}()
-        for (kk, vv) in dd
-            out[Symbol(kk)] = _deserialize(vv)
-        end
-        return out
-    end
  
     if :_structtype in keys(dd)
-        println()
-        @info dd[:_structtype]
-        dump(dd)
-        println()
         if dd[:_structtype] == "GFit.HashVector{GFit.Parameter}"
-            out = HashVector{Parameter}(dd[:data])
+            out = HashVector{Parameter}(_deserialize(dd[:data]))
             for (k, v) in dd[:dict]
                 getfield(out, :dict)[k] = _deserialize(v)
             end
@@ -105,7 +92,6 @@ function _deserialize(dd::AbstractDict)
         elseif dd[:_structtype] == "GFit.HashHashVector{GFit.Parameter}"
             out = HashHashVector{Parameter}()
             for (k, v) in dd[:dict]
-                dump(v)
                 getfield(out, :dict)[k] = _deserialize(v)
             end
             append!(getfield(out, :data), dd[:data])
@@ -142,9 +128,15 @@ function _deserialize(dd::AbstractDict)
         elseif dd[:_structtype] == "GFit.AbstractMeasures"
             # TODO
         end
+    else
+        out = OrderedDict{Symbol, Any}()
+        for (kk, vv) in dd
+            out[Symbol(kk)] = _deserialize(vv)
+        end
+        return out
     end
 
-    error("qui")
+    error("TODO")
 end
 
 
