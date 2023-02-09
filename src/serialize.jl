@@ -191,7 +191,7 @@ function serialize(filename::String, arg; compress=false)
     else
         io = open(filename, "w")
     end
-    JSON.print(io, _serialize(args))
+    JSON.print(io, _serialize(arg))
     close(io)
     return filename
 end
