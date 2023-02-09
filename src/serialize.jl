@@ -9,7 +9,7 @@ _serialize(v::DateTime) = "_TDT" * string(v)
 _serialize(v::String) = v
 _serialize(v::Symbol) = "_TS_" * string(v)
 _serialize(v::AbstractVector) = _serialize.(v)
-_serialize(v::Tuple) = _serialize.(v)
+_serialize(v::Tuple) = [_serialize.(v)...]
 _serialize(v::Number) = (isnan(v)  ||  isinf(v)  ?  "_TN_" * string(v)  :  v)
 
 function _serialize(vv::AbstractDict{Symbol,T}) where {T <: Any}
@@ -129,10 +129,16 @@ function _deserialize(dd::AbstractDict)
             return MinimizerStatus(MinimizerStatusCode(_deserialize(dd[:code])),
                                    _deserialize(dd[:message]),
                                    _deserialize(dd[:internal]))
-        elseif dd[:_structtype] == "GFit.AbstractDomain"
-            # TODO
-        elseif dd[:_structtype] == "GFit.AbstractMeasures"
-            # TODO
+        elseif !isnothing(findfirst("CartesianDomain", dd[:_structtype]))
+            axis = _deserialize(dd[:axis])
+            roi =  _deserialize(dd[:roi])
+            return CartesianDomain(axis..., roi=roi)
+        elseif !isnothing(findfirst("Domain", dd[:_structtype]))
+            axis = _deserialize(dd[:axis])
+            return Domain(axis...)
+        elseif !isnothing(findfirst("Measures", dd[:_structtype]))
+            tmp = _deserialize(dd[:values])
+            return Measures(_deserialize(dd[:domain]), tmp[1], tmp[2])
         end
     else
         out = OrderedDict{Symbol, Any}()
