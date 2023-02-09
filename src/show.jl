@@ -281,15 +281,28 @@ function show(io::IO, res::FitResult)
     println(io, @sprintf("    #Data : %8d              #Free params  : %10d"    , res.ndata, res.nfree))
     println(io, @sprintf("    DOF   : %8d              Red. fit stat.: %10.5g", res.dof, res.fitstat))
     print(io,            "    Status: ")
-    (crayon, status, message) = as_string(res.status)
-    if showsettings.plain
-        print(io, @sprintf("%8s", status))
+
+
+    if res.status.code == MinOK
+        ss = (crayon"green", "OK")
+    elseif res.status.code == MinWARN
+        ss = (crayon"bold yellow", "WARNING")
+    elseif res.status.code == MinERROR
+        ss = (crayon"bold red", "ERROR")
+    elseif res.status.code == MinDRY
+        ss = (crayon"bold red", "DRY")
     else
-        print(io, crayon, @sprintf("%8s", status), crayon"default")
+        error("Unsupported minimizer status code: $(res.status.code)")
+    end
+
+    if showsettings.plain
+        print(io, @sprintf("%8s", ss[2]))
+    else
+        print(io, ss[1], @sprintf("%8s", ss[2]), crayon"default")
     end
     println(io, @sprintf("              Elapsed time  : %10.4g s", res.elapsed))
 
-    if message != ""
-        println(io, crayon, message, crayon"default")
+    if res.status.message != ""
+        println(io, ss[1], res.status.message, crayon"default")
     end
 end

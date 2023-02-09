@@ -1,44 +1,20 @@
 # ====================================================================
 # Minimizers
 #
-abstract type AbstractMinimizer end
-abstract type AbstractMinimizerStatus end
+
+# --------------------------------------------------------------------
+@enum MinimizerStatusCode MinOK MinWARN MinERROR MinDRY
+
+struct MinimizerStatus
+    code::MinimizerStatusCode
+    message::String
+    internal
+end
+MinimizerStatus(code::MinimizerStatusCode) = MinimizerStatus(code, "", nothing)
 
 
 # --------------------------------------------------------------------
-struct MinimizerStatusUnknown <: AbstractMinimizerStatus
-end
-
-struct MinimizerStatusDry <: AbstractMinimizerStatus
-end
-
-struct MinimizerStatusOK <: AbstractMinimizerStatus
-    internal
-end
-
-struct MinimizerStatusWarn <: AbstractMinimizerStatus
-    message::String
-    internal
-end
-
-struct MinimizerStatusError <: AbstractMinimizerStatus
-    message::String
-    internal
-end
-
-function as_string(status::AbstractMinimizerStatus)
-    if isa(status, MinimizerStatusOK)
-        return (crayon"green", "OK", "")
-    elseif isa(status, MinimizerStatusWarn)
-        return (crayon"bold yellow", "WARNING", status.message)
-    elseif isa(status, MinimizerStatusError)
-        return (crayon"bold red", "ERROR", status.message)
-    elseif isa(status, MinimizerStatusDry)
-        return (crayon"bold red", "DRY", "")
-    else
-        error("Unsupported type: $(typeof(status))")
-    end
-end
+abstract type AbstractMinimizer end
 
 
 # --------------------------------------------------------------------
@@ -49,7 +25,7 @@ function fit!(minimizer::dry, fp::AbstractFitProblem)
     finalize!(fp,
               getfield.(params, :val),
               fill(NaN, length(params)))
-    return MinimizerStatusDry()
+    return MinimizerStatus(MinDRY)
 end
 
 
@@ -73,11 +49,11 @@ function fit!(minimizer::lsqfit, fp::AbstractFitProblem)
     ProgressMeter.finish!(prog)
     if !res.converged
         error!(fp)
-        return MinimizerStatusError("Not converged", res)
+        return MinimizerStatus(MinERROR, "Not converged", res)
     end
 
     finalize!(fp, getfield.(Ref(res), :param), LsqFit.stderror(res))
-    return MinimizerStatusOK(res)
+    return MinimizerStatus(MinOK, "", res)
 end
 
 
@@ -129,7 +105,7 @@ function fit!(minimizer::cmpfit, fp::AbstractFitProblem)
 
         if res.status <= 0
             error!(fp)
-            return MinimizerStatusError("Status = $(res.status)", res)
+            return MinimizerStatus(MinError, "Status = $(res.status)", res)
         end
 
         if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_threshold)
@@ -147,8 +123,8 @@ function fit!(minimizer::cmpfit, fp::AbstractFitProblem)
                   getfield.(Ref(res), :perror))
 
         if res.status == 2
-            return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum", res)
+            return MinimizerStatus(MinWARN, "CMPFit status = 2 may imply one (or more) guess values are too far from optimum", res)
         end
-        return MinimizerStatusOK(res)
+        return MinimizerStatus(MinOK, "", res)
     end
 end

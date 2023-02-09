@@ -94,7 +94,7 @@ function _deserialize(dd::AbstractDict)
             for (k, v) in dd[:dict]
                 getfield(out, :dict)[k] = _deserialize(v)
             end
-            append!(getfield(out, :data), dd[:data])
+            append!(getfield(out, :data), _deserialize(dd[:data]))
             return out
         elseif dd[:_structtype] == "GFit.FunctDesc"
             return FunctDesc(deserialized_function,
