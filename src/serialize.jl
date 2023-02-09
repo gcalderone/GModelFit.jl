@@ -152,14 +152,12 @@ end
 
 
 """
-    serialize(filename::String, args...; compress=false)
+    GFit.serialize(filename::String, args...; compress=false)
 
-Save a snapshot of one (or more) GFit object(s) such as `Model`, `MultiModel`, `Domain`, `Measures`, etc using the JSON format.  The snapshot can be restored in a later session with `deserialize`, and the objects will be similar to the original ones, with the following notable differences:
-- in `Model` objects, all components are casted into `GFit.DummyComp` ones.  The original type is availble (as a string) via the `original_type()` function, while the content of the original structure is lost;
-- all `FunctDesc` objects retain their textual representation, but the original function is lost;
-- `Model` and `MultiModel` objects, as well as all the components, retain their last evaluated values but they can no longer be evaluated (an attempt to invoke `evaluate()` will result in an error);
-
-The reason to introduce such differences is to ensure that all data structures can be serialized to a JSON format and can be safely eserialized.
+Save a snapshot of one (or more) GFit object(s) using a JSON format.  The snapshot can be restored in a different Julia session with `GFit.deserialize`, and the resulting objects will be similar to the original ones, with the following notable differences:
+- `Model` objects are casted into `ModelBuffers` ones containing just the latest component evaluations;
+- `MultiModel` objects are casted into `Vector{ModelBuffers}`;
+- `FunctDesc` objects retain their textual representation, but the original function is lost;
 
 ## Example:
 ```julia-repl
@@ -174,8 +172,8 @@ res = fit!(model, data)
 GFit.serialize("my_snapshot.json", [model, data, res])
 
 # Restore snapshot (possibly in a different Julia session)
-using Serialization, GFit
-(model, data, res) = deserialize("my_snapshot.json")
+using GFit
+(model, data, res) = GFit.deserialize("my_snapshot.json")
 ```
 
 !!! note
