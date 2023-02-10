@@ -38,6 +38,7 @@ function _serialize_struct(vv; add_show=false)
 end
 
 _serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _serialize_struct(vv)
+_serialize(vv::MultiModel) = _serialize(ModelBuffers.(vv.models))
 _serialize(vv::Model) = _serialize(ModelBuffers(vv))
 _serialize(vv::ModelBuffers) = _serialize_struct(vv, add_show=true)
 _serialize(vv::FitResult) = _serialize_struct(vv, add_show=true)
