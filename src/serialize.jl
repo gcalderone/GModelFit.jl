@@ -41,7 +41,24 @@ _serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _seria
 _serialize(vv::MultiModel) = _serialize(ModelBuffers.(vv.models))
 _serialize(vv::Model) = _serialize(ModelBuffers(vv))
 _serialize(vv::ModelBuffers) = _serialize_struct(vv, add_show=true)
-_serialize(vv::FitResult) = _serialize_struct(vv, add_show=true)
+function _serialize(vv::FitResult)
+    out = _serialize_struct(vv)
+    if isa(vv.bestfit, Vector)
+        out["show"] = Vector{String}()
+        for i in 1:length(vv.bestfit)
+            io = IOBuffer()
+            section(io, "Best fit parameters for model $i:")
+            show(io, vv.bestfit[i])
+            show(io, vv, bestfit=false)
+            push!(out["show"], String(take!(io)))
+        end
+    else
+        io = IOBuffer()
+        show(io, vv)
+        out["show"] = String(take!(io))
+    end
+    return out
+end
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
 _serialize(vv::MinimizerStatusCode) = Int(vv)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)

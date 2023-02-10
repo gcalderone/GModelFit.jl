@@ -297,9 +297,11 @@ function show(io::IO, status::MinimizerStatus)
 end
 
 
-function show(io::IO, res::FitResult)
-    section(io, "Best fit parameters:")
-    show(io, res.bestfit)
+function show(io::IO, res::FitResult; bestfit=true)
+    if bestfit
+        section(io, "Best fit parameters:")
+        show(io, res.bestfit)
+    end
 
     println(io)
     section(io, "Fit results:")
