@@ -17,7 +17,7 @@ The **GFit.jl** provides several built-in components which may be used to build 
 
 ## FComp
 
-The `FComp` component is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  It comes in two flavours: `FComp` based on one or more named scalar parameters, and `FCompv` (see next section) based on a vector of unnamed parameters.  The `FComp` constructors are defined as follows:
+The `FComp` component is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  It comes in two flavours: `FComp` is used when the function accepts one or more scalar parameters, while `FCompv` (see next section) is used when the function requires a vector of parameters.  The `FComp` constructors are defined as follows:
 
 ```julia
 FComp(funct::Function, deps=Symbol[]; par1=guess1, par2=guess2, ...)
@@ -90,7 +90,7 @@ println("p2: ", res.bestfit[:quadratic].p2.val, " ± ", res.bestfit[:quadratic].
 
 ## FCompv
 
-Just like `FComp`, also `FCompv` is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  However, `FCompv` parameters are stored in a vector, rather than being named ones.  The `FCompv` constructors are defined as follows:
+Just like `FComp`, also `FCompv` is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  However, `FCompv` parameters are passed to the function as a single vector of floats.  The `FCompv` constructors are defined as follows:
 
 ```julia
 FComp(funct::Function, guess::Vector{Float64})
