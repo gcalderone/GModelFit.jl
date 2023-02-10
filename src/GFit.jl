@@ -121,9 +121,9 @@ Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, n
 #
 # A *component* is a generic implementation of a building block for a
 # model. It must inherit `AbstractComponent` and implement the
-# `evaluate!` method.  The structure may contain zero or more field of
-# type Parameter, a Vector{Parameter}, or have all parameters
-# collected in a single field of type OrderedDict{Symbol, Parameter}()
+# `evaluate!` method.  The structure should contain zero or more field
+# of type Parameter, or have all parameters collected in a single
+# field of type OrderedDict{Symbol, Parameter}()
 abstract type AbstractComponent end
 
 # Note: this function must mirror setparams!()
@@ -133,11 +133,6 @@ function getparams(comp::AbstractComponent)
         field = getfield(comp, name)
         if isa(field, Parameter)
             out[name] = field
-        elseif isa(field, Vector{Parameter})
-            for i in 1:length(field)
-                iname = Symbol(name, "[", i, "]")
-                out[iname] = field[i]
-            end
         elseif isa(field, OrderedDict{Symbol, Parameter})
             @assert length(out) == 0  # avoid parameter name clash
             return field
@@ -153,12 +148,6 @@ function setparams!(comp::AbstractComponent, params::HashVector{Parameter})
         if isa(field, Parameter)
             field.val    = params[name].val
             field.actual = params[name].actual
-        elseif isa(field, Vector{Parameter})
-            for i in 1:length(field)
-                iname = Symbol(name, "[", i, "]")
-                field[i].val    = params[iname].val
-                field[i].actual = params[iname].actual
-            end
         elseif isa(field, OrderedDict{Symbol, Parameter})
             for (name, par) in field
                 par.val    = params[name].val

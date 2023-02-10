@@ -14,7 +14,7 @@ struct MyComponent <: AbstractComponent
 end
 ```
 (see below for a complete example).
-Alternatively, the parameters may be specified either as a single field of type `OrderedDict{Symbol, Parameter}` or as `Vector{Parameter}` field(s) (see the [`Polynomial`](https://github.com/gcalderone/GFit.jl/blob/master/src/components/Polynomial.jl) component for an example);
+Alternatively, the parameters may be specified as a single field of type `OrderedDict{Symbol, Parameter}` (see the [`Polynomial`](https://github.com/gcalderone/GFit.jl/blob/master/src/components/Polynomial.jl) component for an example);
 
 - the `evaluate!` function shall be extended to provide the component-specific code for evaluation.
 Specifically, the `evaluate!` function should replace the content of a `buffer::Vector{Float64}` with the outcome of the new component evaluation, given the numerical values for the parameters, e.g.

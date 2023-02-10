@@ -50,14 +50,19 @@ end
 struct FCompv <: GFit.AbstractComponent
     funct::Function
     deps::Vector{Symbol}
-    params::Vector{Parameter}
+    params::OrderedDict{Symbol, Parameter}
 
     FCompv(funct::Function, guess::Vector{T}) where T <: Number =
-        new(funct, Symbol[], Parameter.(guess))
-    FCompv(funct::Function, deps::Vector{Symbol}, guess::Vector{T}) where T <: Number =
-        new(funct, deps, Parameter.(guess))
-end
+        FCompv(funct, Symbol[], guess)
 
+    function FCompv(funct::Function, deps::Vector{Symbol}, guess::Vector{T}) where T <: Number
+        params = OrderedDict{Symbol, Parameter}()
+        for i in 1:length(guess)
+            params[Symbol(:p, i)] = Parameter(guess[i])
+        end
+        new(funct, deps, params)
+    end
+end
 dependencies(comp::FCompv) = getfield(comp, :deps)
 
 
