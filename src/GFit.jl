@@ -26,7 +26,7 @@ import Base.iterate
 import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
-    Model, @λ, select_maincomp!, SumReducer, domain,
+    Model, @λ, select_maincomp!, SumReducer, domain, comptype,
     MultiModel, evaluate, isfreezed, thaw!, freeze!, fit!
 
 include("HashVector.jl")
@@ -599,6 +599,22 @@ Return the domain where the model is evaluated.
 domain(model::Model) = model.domain
 
 
+"""
+    comptype(model::Model, cname::Symbol)
+
+Return a component type as a string
+"""
+comptype(model::Model, cname::Symbol) = string(typeof(model[cname]))
+
+
+"""
+    comptypes(model::Model)
+
+Return a `OrderedDict{Symbol, String}` with the model component types.
+"""
+comptypes(model::Model) = OrderedDict([cname => comptype(model, cname) for cname in keys(model)])
+
+
 # Return model evaluations
 (model::Model)() = reshape(domain(model), model.cevals[find_maincomp(model)].buffer)
 (model::Model)(name::Symbol) = reshape(domain(model), model.cevals[name].buffer)
@@ -614,24 +630,26 @@ function select_maincomp!(model::Model, cname::Symbol)
 end
 
 
-struct ModelBuffers
+struct ModelSnapshot
     domain::AbstractDomain
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
+    comptypes::OrderedDict{Symbol, String}
     show::String
 end
-function ModelBuffers(model::Model)
+function ModelSnapshot(model::Model)
     io = IOBuffer()
     show(io, model)
     s = String(take!(io))
-    ModelBuffers(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model), s)
+    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model),
+                  comptypes(model), s)
 end
 
-domain(model::ModelBuffers) = model.domain
-Base.keys(model::ModelBuffers) = collect(keys(model.buffers))
-(model::ModelBuffers)() = reshape(domain(model), model.buffers[model.maincomp])
-(model::ModelBuffers)(name::Symbol) = reshape(domain(model), model.buffers[name])
-
+domain(model::ModelSnapshot) = model.domain
+Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
+(model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
+(model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
+comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
 
 
 include("multimodel.jl")

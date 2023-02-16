@@ -38,9 +38,9 @@ function _serialize_struct(vv; add_show=false)
 end
 
 _serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _serialize_struct(vv)
-_serialize(vv::MultiModel) = _serialize(ModelBuffers.(vv.models))
-_serialize(vv::Model) = _serialize(ModelBuffers(vv))
-_serialize(vv::ModelBuffers) = _serialize_struct(vv, add_show=true)
+_serialize(vv::MultiModel) = _serialize(ModelSnapshot.(vv.models))
+_serialize(vv::Model) = _serialize(ModelSnapshot(vv))
+_serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 function _serialize(vv::FitResult)
     out = _serialize_struct(vv)
     if isa(vv.bestfit, Vector)
@@ -127,10 +127,11 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd["mpatch"]),
                              _deserialize(dd["actual"]),
                              _deserialize(dd["unc"]))
-        elseif dd["_structtype"] == "GFit.ModelBuffers"
-            return ModelBuffers(_deserialize(dd["domain"]),
+        elseif dd["_structtype"] == "GFit.ModelSnapshot"
+            return ModelSnapshot(_deserialize(dd["domain"]),
                                 _deserialize(dd["buffers"]),
                                 _deserialize(dd["maincomp"]),
+                                _deserialize(dd["comptypes"]),
                                 _deserialize(dd["show"]))
         elseif dd["_structtype"] == "GFit.FitResult"
             return FitResult(_deserialize(dd["timestamp"]),
@@ -140,6 +141,7 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd["dof"]),
                              _deserialize(dd["fitstat"]),
                              _deserialize(dd["status"]),
+                             convert(OrderedDict{Symbol, String},_deserialize(dd["comptypes"])),
                              _deserialize(dd["bestfit"]))
         elseif dd["_structtype"] == "GFit.MinimizerStatus"
             return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
@@ -173,8 +175,8 @@ end
     GFit.serialize(filename::String, args...; compress=false)
 
 Save a snapshot of one (or more) GFit object(s) using a JSON format.  The snapshot can be restored in a different Julia session with `GFit.deserialize`, and the resulting objects will be similar to the original ones, with the following notable differences:
-- `Model` objects are casted into `ModelBuffers` ones containing just the latest component evaluations;
-- `MultiModel` objects are casted into `Vector{ModelBuffers}`;
+- `Model` objects are casted into `ModelSnapshot` ones containing just the latest component evaluations;
+- `MultiModel` objects are casted into `Vector{ModelSnapshot}`;
 - `FunctDesc` objects retain their textual representation, but the original function is lost;
 
 ## Example:

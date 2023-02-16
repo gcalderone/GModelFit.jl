@@ -313,6 +313,6 @@ function show(io::IO, res::FitResult; bestfit=true)
 end
 
 
-function show(io::IO, mb::ModelBuffers)
+function show(io::IO, mb::ModelSnapshot)
     println(io, mb.show)
 end

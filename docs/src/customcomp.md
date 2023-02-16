@@ -1,3 +1,14 @@
+```@setup abc
+using Gnuplot
+Gnuplot.quitall()
+mkpath("assets")
+Gnuplot.options.term = "unknown"
+empty!(Gnuplot.options.init)
+push!( Gnuplot.options.init, linetypes(:Set1_5, lw=2.5, ps=1.5))
+saveas(file) = save(term="pngcairo size 550,350 fontscale 0.8", output="assets/$(file).png")
+dumpjson(file, arg) = GFit.serialize("assets/$(file).json", arg)
+```
+
 # Custom components
 
 Besides the [Built-in components](@ref), the user may define any number of custom components to be used in a model.
@@ -104,4 +115,6 @@ model = Model(dom, :theory => Interpolator(theory_x, theory_y),
                    :main => SumReducer(:theory, :background))
 data = Measures(dom, obs_y, 0.2)
 res = fit!(model, data)
+dumpjson("ex_customcomp", [model, data, res]) # hide
+show(res) # hide
 ```

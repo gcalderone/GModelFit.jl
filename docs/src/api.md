@@ -15,6 +15,7 @@ Model
 MultiModel
 @λ
 axis
+comptype
 coords
 domain
 evaluate
