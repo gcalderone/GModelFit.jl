@@ -121,7 +121,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
         isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (isnan(param.unc)  ?  ""  :  param/unc) (patch == ""  ?  ""  :  param.actual) patch])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (isnan(param.unc)  ?  ""  :  param.unc) (patch == ""  ?  ""  :  param.actual) patch])
         push!(fixed, param.fixed)
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box

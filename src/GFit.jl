@@ -147,10 +147,12 @@ function setparams!(comp::AbstractComponent, params::HashVector{Parameter})
         field = getfield(comp, name)
         if isa(field, Parameter)
             field.val    = params[name].val
+            field.unc    = params[name].unc
             field.actual = params[name].actual
         elseif isa(field, OrderedDict{Symbol, Parameter})
             for (name, par) in field
                 par.val    = params[name].val
+                par.unc    = params[name].unc
                 par.actual = params[name].actual
             end
         end
