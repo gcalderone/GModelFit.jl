@@ -103,7 +103,7 @@ end
 
 
 function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
-    table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
 
     ctype = split(string(typeof(comp)), ".")
@@ -121,7 +121,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
         isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (patch == ""  ?  ""  :  param.actual) patch])
+                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (isnan(param.unc)  ?  ""  :  param/unc) (patch == ""  ?  ""  :  param.actual) patch])
         push!(fixed, param.fixed)
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box
@@ -135,7 +135,7 @@ end
 
 function show(io::IO, comp::AbstractComponent)
     (table, fixed) = preparetable(comp)
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Actual", "Patch"],
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed)))
 end
@@ -202,7 +202,7 @@ function show(io::IO, model::Model)
     section(io, "Parameters:")
     (length(model.cevals) == 0)  &&  (return nothing)
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 7)
+    table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
@@ -214,7 +214,7 @@ function show(io::IO, model::Model)
         push!(hrule, length(fixed)+1)
     end
     table = table[:, [1; 3:end]]  # drop the Type column
-    printtable(io, table, ["Component", "Param.", "Range", "Value.", "Actual", "Patch"],
+    printtable(io, table, ["Component", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:6),
                highlighters=(Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)))
 end
@@ -227,48 +227,6 @@ function show(io::IO, multi::MultiModel)
         show(io, multi.models[id])
     end
     println(io)
-end
-
-
-function show(io::IO, bestfit::Vector{HashHashVector{Parameter}})
-    for id in 1:length(bestfit)
-        println(io)
-        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
-        show(io, bestfit[id])
-    end
-    println(io)
-end
-
-
-function show(io::IO, bestfit::HashHashVector{Parameter})
-    table = Matrix{Union{String,Float64}}(undef, 0, 7)
-    fixed = Vector{Bool}()
-    hrule = Vector{Int}()
-    push!(hrule, 0, 1)
-    for (cname, hv) in bestfit
-        scname = string(cname)
-        for (pname, param) in hv
-            parname = string(pname)
-            parname *= (param.fixed  ?  " (FIXED)"  :  "")
-            (!showsettings.showfixed)  &&  param.fixed  &&  continue
-            range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
-            (range == "-Inf:Inf")  &&  (range = "")
-            patch = ""
-            isa(param.patch, Symbol)  &&  (patch = string(param.patch))
-            isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
-            isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
-            table = vcat(table,
-                         [scname parname range param.val param.unc (patch == ""  ?  ""  :  param.actual) patch])
-            push!(fixed, param.fixed)
-            if !showsettings.plain
-                scname = ""  # delete from following lines within the same component box
-            end
-        end
-        push!(hrule, length(fixed)+1)
-    end
-    printtable(io, table, ["Component", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:7),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]   &&  (j in (2,3,4,5))), showsettings.fixed)))
 end
 
 
@@ -297,15 +255,8 @@ function show(io::IO, status::MinimizerStatus)
 end
 
 
-function show(io::IO, res::FitResult; bestfit=true)
-    if bestfit
-        section(io, "Best fit parameters:")
-        show(io, res.bestfit)
-    end
-
-    println(io)
+function show(io::IO, res::FitResult)
     section(io, "Fit results:")
-
     println(io, @sprintf("    #Data : %8d       Elapsed time  : %10.5g", res.ndata, res.elapsed))
     println(io, @sprintf("    #Free : %8d       Red. fit stat.: %10.5g", res.nfree, res.fitstat))
     print(  io, @sprintf("    DOF   : %8d       ", res.dof))

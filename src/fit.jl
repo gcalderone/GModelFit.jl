@@ -1,6 +1,7 @@
 
 # ====================================================================
 struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
+    timestamp::DateTime
     model::Model
     measures::AbstractMeasures
     resid::Vector{Float64}
@@ -12,7 +13,7 @@ struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
         resid = fill(NaN, length(data))
         nfree = length(free_params(model))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T}(model, data, resid, nfree, length(resid) - nfree)
+        return new{T}(now(), model, data, resid, nfree, length(resid) - nfree)
     end
 end
 
@@ -47,6 +48,7 @@ end
 
 # ====================================================================
 struct MultiFitProblem <: AbstractFitProblem
+    timestamp::DateTime
     multi::MultiModel
     fp::Vector{FitProblem}
     resid::Vector{Float64}
@@ -60,7 +62,7 @@ struct MultiFitProblem <: AbstractFitProblem
         resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
         nfree = sum(getfield.(fp, :nfree))
         @assert nfree > 0 "No free parameter in the model"
-        return new(multi, fp, resid, nfree, length(resid) - nfree)
+        return new(now(), multi, fp, resid, nfree, length(resid) - nfree)
     end
 end
 
@@ -121,7 +123,6 @@ A structure representing the results of a fitting process.
 - `dof::Int`: ndata - nfree;
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
-- `bestfit`: dictionary of `Parameter` objects containing best fit values and their 1-σ uncertainties.  In the multi-model case this will be a vector of dictionaries.
 
 Note: the `FitResult` fields are supposed to be accessed directly by the user, without invoking any get/set method.
 """
@@ -135,25 +136,14 @@ struct FitResult
     # gofstat::Float64
     # log10testprob::Float64
     status::MinimizerStatus
-    comptypes::Union{Vector{OrderedDict{Symbol, String}}, OrderedDict{Symbol, String}}
-    bestfit::Union{Vector{HashHashVector{Parameter}}, HashHashVector{Parameter}}
 end
 
-function FitResult(timestamp::DateTime, fp::AbstractFitProblem, status::MinimizerStatus)
+function FitResult(fp::AbstractFitProblem, status::MinimizerStatus)
     # gof_stat = sum(abs2, residuals(fp))
     # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
-
-    if isa(fp, FitProblem)
-        ct = comptypes(fp.model)
-        bestfit = deepcopy(fp.model.params)
-    else
-        ct = [comptypes(fp.model) for fp in fp.fp]
-        bestfit = [deepcopy(fp.model.params) for fp in fp.fp]
-    end
-
-    FitResult(timestamp, (now() - timestamp).value / 1e3,
+    FitResult(fp.timestamp, (now() - fp.timestamp).value / 1e3,
               length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
-              status, ct, bestfit)
+              status)
 end
 
 
@@ -165,10 +155,9 @@ end
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
-    ts = now()
     fp = FitProblem(model, data)
     status = fit!(minimizer, fp)
-    return FitResult(ts, fp, status)
+    return ModelSnapshot(fp.model), FitResult(fp, status)
 end
 
 """
@@ -177,10 +166,9 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
-    ts = now()
     fp = MultiFitProblem(multi, data)
     status = fit!(minimizer, fp)
-    return FitResult(ts, fp, status)
+    return ModelSnapshot.(fp.multi.models), FitResult(fp, status)
 end
 
 
