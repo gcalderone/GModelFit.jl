@@ -115,6 +115,6 @@ model = Model(dom, :theory => Interpolator(theory_x, theory_y),
                    :main => SumReducer(:theory, :background))
 data = Measures(dom, obs_y, 0.2)
 res = fit!(model, data)
-dumpjson("ex_customcomp", [model, data, res]) # hide
+dumpjson("ex_Customcomp", [model, data, res]) # hide
 show(res) # hide
 ```
