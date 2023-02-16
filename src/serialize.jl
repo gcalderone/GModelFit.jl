@@ -38,8 +38,6 @@ function _serialize_struct(vv; add_show=false)
 end
 
 _serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter}) = _serialize_struct(vv)
-_serialize(vv::MultiModel) = _serialize(ModelSnapshot.(vv.models))
-_serialize(vv::Model) = _serialize(ModelSnapshot(vv))
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 function _serialize(vv::FitResult)
     out = _serialize_struct(vv)
@@ -129,6 +127,7 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd["unc"]))
         elseif dd["_structtype"] == "GFit.ModelSnapshot"
             return ModelSnapshot(_deserialize(dd["domain"]),
+                                _deserialize(dd["params"]),
                                 _deserialize(dd["buffers"]),
                                 _deserialize(dd["maincomp"]),
                                 _deserialize(dd["comptypes"]),

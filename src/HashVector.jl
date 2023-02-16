@@ -80,6 +80,7 @@ struct HashHashVector{V}
 end
 
 internal_data(hhv::HashHashVector) = hhv.data
+keys(hhv::HashHashVector) = collect(keys(getfield(hhv, :dict)))
 
 function empty!(hhv::HashHashVector)
     empty!(hhv.dict)

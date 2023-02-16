@@ -632,6 +632,7 @@ end
 
 struct ModelSnapshot
     domain::AbstractDomain
+    params::HashHashVector{Parameter}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
     comptypes::OrderedDict{Symbol, String}
@@ -641,7 +642,8 @@ function ModelSnapshot(model::Model)
     io = IOBuffer()
     show(io, model)
     s = String(take!(io))
-    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.buffers), find_maincomp(model),
+    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.params),
+                  deepcopy(model.buffers), find_maincomp(model),
                   comptypes(model), s)
 end
 
@@ -650,6 +652,13 @@ Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
 (model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
 (model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
 comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
+Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.params, name)
+function Base.getindex(model::ModelSnapshot, name::Symbol)
+    if name in keys(model.params)
+        return model.params[name]
+    end
+    error("Name $name not defined")
+end
 
 
 include("multimodel.jl")
