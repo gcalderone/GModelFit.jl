@@ -32,7 +32,7 @@ data = Measures(dom, meas, unc)
 model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-res = fit!(model, data)
+best, res = fit!(model, data)
 ```
 
 The output is as follows:

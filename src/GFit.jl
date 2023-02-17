@@ -642,7 +642,12 @@ struct ModelSnapshot
 end
 function ModelSnapshot(model::Model)
     io = IOBuffer()
-    show(io, model)
+    if showsettings.plain
+        show(io , model)
+    else
+        ctx = IOContext(io, :color => true)
+        show(ctx, model)
+    end
     s = String(take!(io))
     ModelSnapshot(deepcopy(domain(model)), deepcopy(model.params),
                   deepcopy(model.buffers), find_maincomp(model),

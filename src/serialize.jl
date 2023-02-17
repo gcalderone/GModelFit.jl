@@ -31,7 +31,12 @@ function _serialize_struct(vv; add_show=false)
     end
     if add_show
         io = IOBuffer()
-        show(io, vv)
+        if showsettings.plain
+            show(io , vv)
+        else
+            ctx = IOContext(io, :color => true)
+            show(ctx, vv)
+        end
         out["show"] = String(take!(io))
     end
     return out
