@@ -27,7 +27,7 @@ import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
-    MultiModel, evaluate, isfreezed, thaw!, freeze!, fit
+    MultiModel, update!, isfreezed, thaw!, freeze!, fit
 
 include("HashVector.jl")
 include("domain.jl")
@@ -205,7 +205,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function evaluate!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
+function update!!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
     c.updated  &&  return
 
     # Do we actually need a new evaluation?
@@ -245,7 +245,7 @@ Individual components may be *freezed* (i.e. have all its parameters fixed durin
 
 The main component, i.e. the one whose evaluation corresponds to the overall model evaluation, is typically automatically identified by analyzing the component dependencies.  However a specific component may be forced to be the main one by invoking `select_maincomp!`.
 
-The model is automatically evaluated whenever needed, however there are a few cases where it is not possible to trigger an automatic evaluation, e.g. immediately after the user modifies a `Parameter` value. In this case an evaluation can be forced by invoking `evaluate()`.
+The model is automatically evaluated whenever needed, however there are a few cases where it is not possible to trigger an automatic evaluation, e.g. immediately after the user modifies a `Parameter` value. In this case an evaluation can be forced by invoking `update!()`.
 
 The most important function for a `Model` object is `fit()`, which allows to fit the model against an empirical dataset. The `!` in the name reminds us that, after fitting, the parameter values will be set to the best fit ones (rather than retaining their original values).
 
@@ -371,22 +371,22 @@ end
 
 
 """
-    evaluate(model::Model)
+    update!(model::Model)
 
 Evaluate a `Model` and update internal structures.
 """
-function evaluate(model::Model)
-    eval_step0(model)
-    # eval_step1()
-    eval_step2(model)
-    eval_step3(model)
-    eval_step4(model)
+function update!(model::Model)
+    update_step0(model)
+    # update_step1()
+    update_step2(model)
+    update_step3(model)
+    update_step4(model)
     return model
 end
 
 
 # Evaluation step 0: update internal structures before fitting
-function eval_step0(model::Model)
+function update_step0(model::Model)
     empty!(model.params)
     empty!(model.pvalues)
     empty!(model.actual)
@@ -452,14 +452,14 @@ end
 
 
 # Evaluation step 1: set new model parameters
-function eval_step1(model::Model, pvalues::Vector{Float64})
+function update_step1(model::Model, pvalues::Vector{Float64})
     internal_data(model.pvalues)[model.ifree] .= pvalues
 end
 
 
 # Evaluation step 2: copy all parameter values into actual, then
 # update the latter by invoking the user patch functions.
-function eval_step2(model::Model)
+function update_step2(model::Model)
     # Reset `updated` flag
     for (cname, ceval) in model.cevals
         ceval.updated = false
@@ -495,19 +495,19 @@ end
 
 # Evaluation step 3: actual evaluation of model components, starting
 # from the main one and following dependencies
-eval_step3(model::Model) = eval_step3(model, find_maincomp(model))
-function eval_step3(model::Model, cname::Symbol)
+update_step3(model::Model) = update_step3(model, find_maincomp(model))
+function update_step3(model::Model, cname::Symbol)
     # Recursive evaluation of dependencies
     for d in dependencies(model, cname)
-        eval_step3(model, d)
+        update_step3(model, d)
     end
-    evaluate!(model.cevals[cname], model.domain, values(model.actual[cname]))
+    update!!(model.cevals[cname], model.domain, values(model.actual[cname]))
 end
 
 
 # Evaluation step 4: copy back bestfit and actual values, as well as
 # uncertainties, into their original Parameter structures.
-function eval_step4(model::Model, uncerts=Vector{Float64}[])
+function update_step4(model::Model, uncerts=Vector{Float64}[])
     ipar = 1
     i = 1
     for (cname, hv) in model.params
@@ -538,7 +538,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     ceval = CompEval(comp, model.domain)
     model.cevals[cname] = ceval
     model.buffers[cname] = ceval.buffer
-    evaluate(model)
+    update!(model)
 end
 
 free_params(model::Model) = internal_data(model.params)[model.ifree]
@@ -561,7 +561,7 @@ Freeze a component in the model (i.e. treat all component parameters as fixed fo
 function freeze!(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"
     model.cevals[cname].cfixed = true
-    evaluate(model)
+    update!(model)
     nothing
 end
 
@@ -573,7 +573,7 @@ Thaw a freezed component in the model (i.e. treat component parameters as fixed 
 function thaw!(model::Model, cname::Symbol)
     @assert cname in keys(model.cevals) "Component $cname is not defined"
     model.cevals[cname].cfixed = false
-    evaluate(model)
+    update!(model)
     nothing
 end
 

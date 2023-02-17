@@ -9,7 +9,7 @@ struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
     dof::Int
 
     function FitProblem(model::Model, data::T) where T <: AbstractMeasures
-        evaluate(model)
+        update!(model)
         resid = fill(NaN, length(data))
         nfree = length(free_params(model))
         @assert nfree > 0 "No free parameter in the model"
@@ -21,9 +21,9 @@ free_params(fp::FitProblem) = free_params(fp.model)
 residuals(fp::FitProblem) = fp.resid
 
 function update!(fp::FitProblem, pvalues::Vector{Float64})
-    eval_step1(fp.model, pvalues)
-    eval_step2(fp.model)
-    eval_step3(fp.model)
+    update_step1(fp.model, pvalues)
+    update_step2(fp.model)
+    update_step3(fp.model)
     update_residuals!(fp)
     return fp.resid
 end
@@ -37,11 +37,11 @@ fit_stat(fp::FitProblem{Measures{N}}) where N =
 function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     @assert fp.nfree == length(best) == length(uncerts)
     update!(fp, best)
-    eval_step4(fp.model, uncerts)
+    update_step4(fp.model, uncerts)
 end
 
 function error!(fp::FitProblem)
-    eval_step4(fp.model, fill(NaN, fp.nfree))
+    update_step4(fp.model, fill(NaN, fp.nfree))
 end
 
 
@@ -57,7 +57,7 @@ struct MultiFitProblem <: AbstractFitProblem
 
     function MultiFitProblem(multi::MultiModel, datasets::Vector{T}) where T <: AbstractMeasures
         @assert length(multi) == length(datasets)
-        evaluate(multi)
+        update!(multi)
         fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
         resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
         nfree = sum(getfield.(fp, :nfree))
@@ -73,10 +73,10 @@ function update!(fp::MultiFitProblem, pvalues::Vector{Float64})
     # We need to copy all parameter values before evaluation to ensure
     # all patch functions use the current parameter values
     for (id, i1, i2) in free_params_indices(fp.multi)
-        eval_step1(fp.multi[id], pvalues[i1:i2])
+        update_step1(fp.multi[id], pvalues[i1:i2])
     end
-    eval_step2(fp.multi)
-    eval_step3(fp.multi)
+    update_step2(fp.multi)
+    update_step3(fp.multi)
 
     # Populate resid vector
     i1 = 1

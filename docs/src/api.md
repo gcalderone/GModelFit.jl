@@ -18,7 +18,6 @@ axis
 comptype
 coords
 domain
-evaluate
 fit
 freeze!
 getindex
@@ -28,6 +27,7 @@ length
 push!
 select_maincomp!
 thaw!
+update!
 uncerts
 values
 ```

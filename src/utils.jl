@@ -84,7 +84,7 @@ No systematic error is considered when generating mock dataset(s).
 """
 function mock(::Type{Measures}, model::Model; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     rng = MersenneTwister(seed);
-    evaluate(model)
+    update!(model)
     values = model()
     ee = extrema(values)
     range = ee[2] - ee[1]
