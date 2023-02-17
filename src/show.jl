@@ -271,8 +271,9 @@ end
 
 
 function show(io::IO, mb::Vector{ModelSnapshot})
-    for i in 1:length(mb)
-        section(io, "Model $(i):")
-        println(io, mb[i].show)
+    for id in 1:length(mb)
+        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
+        println(io, mb[id].show)
     end
+    println(io)
 end
