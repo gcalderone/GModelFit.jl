@@ -27,7 +27,7 @@ import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
-    MultiModel, evaluate, isfreezed, thaw!, freeze!, fit!
+    MultiModel, evaluate, isfreezed, thaw!, freeze!, fit
 
 include("HashVector.jl")
 include("domain.jl")
@@ -247,7 +247,7 @@ The main component, i.e. the one whose evaluation corresponds to the overall mod
 
 The model is automatically evaluated whenever needed, however there are a few cases where it is not possible to trigger an automatic evaluation, e.g. immediately after the user modifies a `Parameter` value. In this case an evaluation can be forced by invoking `evaluate()`.
 
-The most important function for a `Model` object is `fit!()`, which allows to fit the model against an empirical dataset. The `!` in the name reminds us that, after fitting, the parameter values will be set to the best fit ones (rather than retaining their original values).
+The most important function for a `Model` object is `fit()`, which allows to fit the model against an empirical dataset. The `!` in the name reminds us that, after fitting, the parameter values will be set to the best fit ones (rather than retaining their original values).
 
 The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
 """

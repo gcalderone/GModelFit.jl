@@ -72,9 +72,9 @@ println() # hide
 We can fit the model against a mock dataset (see [Generate mock datasets](@ref)):
 ```@example abc
 data = GFit.mock(Measures, model)
-bestfit, res = fit!(model, data)
-dumpjson("ex_Parameter", [bestfit, data, res]) # hide
-show(res) # hide
+best, res = fit(model, data)
+dumpjson("ex_Parameter", [data, best, res]) # hide
+show((best, res)) # hide
 ```
 and plot the results with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
 ```@example abc 

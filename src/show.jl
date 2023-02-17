@@ -111,8 +111,6 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     ctype = join(ctype, ".")
 
     for (pname, param) in getparams(comp)
-        parname = string(pname)
-        parname *= (param.fixed  ?  " (FIXED)"  :  "")
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         (range == "-Inf:Inf")  &&  (range = "")
@@ -121,7 +119,10 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
         isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     [cname * (cfixed  ?  " (FIXED)"  :  "") ctype parname range param.val (isnan(param.unc)  ?  ""  :  param.unc) (patch == ""  ?  ""  :  param.actual) patch])
+                     permutedims([cname * (cfixed  ?  " (FIXED)"  :  ""), ctype,
+                                  string(pname), range, param.val,
+                                  (param.fixed | cfixed  ?  " (FIXED)"  :  (isnan(param.unc)  ?  ""  :  param.unc)),
+                                  (patch == ""  ?  ""  :  param.actual), patch]))
         push!(fixed, param.fixed)
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box
@@ -257,13 +258,21 @@ end
 
 function show(io::IO, res::FitStats)
     section(io, "Fit results:")
-    println(io, @sprintf("    #Data : %8d       Elapsed time  : %10.5g", res.ndata, res.elapsed))
-    println(io, @sprintf("    #Free : %8d       Red. fit stat.: %10.5g", res.nfree, res.fitstat))
-    print(  io, @sprintf("    DOF   : %8d       ", res.dof))
+    println(io, @sprintf("    #Data : %8d         Elapsed time  : %10.5g", res.ndata, res.elapsed))
+    println(io, @sprintf("    #Free : %8d         Red. fit stat.: %10.5g", res.nfree, res.fitstat))
+    print(  io, @sprintf("    DOF   : %8d         ", res.dof))
     show(io, res.status)
 end
 
 
 function show(io::IO, mb::ModelSnapshot)
     println(io, mb.show)
+end
+
+
+function show(io::IO, mb::Vector{ModelSnapshot})
+    for i in 1:length(mb)
+        section(io, "Model $(i):")
+        println(io, mb[i].show)
+    end
 end

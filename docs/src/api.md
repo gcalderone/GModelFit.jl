@@ -19,7 +19,7 @@ comptype
 coords
 domain
 evaluate
-fit!
+fit
 freeze!
 getindex
 haskey

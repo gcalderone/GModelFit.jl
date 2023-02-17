@@ -172,10 +172,10 @@ using GFit
 dom  = Domain(1:5)
 model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-res = fit!(model, data)
+best, res = fit(model, data)
 
 # Save a snapshot
-GFit.serialize("my_snapshot.json", [model, data, res])
+GFit.serialize("my_snapshot.json", [data, best, res])
 
 # Restore snapshot (possibly in a different Julia session)
 using GFit

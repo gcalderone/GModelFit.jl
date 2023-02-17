@@ -13,7 +13,7 @@ saveas(file) = Gnuplot.save(term="pngcairo size 550,350 fontscale 0.8", output="
 
 It provides the basic tools to define, interactively manipulate and efficiently evaluate a (possibly very complex) model, and to fit the latter to empirical data. The main functionalities are:
 - it handles datasets of any dimensionality;
-- the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit!()` and the object constructors (see [Basic concepts and data types](@ref));
+- the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit()` and the object constructors (see [Basic concepts and data types](@ref));
 - the fitting model is evaluated on a user defined domain, and is the result of a combination of *model components* or mathematical expressions (in the form of [lambda functions](https://en.wikipedia.org/wiki/Anonymous_function)), or any arbitrary mixture of the two;
 - it provides several ready-to-use [Built-in components](@ref), and it also allows to define new components to suit specific needs ([Custom components](@ref));
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
@@ -70,20 +70,20 @@ data = Measures(dom, meas, unc)
 model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-bestfit, res = fit!(model, data)
+best, res = fit(model, data)
 nothing # hide
 ```
 
 The **GFit.jl** package implements a `show` method for many of the data types involved, hence the above code results in the following output:
 ```@example abc
-show(res) # hide
+show((best, res)) # hide
 ```
 showing the best fit parameter values and the associated uncertaintites, as well as a few statistics concerning the fitting process.
 
 If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
 ```@example abc
 model[:main].a0.val = 5
-bestfit, res = fit!(model, data)
+best, res = fit(model, data)
 nothing # hide
 ```
 
@@ -99,8 +99,8 @@ saveas("simple_example") # hide
 Also, you can easily access the numerical results for further analysis, e.g.:
 ```@example abc
 println("Best fit value for the offset parameter: ", 
-	bestfit[:main].a0.val, " ± ", 
-	bestfit[:main].a0.unc, "\n",
+	best[:main].a0.val, " ± ", 
+	best[:main].a0.unc, "\n",
 	"Reduced χ^2: ", res.fitstat)
 ```
 

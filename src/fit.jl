@@ -150,39 +150,39 @@ end
 
 # ====================================================================
 """
-    fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+    fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
-function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     fp = FitProblem(model, data)
-    status = fit!(minimizer, fp)
+    status = fit(minimizer, fp)
     return ModelSnapshot(fp.model), FitStats(fp, status)
 end
 
 """
-    fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
+    fit(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
-function fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+function fit(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     fp = MultiFitProblem(multi, data)
-    status = fit!(minimizer, fp)
+    status = fit(minimizer, fp)
     return ModelSnapshot.(fp.multi.models), FitStats(fp, status)
 end
 
 
 """
-    fit!(model::Model; minimizer::AbstractMinimizer=lsqfit())
-    fit!(model::MultiModel; minimizer::AbstractMinimizer=lsqfit())
+    fit(model::Model; minimizer::AbstractMinimizer=lsqfit())
+    fit(model::MultiModel; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a model against dataset(s) of zeros.
 """
-fit!(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
-    fit!(model,
+fit(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
+    fit(model,
          Measures(domain(model), fill(0., length(domain(model))), 1.);
          minimizer=minimizer)
 
-fit!(model::MultiModel; minimizer::AbstractMinimizer=lsqfit()) =
-    fit!(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
+fit(model::MultiModel; minimizer::AbstractMinimizer=lsqfit()) =
+    fit(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
          minimizer=minimizer)

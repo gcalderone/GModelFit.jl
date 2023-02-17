@@ -13,7 +13,7 @@ using Random
 rng = MersenneTwister(0);
 noise = maximum(model()) * 0.01
 data = Measures(model() + noise * randn(rng, length(model())), noise);
-ret1 = fit!(model, data)
+ret1 = fit(model, data)
 ```
 
 To produce the plots I will use the [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl) package, but the user can choose any other package:
@@ -37,7 +37,7 @@ model = Model(dom,
               :psf => GFit.Gaussian(100., 0., 0., 1, 0.3, 15), 
 			  :main => SumReducer(:background, :psf))
 data = GFit.mock(Measures, model)
-ret1 = fit!(model, data)
+ret1 = fit(model, data)
 ```
 
 To produce the plots I will use the [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl) package, but the user can choose any other package:

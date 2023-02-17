@@ -19,7 +19,7 @@ abstract type AbstractMinimizer end
 
 # --------------------------------------------------------------------
 struct dry <: AbstractMinimizer; end
-function fit!(minimizer::dry, fp::AbstractFitProblem)
+function fit(minimizer::dry, fp::AbstractFitProblem)
     params = free_params(fp)
     println(params)
     finalize!(fp,
@@ -34,7 +34,7 @@ import LsqFit
 
 struct lsqfit <: AbstractMinimizer; end
 
-function fit!(minimizer::lsqfit, fp::AbstractFitProblem)
+function fit(minimizer::lsqfit, fp::AbstractFitProblem)
     params = free_params(fp)
     ndata = length(residuals(fp))
     prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
@@ -79,7 +79,7 @@ mutable struct cmpfit <: AbstractMinimizer
     cmpfit() = new(CMPFit.Config(), NaN)
 end
 
-function fit!(minimizer::cmpfit, fp::AbstractFitProblem)
+function fit(minimizer::cmpfit, fp::AbstractFitProblem)
     params = free_params(fp)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
