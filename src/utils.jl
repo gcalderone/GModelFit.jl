@@ -14,7 +14,8 @@ end
 
 
 # ====================================================================
-function print_param_covariance(fitres::FitResult;
+#= TODO
+function print_param_covariance(fitres::FitStats;
                                 select=nothing, sort=false, threshold=0.)
     @assert isa(fitres.status.internal, CMPFit.Result) "Minimizer is not CMPFit"
 
@@ -60,7 +61,7 @@ function print_param_covariance(fitres::FitResult;
         @printf "%-30s  %-30s  %10.4f\n" parnames[ii[i]] parnames[jj[i]] covar[i]
     end
 end
-
+=#
 
 """
     mock(::Type{Measures}, model::Model; keywords...)

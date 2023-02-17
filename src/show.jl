@@ -255,7 +255,7 @@ function show(io::IO, status::MinimizerStatus)
 end
 
 
-function show(io::IO, res::FitResult)
+function show(io::IO, res::FitStats)
     section(io, "Fit results:")
     println(io, @sprintf("    #Data : %8d       Elapsed time  : %10.5g", res.ndata, res.elapsed))
     println(io, @sprintf("    #Free : %8d       Red. fit stat.: %10.5g", res.nfree, res.fitstat))

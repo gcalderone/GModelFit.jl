@@ -37,7 +37,7 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
-_serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter, FitResult}) = _serialize_struct(vv)
+_serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
 _serialize(vv::MinimizerStatusCode) = Int(vv)
@@ -114,16 +114,16 @@ function _deserialize(dd::AbstractDict)
                                 _deserialize(dd["maincomp"]),
                                 _deserialize(dd["comptypes"]),
                                 _deserialize(dd["show"]))
-        elseif dd["_structtype"] == "GFit.FitResult"
-            return FitResult(_deserialize(dd["timestamp"]),
-                             _deserialize(dd["elapsed"]),
-                             _deserialize(dd["ndata"]),
-                             _deserialize(dd["nfree"]),
-                             _deserialize(dd["dof"]),
-                             _deserialize(dd["fitstat"]),
-                             _deserialize(dd["status"]),
-                             convert(OrderedDict{Symbol, String},_deserialize(dd["comptypes"])),
-                             _deserialize(dd["bestfit"]))
+        elseif dd["_structtype"] == "GFit.FitStats"
+            return FitStats(_deserialize(dd["timestamp"]),
+                            _deserialize(dd["elapsed"]),
+                            _deserialize(dd["ndata"]),
+                            _deserialize(dd["nfree"]),
+                            _deserialize(dd["dof"]),
+                            _deserialize(dd["fitstat"]),
+                            _deserialize(dd["status"]),
+                            convert(OrderedDict{Symbol, String},_deserialize(dd["comptypes"])),
+                            _deserialize(dd["bestfit"]))
         elseif dd["_structtype"] == "GFit.MinimizerStatus"
             return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
                                    _deserialize(dd["message"]),

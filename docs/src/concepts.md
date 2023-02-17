@@ -18,7 +18,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 - *Multi-model*: a container for two or more models, suitable to be compared to a corresponding number of `Measures` objects to perform [Multi-dataset fitting](@ref).  All models are identified by a unique integer identifier, starting from 1.  A multi-model is represented by an object of type `MultiModel`;
 
-- *Fit results*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitResult`](@ref) structure.
+- *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit!()`](@ref) function in a [`GFit.FitStats`](@ref) structure.
 
 - Standard Julia functions can be used by **GFit.jl** in two different contexts:
   - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when performing [Multi-dataset fitting](@ref);

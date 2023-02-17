@@ -111,7 +111,7 @@ end
 
 # ====================================================================
 """
-    FitResult
+    FitStats
 
 A structure representing the results of a fitting process.
 
@@ -124,9 +124,9 @@ A structure representing the results of a fitting process.
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 
-Note: the `FitResult` fields are supposed to be accessed directly by the user, without invoking any get/set method.
+Note: the `FitStats` fields are supposed to be accessed directly by the user, without invoking any get() method.
 """
-struct FitResult
+struct FitStats
     timestamp::DateTime
     elapsed::Float64
     ndata::Int
@@ -138,10 +138,10 @@ struct FitResult
     status::MinimizerStatus
 end
 
-function FitResult(fp::AbstractFitProblem, status::MinimizerStatus)
+function FitStats(fp::AbstractFitProblem, status::MinimizerStatus)
     # gof_stat = sum(abs2, residuals(fp))
     # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
-    FitResult(fp.timestamp, (now() - fp.timestamp).value / 1e3,
+    FitStats(fp.timestamp, (now() - fp.timestamp).value / 1e3,
               length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
               status)
 end
@@ -157,7 +157,7 @@ Fit a model to an empirical data set using the specified minimizer (default: `ls
 function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     fp = FitProblem(model, data)
     status = fit!(minimizer, fp)
-    return ModelSnapshot(fp.model), FitResult(fp, status)
+    return ModelSnapshot(fp.model), FitStats(fp, status)
 end
 
 """
@@ -168,7 +168,7 @@ Fit a multi-model to a set of empirical data sets using the specified minimizer 
 function fit!(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     fp = MultiFitProblem(multi, data)
     status = fit!(minimizer, fp)
-    return ModelSnapshot.(fp.multi.models), FitResult(fp, status)
+    return ModelSnapshot.(fp.multi.models), FitStats(fp, status)
 end
 
 
