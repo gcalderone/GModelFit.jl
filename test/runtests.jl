@@ -1,53 +1,62 @@
-using Random, Test, GFit
+using Random, Test, GFit, PMap
 
-hv = GFit.HashVector{Int}()
-hv.a = 1
-push!(GFit.internal_data(hv), 999)
-hv.b = 2
-hv.b = 3
+# Test Model
+mm = PMapModel{Float64}()
+@assert typeof(mm) == PMapModel{Float64}
 
-@test length(hv) == 2
-@test all(propertynames(hv) .== [:a, :b])
+mm[:comp] # empty component
+mm[:comp3][:par] = 3.1
+mm[:comp1][:par] = 1.1
+mm[:comp1][:alt] = 1.2
+mm[:comp3].par = 99
 
-@test hv.a == 1
-@test hv.b == 3
+@assert PMap.internal_vector(mm) == [99, 1.1, 1.2]
 
-hv.a = 10
-@test hv.a == 10
+@assert mm[:comp1].par == 1.1
+@assert mm[:comp1].alt == 1.2
+@assert mm[:comp3].par == 99
 
-for (key, val) in hv
-    println(key, "  ", val)
+@assert keys(mm) == [:comp, :comp3, :comp1]
+
+@assert propertynames(mm[:comp])  == Symbol[]
+@assert propertynames(mm[:comp1]) == [:par, :alt]
+@assert propertynames(mm[:comp3]) == [:par]
+
+@assert items(mm) == [99, 1.1, 1.2]
+@assert items(mm[:comp]) == Float64[]
+@assert items(mm[:comp1]) == [1.1, 1.2]
+@assert items(mm[:comp3]) == [99]
+
+for (cname, comp) in mm
+    println(cname)
+    for (pname, par) in comp
+        println("  ", pname, ": ", par)
+        @assert getproperty(mm[cname], pname) == par
+    end
 end
 
-@test hv[:a] == 10
-@test hv[:b] == 3
-
-hv[:a] = 88
-hv[:b] = 99
-
-@test hv[:a] == 88
-@test hv[:b] == 99
 
 
 
-hhv = GFit.HashHashVector{Int}()
-hhv[:comp1].a = 10
-hhv[:comp1].b = 20
-hhv[:comp2].a = 30
 
+# Test multimodel
+MM = PMapMultiModel([mm, deepcopy(mm)])
+@assert typeof(MM[1]) == PMapModel{Float64}
+@assert items(MM) == [99., 1.1, 1.2, 99., 1.1, 1.2]
 
-@test hhv[:comp1].a == 10
-@test hhv[:comp1].b == 20
-@test hhv[:comp2].a == 30
+MM[1][:comp1].par = 12345
+@assert items(MM) == [99., 12345., 1.2, 99., 1.1, 1.2]
 
-@test hhv[:comp1][:a] == 10
-@test hhv[:comp1][:b] == 20
-@test hhv[:comp2][:a] == 30
+set_items!(MM, [1,2,3,4,5,6])
+@assert items(MM) == [1,2,3,4,5,6]
 
-
-for (key1, hv) in hhv
-    for (key, val) in hv
-        println(key1, "  ", key, "  ", val)
+for i in 1:length(MM)
+    for (cname, comp) in MM[i]
+        println(cname)
+        for (pname, par) in comp
+            println("  ", pname, ": ", par)
+            @assert getproperty(MM[i][cname], pname) == par
+        end
     end
 end
 

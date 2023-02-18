@@ -12,9 +12,9 @@ Just like a `Model` object you may need to manually trigger a `MultiModel` evalu
 """
 struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
-    pvalues::Vector{HashHashVector{Float64}}
+    pvalues::Vector{PMapModel{Float64}}
     function MultiModel(v::Vararg{Model})
-        multi = new([v...], Vector{HashHashVector{Float64}}())
+        multi = new([v...], Vector{PMapModel{Float64}}())
         for m in v
             m.parent = multi
         end

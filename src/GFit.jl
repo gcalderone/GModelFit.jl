@@ -21,15 +21,17 @@ import Base.setindex!
 import Base.reshape
 import Base.propertynames
 import Base.getproperty
-import Base.setproperty!
 import Base.iterate
+import Base.values
 import Base.push!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
     MultiModel, update!, isfreezed, thaw!, freeze!, fit
 
-include("HashVector.jl")
+include("PMap.jl")
+using .PMap
+
 include("domain.jl")
 
 # ====================================================================
@@ -142,7 +144,7 @@ function getparams(comp::AbstractComponent)
 end
 
 # Note: this function must mirror getparams()
-function setparams!(comp::AbstractComponent, params::HashVector{Parameter})
+function setparams!(comp::AbstractComponent, params::PMapComponent{Parameter})
     for name in fieldnames(typeof(comp))
         field = getfield(comp, name)
         if isa(field, Parameter)
@@ -205,7 +207,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function update!!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
+function update!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
     c.updated  &&  return
 
     # Do we actually need a new evaluation?
@@ -255,9 +257,9 @@ mutable struct Model   # mutable because of parent and maincomp
     parent::Union{Nothing, AbstractMultiModel}
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    params::HashHashVector{Parameter}
-    pvalues::HashHashVector{Float64}
-    actual::HashHashVector{Float64}
+    params::PMapModel{Parameter}
+    pvalues::PMapModel{Float64}
+    actual::PMapModel{Float64}
     ifree::Vector{Int}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
@@ -296,9 +298,9 @@ mutable struct Model   # mutable because of parent and maincomp
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
-                    HashHashVector{Parameter}(),
-                    HashHashVector{Float64}(),
-                    HashHashVector{Float64}(),
+                    PMapModel{Parameter}(),
+                    PMapModel{Float64}(),
+                    PMapModel{Float64}(),
                     Vector{Int}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
@@ -453,7 +455,7 @@ end
 
 # Evaluation step 1: set new model parameters
 function update_step1(model::Model, pvalues::Vector{Float64})
-    internal_data(model.pvalues)[model.ifree] .= pvalues
+    items(model.pvalues)[model.ifree] .= pvalues
 end
 
 
@@ -465,7 +467,7 @@ function update_step2(model::Model)
         ceval.updated = false
     end
     # Copy pvalues into actual
-    internal_data(model.actual) .= internal_data(model.pvalues)
+    items(model.actual) .= items(model.pvalues)
     # Patch parameter values
     for (cname, hv) in model.params
         for (pname, par) in hv
@@ -501,7 +503,7 @@ function update_step3(model::Model, cname::Symbol)
     for d in dependencies(model, cname)
         update_step3(model, d)
     end
-    update!!(model.cevals[cname], model.domain, values(model.actual[cname]))
+    update!(model.cevals[cname], model.domain, collect(items(model.actual[cname])))
 end
 
 
@@ -541,7 +543,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     update!(model)
 end
 
-free_params(model::Model) = internal_data(model.params)[model.ifree]
+free_params(model::Model) = items(model.params)[model.ifree]
 
 """
     isfreezed(model::Model, cname::Symbol)
@@ -634,7 +636,7 @@ end
 
 struct ModelSnapshot
     domain::AbstractDomain
-    params::HashHashVector{Parameter}
+    params::PMapModel{Parameter}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
     comptypes::OrderedDict{Symbol, String}

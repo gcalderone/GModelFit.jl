@@ -42,7 +42,7 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
-_serialize(vv::Union{HashVector, HashHashVector, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
+_serialize(vv::Union{PMapModel, PMapComponent, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
 _serialize(vv::MinimizerStatusCode) = Int(vv)
@@ -85,14 +85,14 @@ function _deserialize(dd::AbstractDict)
     end
 
     if "_structtype" in keys(dd)
-        if dd["_structtype"] == "GFit.HashVector{GFit.Parameter}"
-            out = HashVector{Parameter}(_deserialize(dd["data"]))
+        if dd["_structtype"] == "GFit.PMapComponent{GFit.Parameter}"
+            out = PMapComponent{Parameter}(_deserialize(dd["data"]))
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
             return out
-        elseif dd["_structtype"] == "GFit.HashHashVector{GFit.Parameter}"
-            out = HashHashVector{Parameter}()
+        elseif dd["_structtype"] == "GFit.PMapModel{GFit.Parameter}"
+            out = PMapModel{Parameter}()
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
