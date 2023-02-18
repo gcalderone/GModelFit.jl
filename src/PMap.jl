@@ -3,7 +3,7 @@ module PMap
 
 using DataStructures
 
-import Base.getindex, Base.setindex!,
+import Base.getindex, Base.setindex!, Base.push!,
 Base.getproperty, Base.setproperty!, Base.propertynames,
 Base.length, Base.keys, Base.empty!, Base.iterate
 
@@ -88,7 +88,11 @@ iterate(pmap::PMapModel, state...) = iterate(pmap.comps, state...)
 # MultiModel
 struct PMapMultiModel{T}
     models::Vector{PMapModel{T}}
+    PMapMultiModel{T}() where T = new(Vector{PMapModel{T}}())
 end
+
+empty!(pmap::PMapMultiModel) = empty!.(pmap.models)
+push!(pmap::PMapMultiModel, m::PMapModel) = push!(pmap.models, m)
 
 getindex(pmap::PMapMultiModel, i::Int) = pmap.models[i]
 length(pmap::PMapMultiModel) = length(pmap.models)
