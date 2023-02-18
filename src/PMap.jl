@@ -7,41 +7,24 @@ import Base.getindex, Base.setindex!,
 Base.getproperty, Base.setproperty!, Base.propertynames,
 Base.length, Base.keys, Base.empty!, Base.iterate
 
-export PMapMultiModel, PMapModel, PMapComponent, items, set_items!
-    
-abstract type AbstractPMapComponent{T} end
+export  PMapComponent, PMapModel, PMapMultiModel, items, set_items!
 
-struct PMapModel{T}
-    comps::OrderedDict{Symbol, AbstractPMapComponent}
+struct PMapComponent{T}
+    params::OrderedDict{Symbol, Int}
     data::Vector{T}
 end
 
-struct PMapComponent{T} <: AbstractPMapComponent{T}
-    params::OrderedDict{Symbol, Int}
-    parent::PMapModel
+struct PMapModel{T}
+    comps::OrderedDict{Symbol, PMapComponent}
+    data::Vector{T}
 end
 
-PMapModel{T}() where T = PMapModel{T}(OrderedDict{Symbol, PMapComponent{T}}(), Vector{T}())
-PMapComponent(parent::PMapModel{T})  where T = PMapComponent{T}(OrderedDict{Symbol, Int}(), parent)
 
-internal_vector(pmap::PMapModel)      = pmap.data
-internal_vector(pmap::PMapComponent)  = getfield(pmap, :parent).data
+PMapComponent(parent::PMapModel{T}) where T = PMapComponent{T}(OrderedDict{Symbol, Int}(), parent.data)
+internal_vector(pmap::PMapComponent)  = getfield(pmap, :data)
 internal_dict(  pmap::PMapComponent)  = getfield(pmap, :params)
-
-function empty!(pmap::PMapModel)
-    empty!(pmap.comps)
-    empty!(pmap.data)
-end
-
-keys(pmap::PMapModel) = collect(keys(pmap.comps))
 propertynames(pmap::PMapComponent) = collect(keys(internal_dict(pmap)))
 
-function getindex(pmap::PMapModel{T}, key::Symbol) where T
-    if !haskey(pmap.comps, key)
-        pmap.comps[key] = PMapComponent(pmap)
-    end
-    return pmap.comps[key]
-end
 getindex(pmap::PMapComponent, key::Symbol) =
     internal_vector(pmap)[internal_dict(pmap)[key]]
 getproperty(pmap::PMapComponent, key::Symbol) = getindex(pmap, key)
@@ -59,6 +42,37 @@ end
 setproperty!(pmap::PMapComponent, key::Symbol, value) =
     setindex!(pmap, value, key)
 
+items(pmap::PMapComponent) =
+    view(internal_vector(pmap), collect(values(internal_dict(pmap))))
+
+function iterate(pmap::PMapComponent, state...)
+    out = iterate(internal_dict(pmap), state...)
+    isnothing(out)  &&  (return nothing)
+    return (out[1][1] => getproperty(pmap, out[1][1]), out[2])
+end
+
+
+
+
+
+PMapModel{T}() where T = PMapModel{T}(OrderedDict{Symbol, PMapComponent{T}}(), Vector{T}())
+
+internal_vector(pmap::PMapModel) = pmap.data
+
+function empty!(pmap::PMapModel)
+    empty!(pmap.comps)
+    empty!(pmap.data)
+end
+
+keys(pmap::PMapModel) = collect(keys(pmap.comps))
+
+function getindex(pmap::PMapModel{T}, key::Symbol) where T
+    if !haskey(pmap.comps, key)
+        pmap.comps[key] = PMapComponent(pmap)
+    end
+    return pmap.comps[key]
+end
+
 function items(pmap::PMapModel)
     ids = Vector{Int}()
     for (cname, comp) in pmap
@@ -66,16 +80,9 @@ function items(pmap::PMapModel)
     end
     return view(internal_vector(pmap), ids)
 end
-items(pmap::PMapComponent) = 
-    view(internal_vector(pmap), collect(values(internal_dict(pmap))))
 
 iterate(pmap::PMapModel, state...) = iterate(pmap.comps, state...)
 
-function iterate(pmap::PMapComponent, state...)
-    out = iterate(internal_dict(pmap), state...)
-    isnothing(out)  &&  (return nothing)
-    return (out[1][1] => getproperty(pmap, out[1][1]), out[2])
-end
 
 
 # MultiModel

@@ -1,4 +1,4 @@
-using Random, Test, GFit, PMap
+using Random, Test, GFit, .PMap
 
 # Test Model
 mm = PMapModel{Float64}()
