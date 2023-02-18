@@ -85,13 +85,13 @@ function _deserialize(dd::AbstractDict)
     end
 
     if "_structtype" in keys(dd)
-        if dd["_structtype"] == "GFit.PMapComponent{GFit.Parameter}"
+        if dd["_structtype"] == "GFit.PMap.PMapComponent{GFit.Parameter}"
             out = PMapComponent{Parameter}(_deserialize(dd["data"]))
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
             return out
-        elseif dd["_structtype"] == "GFit.PMapModel{GFit.Parameter}"
+        elseif dd["_structtype"] == "GFit.PMap.PMapModel{GFit.Parameter}"
             out = PMapModel{Parameter}()
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)

@@ -24,6 +24,7 @@ import Base.getproperty
 import Base.iterate
 import Base.values
 import Base.push!
+import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
@@ -117,6 +118,29 @@ mutable struct Parameter
 end
 Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 
+
+struct ParameterVectors
+    params::PMapModel{Parameter}
+    values::PMapModel{Float64}
+    actual::PMapModel{Float64}
+    ifree::Vector{Int}
+    ParameterVectors() = new(PMapModel{Parameter}(), PMapModel{Float64}(),
+                             PMapModel{Float64}(), Vector{Int}())
+end
+function empty!(pv::ParameterVectors)
+    empty!(pv.params)
+    empty!(pv.values)
+    empty!(pv.actual)
+    empty!(pv.ifree)
+end
+function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
+    pv.params[cname][pname] = par
+    pv.values[cname][pname] = par.val
+    pv.actual[cname][pname] = par.actual
+    if !par.fixed
+        push!(pv.ifree, length(items(pv.params)))
+    end
+end
 
 # ====================================================================
 # Components:
@@ -257,10 +281,7 @@ mutable struct Model   # mutable because of parent and maincomp
     parent::Union{Nothing, AbstractMultiModel}
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    params::PMapModel{Parameter}
-    pvalues::PMapModel{Float64}
-    actual::PMapModel{Float64}
-    ifree::Vector{Int}
+    pv::ParameterVectors
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
 
@@ -298,10 +319,7 @@ mutable struct Model   # mutable because of parent and maincomp
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
-                    PMapModel{Parameter}(),
-                    PMapModel{Float64}(),
-                    PMapModel{Float64}(),
-                    Vector{Int}(),
+                    ParameterVectors(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
 
@@ -389,12 +407,7 @@ end
 
 # Evaluation step 0: update internal structures before fitting
 function update_step0(model::Model)
-    empty!(model.params)
-    empty!(model.pvalues)
-    empty!(model.actual)
-    empty!(model.ifree)
-
-    ipar = 1
+    empty!(model.pv)
     for (cname, ceval) in model.cevals
         for (pname, _par) in getparams(ceval.comp)
             # Parameter may be changed here, hence we take a copy of the original one
@@ -407,9 +420,6 @@ function update_step0(model::Model)
                 s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
                 error(s)
             end
-            model.params[ cname][pname] = par
-            model.pvalues[cname][pname] = par.val
-            model.actual[ cname][pname] = par.val
 
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -435,10 +445,7 @@ function update_step0(model::Model)
             if ceval.cfixed != 0
                 par.fixed = true
             end
-            if !par.fixed
-                push!(model.ifree, ipar)
-            end
-            ipar += 1
+            push!(model.pv, cname, pname, par)
         end
 
         empty!(ceval.deps)
@@ -455,7 +462,7 @@ end
 
 # Evaluation step 1: set new model parameters
 function update_step1(model::Model, pvalues::Vector{Float64})
-    items(model.pvalues)[model.ifree] .= pvalues
+    items(model.pv.values)[model.pv.ifree] .= pvalues
 end
 
 
@@ -467,27 +474,27 @@ function update_step2(model::Model)
         ceval.updated = false
     end
     # Copy pvalues into actual
-    items(model.actual) .= items(model.pvalues)
+    items(model.pv.actual) .= items(model.pv.values)
     # Patch parameter values
-    for (cname, hv) in model.params
-        for (pname, par) in hv
+    for (cname, comp) in model.pv.params
+        for (pname, par) in comp
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
-                    model.actual[cname][pname] = model.pvalues[par.patch][pname]
+                    model.pv.actual[cname][pname] = model.pv.values[par.patch][pname]
                 else                       # invoke a patch function
                     if length(par.patch.args) == 1
-                        model.actual[cname][pname] = par.patch(model.pvalues)
+                        model.pv.actual[cname][pname] = par.patch(model.pv.values)
                     else
-                        model.actual[cname][pname] = par.patch(model.pvalues, model.pvalues[cname][pname])
+                        model.pv.actual[cname][pname] = par.patch(model.pv.values, model.values[cname][pname])
                     end
                 end
             elseif !isnothing(par.mpatch)
                 @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
                 if length(par.mpatch.args) == 1
-                    model.actual[cname][pname] = par.mpatch(model.parent.pvalues)
+                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pv.values)
                 else
-                    model.actual[cname][pname] = par.mpatch(model.parent.pvalues, model.pvalues[cname][pname])
+                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pv.values, model.pv.values[cname][pname])
                 end
             end
         end
@@ -503,32 +510,30 @@ function update_step3(model::Model, cname::Symbol)
     for d in dependencies(model, cname)
         update_step3(model, d)
     end
-    update!(model.cevals[cname], model.domain, collect(items(model.actual[cname])))
+    update!(model.cevals[cname], model.domain, collect(items(model.pv.actual[cname])))
 end
 
 
 # Evaluation step 4: copy back bestfit and actual values, as well as
 # uncertainties, into their original Parameter structures.
 function update_step4(model::Model, uncerts=Vector{Float64}[])
-    ipar = 1
     i = 1
-    for (cname, hv) in model.params
-        for (pname, par) in hv
-            par.val    = model.pvalues[cname][pname]
-            par.actual = model.actual[ cname][pname]
-            if (length(uncerts) > 0)  &&  (ipar in model.ifree)
+    for (cname, comp) in model.pv.params
+        for (pname, par) in comp
+            par.val    = model.pv.values[cname][pname]
+            par.actual = model.pv.actual[ cname][pname]
+            if (length(uncerts) > 0)  &&  (!par.fixed)
                 par.unc = uncerts[i]
                 i += 1
             else
                 par.unc = NaN
             end
-            ipar += 1
         end
     end
 
     # Also update Model's parameters
     for (cname, ceval) in model.cevals
-        setparams!(ceval.comp, model.params[cname])
+        setparams!(ceval.comp, model.pv.params[cname])
     end
 end
 
@@ -543,7 +548,7 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     update!(model)
 end
 
-free_params(model::Model) = items(model.params)[model.ifree]
+free_params(model::Model) = collect(items(model.pv.params)[model.pv.ifree])
 
 """
     isfreezed(model::Model, cname::Symbol)
@@ -651,7 +656,7 @@ function ModelSnapshot(model::Model)
         show(ctx, model)
     end
     s = String(take!(io))
-    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.params),
+    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.pv.params),
                   deepcopy(model.buffers), find_maincomp(model),
                   comptypes(model), s)
 end
