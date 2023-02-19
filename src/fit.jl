@@ -87,15 +87,3 @@ function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit()
     status = fit(minimizer, fp)
     return ModelSnapshot(fp.model), FitStats(fp, status)
 end
-
-
-"""
-    fit(model::Model; minimizer::AbstractMinimizer=lsqfit())
-    fit(model::MultiModel; minimizer::AbstractMinimizer=lsqfit())
-
-Fit a model against dataset(s) of zeros.
-"""
-fit(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
-    fit(model,
-         Measures(domain(model), fill(0., length(domain(model))), 1.);
-         minimizer=minimizer)

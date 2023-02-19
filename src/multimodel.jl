@@ -21,7 +21,8 @@ function update!(multi::Vector{Model})
 end
 
 function update_step_init(multi::Vector{Model})
-    # Populate pvmulti fields in all Model structures
+    # Populate pvmulti fields in all Model structures to notify we are
+    # going to perform a multi-model fitting
     for i in 1:length(multi)
         empty!(multi[i].pvmulti)
         for j in 1:length(multi)
