@@ -20,8 +20,8 @@ end
 free_params(fp::FitProblem) = free_params(fp.model)
 residuals(fp::FitProblem) = fp.resid
 
-function update_step_fit(fp::FitProblem, pvalues::Vector{Float64})
-    update_step_fit(fp.model, pvalues)
+function update_step_evaluation(fp::FitProblem, pvalues::Vector{Float64})
+    update_step_evaluation(fp.model, pvalues)
     fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
     return fp.resid
 end
@@ -31,7 +31,7 @@ fit_stat(fp::FitProblem{Measures{N}}) where N =
 
 function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     @assert fp.nfree == length(best) == length(uncerts)
-    update_step_fit(fp, best)
+    update_step_evaluation(fp, best)
     update_step_finalize(fp.model, uncerts)
 end
 

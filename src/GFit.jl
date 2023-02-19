@@ -396,7 +396,7 @@ Evaluate a `Model` and update internal structures.
 """
 function update!(model::Model)
     update_step_init(model)
-    update_step_fit(model)
+    update_step_evaluation(model)
     update_step_finalize(model)
     return model
 end
@@ -460,11 +460,11 @@ end
 
 
 # Evaluation step fit:
-# - set new model parameters;
+# - set new parameter values (if provided)
 # - copy all parameter values into actual;
 # - update actual by invoking the patch functions;
 # - evaluation of all components
-function update_step_fit(model::Model, pvalues=Vector{Float64}[])
+function update_step_evaluation(model::Model, pvalues=Vector{Float64}[])
     # set new model parameters
     if length(pvalues) > 0
         items(model.pv.values)[model.pv.ifree] .= pvalues

@@ -1,22 +1,3 @@
-function update!(multi::Vector{Model})
-    update_step_init(multi)
-    update_step_fit(multi)
-    update_step_finalize(multi)
-    return multi
-end
-
-function update_step_init(multi::Vector{Model})
-    # Populate pvmulti fields in all Model structures
-    for i in 1:length(multi)
-        empty!(multi[i].pvmulti)
-        for j in 1:length(multi)
-            push!(multi[i].pvmulti, multi[j].pv.values)
-        end
-    end
-    update_step_init.(multi)
-end
-
-
 function free_params_indices(multi::Vector{Model})
     out = Vector{NTuple{3, Int}}()
     i1 = 1
@@ -32,13 +13,32 @@ function free_params_indices(multi::Vector{Model})
 end
 
 
-function update_step_fit(multi::Vector{Model}, pvalues=Vector{Float64}[])
+function update!(multi::Vector{Model})
+    update_step_init(multi)
+    update_step_evaluation(multi)
+    update_step_finalize(multi)
+    return multi
+end
+
+function update_step_init(multi::Vector{Model})
+    # Populate pvmulti fields in all Model structures
+    for i in 1:length(multi)
+        empty!(multi[i].pvmulti)
+        for j in 1:length(multi)
+            push!(multi[i].pvmulti, multi[j].pv.values)
+        end
+    end
+    update_step_init.(multi)
+end
+
+function update_step_evaluation(multi::Vector{Model}, pvalues=Vector{Float64}[])
+    # Must set pvalues on all models before any evaluation
     if length(pvalues) > 0
         for (id, i1, i2) in free_params_indices(multi)
             items(multi[id].pv.values)[multi[id].pv.ifree] .= pvalues[i1:i2]
         end
     end
-    update_step_fit.(multi)
+    update_step_evaluation.(multi)
 end
 
 function update_step_finalize(multi::Vector{Model}, uncerts=Vector{Float64}[])
@@ -85,8 +85,8 @@ end
 free_params(fp::MultiFitProblem) = free_params(fp.multi)
 residuals(fp::MultiFitProblem) = fp.resid
 
-function update_step_fit(fp::MultiFitProblem, pvalues::Vector{Float64})
-    update_step_fit(fp.multi, pvalues)
+function update_step_evaluation(fp::MultiFitProblem, pvalues::Vector{Float64})
+    update_step_evaluation(fp.multi, pvalues)
 
     # Populate residuals
     i1 = 1
