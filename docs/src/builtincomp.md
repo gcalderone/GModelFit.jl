@@ -116,9 +116,10 @@ model = Model(dom, GFit.FCompv(x -> A*x - b,
                                [1, 1, 1]))
 println() # hide
 ```
-where `x = [1, 1, 1]` are the initial guess values for the three parameters in the fit.  In this case there is no *empirical data* to compare the model to since we already inserted the data into the model.  When the `fit` function is invoked with just one argument (the model) the data are assumed to zeros, with equal weights (i.e. all uncertainties are 1);
+where `x = [1, 1, 1]` are the initial guess values for the three parameters in the fit.  In this case the *empirical data* to compare the model to are just zeros, and we will assume a constant uncertainty of 1 for all samples:
 ```@example abc
-best, res = fit(model)
+data = Measures(domain(model), fill(0., length(domain(model))), 1.)
+best, res = fit(model, data)
 dumpjson("ex_FCompv", [data, best, res]) # hide
 show((best, res)) # hide
 ```
