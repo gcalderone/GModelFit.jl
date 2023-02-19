@@ -1,8 +1,8 @@
-using Random, Test, GFit, .PMap
+using Random, Test, GFit, .PV
 
 # Test Model
-mm = PMapModel{Float64}()
-@assert typeof(mm) == PMapModel{Float64}
+mm = PVModel{Float64}()
+@assert typeof(mm) == PVModel{Float64}
 
 mm[:comp] # empty component
 mm[:comp3][:par] = 3.1
@@ -10,7 +10,7 @@ mm[:comp1][:par] = 1.1
 mm[:comp1][:alt] = 1.2
 mm[:comp3].par = 99
 
-@assert PMap.internal_vector(mm) == [99, 1.1, 1.2]
+@assert PV.internal_vector(mm) == [99, 1.1, 1.2]
 
 @assert mm[:comp1].par == 1.1
 @assert mm[:comp1].alt == 1.2
@@ -36,12 +36,11 @@ for (cname, comp) in mm
 end
 
 
-
-
-
 # Test multimodel
-MM = PMapMultiModel([mm, deepcopy(mm)])
-@assert typeof(MM[1]) == PMapModel{Float64}
+MM = PVMulti{Float64}()
+push!(MM, mm)
+push!(MM, deepcopy(mm))
+@assert typeof(MM[1]) == PVModel{Float64}
 @assert items(MM) == [99., 1.1, 1.2, 99., 1.1, 1.2]
 
 MM[1][:comp1].par = 12345
