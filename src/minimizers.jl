@@ -48,7 +48,6 @@ function fit(minimizer::lsqfit, fp::AbstractFitProblem)
                            upper=getfield.(params, :high))
     ProgressMeter.finish!(prog)
     if !res.converged
-        error!(fp)
         return MinimizerStatus(MinERROR, "Not converged", res)
     end
 
@@ -104,7 +103,6 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
         ProgressMeter.finish!(prog)
 
         if res.status <= 0
-            error!(fp)
             return MinimizerStatus(MinError, "Status = $(res.status)", res)
         end
 

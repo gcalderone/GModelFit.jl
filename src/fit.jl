@@ -35,10 +35,6 @@ function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float6
     update_step_finalize(fp.model, uncerts)
 end
 
-function error!(fp::FitProblem)
-    update_step_finalize(fp.model, fill(NaN, fp.nfree))
-end
-
 
 # ====================================================================
 """

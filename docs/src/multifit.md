@@ -26,7 +26,7 @@ using GFit
 dom = Domain(-5.:5)
 model1 = Model(dom, GFit.Gaussian(1, 0., 1.))
 model2 = Model(dom, GFit.Gaussian(1, 0., 1.))
-multi = MultiModel(model1, model2)
+multi = [model1, model2]
 
 # Patch parameters
 multi[2][:main].norm.mpatch   = @λ m -> m[1][:main].norm

@@ -124,17 +124,14 @@ struct ParameterVectors
     values::PVModel{Float64}
     actual::PVModel{Float64}
     ifree::Vector{Int}
-    mvalues::PVMulti{Float64}
     ParameterVectors() = new(PVModel{Parameter}(), PVModel{Float64}(),
-                             PVModel{Float64}(), Vector{Int}(),
-                             PVMulti{Float64}())
+                             PVModel{Float64}(), Vector{Int}())
 end
 function empty!(pv::ParameterVectors)
     empty!(pv.params)
     empty!(pv.values)
     empty!(pv.actual)
     empty!(pv.ifree)
-    empty!(pv.mvalues)
 end
 function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
     pv.params[cname][pname] = par
@@ -283,6 +280,7 @@ mutable struct Model   # mutable because of maincomp
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     pv::ParameterVectors
+    pvmulti::PVMulti{Float64}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
 
@@ -320,7 +318,7 @@ mutable struct Model   # mutable because of maincomp
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(domain, OrderedDict{Symbol, CompEval}(),
-                    ParameterVectors(),
+                    ParameterVectors(), PVMulti{Float64}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
 
@@ -435,6 +433,7 @@ function update_step_init(model::Model)
                     end
                 end
             elseif !isnothing(par.mpatch)
+                @assert length(model.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
                 @assert length(par.mpatch.args) in [1,2]
                 if length(par.mpatch.args) == 1
                     par.fixed = true
@@ -492,11 +491,11 @@ function update_step_fit(model::Model, pvalues=Vector{Float64}[])
                     end
                 end
             elseif !isnothing(par.mpatch)
-                @assert length(model.pv.mvalues) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
+                @assert length(model.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
                 if length(par.mpatch.args) == 1
-                    model.pv.actual[cname][pname] = par.mpatch(model.pv.mvalues)
+                    model.pv.actual[cname][pname] = par.mpatch(model.pvmulti)
                 else
-                    model.pv.actual[cname][pname] = par.mpatch(model.pv.mvalues, model.pv.values[cname][pname])
+                    model.pv.actual[cname][pname] = par.mpatch(model.pvmulti, model.pv.values[cname][pname])
                 end
             end
         end
@@ -676,13 +675,12 @@ function Base.getindex(model::ModelSnapshot, name::Symbol)
 end
 
 
-# include("multimodel.jl")
-
 abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
-include("serialize.jl")
+include("multimodel.jl")
 
+include("serialize.jl")
 include("show.jl")
 include("utils.jl")
 
