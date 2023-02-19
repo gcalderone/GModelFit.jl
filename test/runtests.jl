@@ -36,29 +36,6 @@ for (cname, comp) in mm
 end
 
 
-# Test multimodel
-MM = PVMulti{Float64}()
-push!(MM, mm)
-push!(MM, deepcopy(mm))
-@assert typeof(MM[1]) == PVModel{Float64}
-@assert items(MM) == [99., 1.1, 1.2, 99., 1.1, 1.2]
-
-MM[1][:comp1].par = 12345
-@assert items(MM) == [99., 12345., 1.2, 99., 1.1, 1.2]
-
-set_items!(MM, [1,2,3,4,5,6])
-@assert items(MM) == [1,2,3,4,5,6]
-
-for i in 1:length(MM)
-    for (cname, comp) in MM[i]
-        println(cname)
-        for (pname, par) in comp
-            println("  ", pname, ": ", par)
-            @assert getproperty(MM[i][cname], pname) == par
-        end
-    end
-end
-
 
 # ====================================================================
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]

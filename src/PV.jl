@@ -3,9 +3,9 @@ module PV
 
 using DataStructures
 
-import Base.getindex, Base.setindex!, Base.push!,
+import Base.getindex, Base.setindex!,
 Base.getproperty, Base.setproperty!, Base.propertynames,
-Base.length, Base.keys, Base.empty!, Base.iterate
+Base.keys, Base.empty!, Base.iterate
 
 export  PVComp, PVModel, PVMulti, items, set_items!
 
@@ -82,38 +82,5 @@ function items(pv::PVModel)
 end
 
 iterate(pv::PVModel, state...) = iterate(pv.comps, state...)
-
-
-
-# Multi
-struct PVMulti{T}
-    models::Vector{PVModel{T}}
-    PVMulti{T}() where T = new(Vector{PVModel{T}}())
-end
-
-empty!(pv::PVMulti) = empty!(pv.models)
-push!(pv::PVMulti, m::PVModel) = push!(pv.models, m)
-
-getindex(pv::PVMulti, i::Int) = pv.models[i]
-length(pv::PVMulti) = length(pv.models)
-
-# Note: the following returns a copy of the items, rather than a view
-function items(pv::PVMulti{T}) where T
-    out = Vector{T}()
-    for i in 1:length(pv)
-        append!(out, items(pv[i]))
-    end
-    return out
-end
-
-function set_items!(pv::PVMulti, values::Vector)
-    c = 1
-    for i in 1:length(pv)
-        v = items(pv[i])
-        v .= values[c:(c+length(v)-1)]
-        c += length(v)
-    end
-    nothing
-end
 
 end

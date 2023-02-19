@@ -280,7 +280,7 @@ mutable struct Model   # mutable because of maincomp
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     pv::ParameterVectors
-    pvmulti::PVMulti{Float64}
+    pvmulti::Vector{PVModel{Float64}}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
 
@@ -318,7 +318,7 @@ mutable struct Model   # mutable because of maincomp
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
         model = new(domain, OrderedDict{Symbol, CompEval}(),
-                    ParameterVectors(), PVMulti{Float64}(),
+                    ParameterVectors(), Vector{PVModel{Float64}}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
 

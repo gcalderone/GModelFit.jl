@@ -33,13 +33,12 @@ end
 
 
 function update_step_fit(multi::Vector{Model}, pvalues=Vector{Float64}[])
-     if length(pvalues) > 0
-         for (id, i1, i2) in free_params_indices(multi)
-             update_step_fit(multi[id], pvalues[i1:i2])
-         end
-     else
-         update_step_fit.(multi)
-     end
+    if length(pvalues) > 0
+        for (id, i1, i2) in free_params_indices(multi)
+            items(multi[id].pv.values)[multi[id].pv.ifree] .= pvalues[i1:i2]
+        end
+    end
+    update_step_fit.(multi)
 end
 
 function update_step_finalize(multi::Vector{Model}, uncerts=Vector{Float64}[])
