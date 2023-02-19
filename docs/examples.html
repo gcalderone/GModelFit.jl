@@ -9,7 +9,7 @@ using Random
 rng = MersenneTwister(0);
 noise = maximum(model()) * 0.01
 data = Measures(model() + noise * randn(rng, length(model())), noise);
-ret1 = fit!(model, data)</code></pre><p>To produce the plots I will use the <a href="https://github.com/gcalderone/Gnuplot.jl">Gnuplot.jl</a> package, but the user can choose any other package:</p><pre><code class="language-julia hljs">using Gnuplot
+ret1 = fit(model, data)</code></pre><p>To produce the plots I will use the <a href="https://github.com/gcalderone/Gnuplot.jl">Gnuplot.jl</a> package, but the user can choose any other package:</p><pre><code class="language-julia hljs">using Gnuplot
 @gp    &quot;set multi layout 2,1&quot; :-
 @gp :- domain(model) data.val data.unc &quot;w yerr tit &#39;Data&#39;&quot; :-
 @gp :- domain(model) model(:line1) .+ model(:offset) &quot;w l tit &#39;offset + line1&#39;&quot; :-
@@ -21,7 +21,7 @@ model = Model(dom,
               :psf =&gt; GFit.Gaussian(100., 0., 0., 1, 0.3, 15), 
 			  :main =&gt; SumReducer(:background, :psf))
 data = GFit.mock(Measures, model)
-ret1 = fit!(model, data)</code></pre><p>To produce the plots I will use the <a href="https://github.com/gcalderone/Gnuplot.jl">Gnuplot.jl</a> package, but the user can choose any other package:</p><pre><code class="language-julia hljs">using Gnuplot
+ret1 = fit(model, data)</code></pre><p>To produce the plots I will use the <a href="https://github.com/gcalderone/Gnuplot.jl">Gnuplot.jl</a> package, but the user can choose any other package:</p><pre><code class="language-julia hljs">using Gnuplot
 
 # Plot the model...
 @gsp coords(dom, 1) coords(dom, 2) model()
@@ -30,4 +30,4 @@ ret1 = fit!(model, data)</code></pre><p>To produce the plots I will use the <a h
 @gsp coords(dom, 1) coords(dom, 2) values(data) - model()
 
 # Plot using pm3d style
-@gsp &quot;set pm3d&quot; &quot;set palette&quot; coords(dom, 1) coords(dom, 2) model() &quot;w dots&quot;</code></pre></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Tuesday 31 January 2023 01:53">Tuesday 31 January 2023</span>. Using Julia version 1.8.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+@gsp &quot;set pm3d&quot; &quot;set palette&quot; coords(dom, 1) coords(dom, 2) model() &quot;w dots&quot;</code></pre></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Monday 20 February 2023 00:03">Monday 20 February 2023</span>. Using Julia version 1.8.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
