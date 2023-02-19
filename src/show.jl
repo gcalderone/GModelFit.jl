@@ -232,7 +232,7 @@ end
 
 
 function show(io::IO, status::MinimizerStatus)
-    print(io, "Status        : ")
+    print(io, "Status: ")
     if status.code == MinOK
         ss = (crayon"green", "OK")
     elseif status.code == MinWARN
@@ -246,21 +246,22 @@ function show(io::IO, status::MinimizerStatus)
     end
 
     if showsettings.plain
-        println(io, @sprintf("%10s", ss[2]))
+        print(io, @sprintf("%8s", ss[2]))
     else
-        println(io, ss[1], @sprintf("%10s", ss[2]), crayon"default")
+        print(io, ss[1], @sprintf("%8s", ss[2]), crayon"default")
     end
     if status.message != ""
-        println(io, ss[1], ": ", status.message, crayon"default")
+        println(io, ss[1], ": ", status.message)
     end
+    println(io, crayon"default")
 end
 
 
 function show(io::IO, res::FitStats)
     section(io, "Fit results:")
-    println(io, @sprintf("    #Data : %8d         Elapsed time  : %10.5g", res.ndata, res.elapsed))
-    println(io, @sprintf("    #Free : %8d         Red. fit stat.: %10.5g", res.nfree, res.fitstat))
-    print(  io, @sprintf("    DOF   : %8d         ", res.dof))
+    println(io, @sprintf("    #Data : %8d         Red. fit stat.: %10.5g  (DOF: %d)", res.ndata, res.fitstat, res.dof))
+    println(io, @sprintf("    #Free : %8d         Elapsed time  : %10.5g", res.nfree, res.elapsed))
+    print(io, "    ")
     show(io, res.status)
 end
 
