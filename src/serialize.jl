@@ -42,7 +42,7 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
-_serialize(vv::Union{PMapModel, PMapComponent, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
+_serialize(vv::Union{PVModel, PVComp, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
 _serialize(vv::MinimizerStatusCode) = Int(vv)
@@ -85,14 +85,14 @@ function _deserialize(dd::AbstractDict)
     end
 
     if "_structtype" in keys(dd)
-        if dd["_structtype"] == "GFit.PMap.PMapComponent{GFit.Parameter}"
-            out = PMapComponent{Parameter}(_deserialize(dd["data"]))
+        if dd["_structtype"] == "GFit.PV.PVComp{GFit.Parameter}"
+            out = PVComp{Parameter}(_deserialize(dd["data"]))
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end
             return out
-        elseif dd["_structtype"] == "GFit.PMap.PMapModel{GFit.Parameter}"
-            out = PMapModel{Parameter}()
+        elseif dd["_structtype"] == "GFit.PV.PVModel{GFit.Parameter}"
+            out = PVModel{Parameter}()
             for (k, v) in dd["dict"]
                 getfield(out, :dict)[Symbol(k)] = _deserialize(v)
             end

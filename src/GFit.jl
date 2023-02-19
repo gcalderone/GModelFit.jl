@@ -30,8 +30,8 @@ export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
     MultiModel, update!, isfreezed, thaw!, freeze!, fit
 
-include("PMap.jl")
-using .PMap
+include("PV.jl")
+using .PV
 
 include("domain.jl")
 
@@ -118,15 +118,16 @@ mutable struct Parameter
 end
 Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 
+
 struct ParameterVectors
-    params::PMapModel{Parameter}
-    values::PMapModel{Float64}
-    actual::PMapModel{Float64}
+    params::PVModel{Parameter}
+    values::PVModel{Float64}
+    actual::PVModel{Float64}
     ifree::Vector{Int}
-    mvalues::PMapMultiModel{Float64}
-    ParameterVectors() = new(PMapModel{Parameter}(), PMapModel{Float64}(),
-                             PMapModel{Float64}(), Vector{Int}(),
-                             PMapMultiModel{Float64}())
+    mvalues::PVMulti{Float64}
+    ParameterVectors() = new(PVModel{Parameter}(), PVModel{Float64}(),
+                             PVModel{Float64}(), Vector{Int}(),
+                             PVMulti{Float64}())
 end
 function empty!(pv::ParameterVectors)
     empty!(pv.params)
@@ -170,7 +171,7 @@ function getparams(comp::AbstractComponent)
 end
 
 # Note: this function must mirror getparams()
-function setparams!(comp::AbstractComponent, params::PMapComponent{Parameter})
+function setparams!(comp::AbstractComponent, params::PVComp{Parameter})
     for name in fieldnames(typeof(comp))
         field = getfield(comp, name)
         if isa(field, Parameter)
@@ -641,7 +642,7 @@ end
 
 struct ModelSnapshot
     domain::AbstractDomain
-    params::PMapModel{Parameter}
+    params::PVModel{Parameter}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
     comptypes::OrderedDict{Symbol, String}
