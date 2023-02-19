@@ -91,7 +91,7 @@ struct PMapMultiModel{T}
     PMapMultiModel{T}() where T = new(Vector{PMapModel{T}}())
 end
 
-empty!(pmap::PMapMultiModel) = empty!.(pmap.models)
+empty!(pmap::PMapMultiModel) = empty!(pmap.models)
 push!(pmap::PMapMultiModel, m::PMapModel) = push!(pmap.models, m)
 
 getindex(pmap::PMapMultiModel, i::Int) = pmap.models[i]

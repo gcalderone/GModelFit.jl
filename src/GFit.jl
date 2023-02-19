@@ -486,15 +486,15 @@ function update_step2(model::Model)
                     if length(par.patch.args) == 1
                         model.pv.actual[cname][pname] = par.patch(model.pv.values)
                     else
-                        model.pv.actual[cname][pname] = par.patch(model.pv.values, model.values[cname][pname])
+                        model.pv.actual[cname][pname] = par.patch(model.pv.values, model.pv.values[cname][pname])
                     end
                 end
             elseif !isnothing(par.mpatch)
                 @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
                 if length(par.mpatch.args) == 1
-                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pv.values)
+                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pvalues)
                 else
-                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pv.values, model.pv.values[cname][pname])
+                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pvalues, model.pv.values[cname][pname])
                 end
             end
         end

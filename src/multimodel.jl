@@ -12,9 +12,9 @@ Just like a `Model` object you may need to manually trigger a `MultiModel` evalu
 """
 struct MultiModel <: AbstractMultiModel
     models::Vector{Model}
-    pvalues::Vector{PMapModel{Float64}}
+    pvalues::PMapMultiModel{Float64}
     function MultiModel(v::Vararg{Model})
-        multi = new([v...], Vector{PMapModel{Float64}}())
+        multi = new([v...], PMapMultiModel{Float64}())
         for m in v
             m.parent = multi
         end
@@ -63,7 +63,7 @@ function free_params_indices(multi::MultiModel)
     out = Vector{NTuple{3, Int}}()
     i1 = 1
     for id in 1:length(multi)
-        nn = length(multi[id].ifree)
+        nn = length(multi[id].pv.ifree)
         if nn > 0
             i2 = i1 + nn - 1
             push!(out, (id, i1, i2))
@@ -80,7 +80,7 @@ function update_step0(multi::MultiModel)
     end
     empty!(multi.pvalues)
     for id in 1:length(multi)
-        push!(multi.pvalues, multi.models[id].pvalues)
+        push!(multi.pvalues, multi.models[id].pv.values)
     end
 end
 
