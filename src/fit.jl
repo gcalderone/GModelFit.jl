@@ -20,9 +20,13 @@ end
 free_params(fp::FitProblem) = free_params(fp.model)
 residuals(fp::FitProblem) = fp.resid
 
+function update_step_residuals(fp::FitProblem)
+    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
+end
+
 function update_step_evaluation(fp::FitProblem, pvalues::Vector{Float64})
     update_step_evaluation(fp.model, pvalues)
-    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
+    update_step_residuals(fp)
     return fp.resid
 end
 

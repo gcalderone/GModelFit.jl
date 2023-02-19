@@ -91,6 +91,7 @@ function update_step_evaluation(fp::MultiFitProblem, pvalues::Vector{Float64})
     # Populate residuals
     i1 = 1
     for id in 1:length(fp.multi)
+        update_step_residuals(fp.fp[id])
         nn = length(fp.fp[id].resid)
         if nn > 0
             i2 = i1 + nn - 1
@@ -101,7 +102,6 @@ function update_step_evaluation(fp::MultiFitProblem, pvalues::Vector{Float64})
     return fp.resid
 end
 
-# TODO: Handle the case where at least one dataset is not a `Measures`
 fit_stat(fp::MultiFitProblem) =
     sum(abs2, fp.resid) / fp.dof
 
