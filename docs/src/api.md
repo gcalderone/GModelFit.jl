@@ -14,6 +14,7 @@ Measures{N}
 Model
 @λ
 axis
+compare
 comptype
 coords
 domain
