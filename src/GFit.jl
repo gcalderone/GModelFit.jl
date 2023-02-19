@@ -459,17 +459,16 @@ function update_step_init(model::Model)
 end
 
 
+# Set new model parameters
+function update_step_newpvalues(model::Model, pvalues::Vector{Float64})
+    items(model.pv.values)[model.pv.ifree] .= pvalues
+end
+
 # Evaluation step fit:
-# - set new parameter values (if provided)
 # - copy all parameter values into actual;
 # - update actual by invoking the patch functions;
 # - evaluation of all components
-function update_step_evaluation(model::Model, pvalues=Vector{Float64}[])
-    # set new model parameters
-    if length(pvalues) > 0
-        items(model.pv.values)[model.pv.ifree] .= pvalues
-    end
-
+function update_step_evaluation(model::Model)
     # Reset `updated` flag
     for (cname, ceval) in model.cevals
         ceval.updated = false

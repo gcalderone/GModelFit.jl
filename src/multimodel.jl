@@ -31,13 +31,13 @@ function update_step_init(multi::Vector{Model})
     update_step_init.(multi)
 end
 
-function update_step_evaluation(multi::Vector{Model}, pvalues=Vector{Float64}[])
-    # Must set pvalues on all models before any evaluation
-    if length(pvalues) > 0
-        for (id, i1, i2) in free_params_indices(multi)
-            items(multi[id].pv.values)[multi[id].pv.ifree] .= pvalues[i1:i2]
-        end
+function update_step_newpvalues(multi::Vector{Model}, pvalues::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(multi)
+        update_step_newpvalues(multi[id], pvalues[i1:i2])
     end
+end
+
+function update_step_evaluation(multi::Vector{Model})
     update_step_evaluation.(multi)
 end
 
@@ -83,20 +83,21 @@ struct MultiFitProblem <: AbstractFitProblem
 end
 
 free_params(fp::MultiFitProblem) = free_params(fp.multi)
-residuals(fp::MultiFitProblem) = fp.resid
 
-function update_step_evaluation(fp::MultiFitProblem, pvalues::Vector{Float64})
-    update_step_evaluation(fp.multi, pvalues)
+residuals(fp::MultiFitProblem) = fp.resid
+function residuals(fp::MultiFitProblem, pvalues::Vector{Float64})
+    # Must set pvalues on all models before any evaluation
+    update_step_newpvalues(fp.multi, pvalues)
 
     # Populate residuals
-    i1 = 1
-    for id in 1:length(fp.multi)
-        update_step_residuals(fp.fp[id])
+    j1 = 1
+    for (id, i1, i2) in free_params_indices(fp.multi)
+        residuals(fp.fp[id], pvalues[i1:i2])
         nn = length(fp.fp[id].resid)
         if nn > 0
-            i2 = i1 + nn - 1
-            fp.resid[i1:i2] .= fp.fp[id].resid
-            i1 += nn
+            j2 = j1 + nn - 1
+            fp.resid[j1:j2] .= fp.fp[id].resid
+            j1 += nn
         end
     end
     return fp.resid

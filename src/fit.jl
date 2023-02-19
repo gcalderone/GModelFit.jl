@@ -18,15 +18,12 @@ struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
 end
 
 free_params(fp::FitProblem) = free_params(fp.model)
+
 residuals(fp::FitProblem) = fp.resid
-
-function update_step_residuals(fp::FitProblem)
+function residuals(fp::FitProblem, pvalues::Vector{Float64})
+    update_step_newpvalues(fp.model, pvalues)
+    update_step_evaluation(fp.model)
     fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
-end
-
-function update_step_evaluation(fp::FitProblem, pvalues::Vector{Float64})
-    update_step_evaluation(fp.model, pvalues)
-    update_step_residuals(fp)
     return fp.resid
 end
 
@@ -35,7 +32,7 @@ fit_stat(fp::FitProblem{Measures{N}}) where N =
 
 function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     @assert fp.nfree == length(best) == length(uncerts)
-    update_step_evaluation(fp, best)
+    residuals(fp, best)
     update_step_finalize(fp.model, uncerts)
 end
 
