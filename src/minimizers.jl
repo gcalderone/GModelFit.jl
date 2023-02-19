@@ -21,7 +21,7 @@ abstract type AbstractMinimizer end
 struct dry <: AbstractMinimizer; end
 function fit(minimizer::dry, fp::AbstractFitProblem)
     params = free_params(fp)
-    println(params)
+    residuals(fp, getfield.(params, :val))
     finalize!(fp,
               getfield.(params, :val),
               fill(NaN, length(params)))

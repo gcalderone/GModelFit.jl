@@ -115,7 +115,7 @@ end
 
 
 """
-    fit(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
+    fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
@@ -125,3 +125,14 @@ function fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::Abstrac
     return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
 
+
+"""
+    compare(multi::Vector{Model}, data::Vector{Measures{N}})
+
+Compare a multi-model to a multi-dataset and return a `FitStats` object.
+"""
+function compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N
+    fp = MultiFitProblem(multi, data)
+    status = fit(dry(), fp)
+    return FitStats(fp, MinimizerStatus(MinDRY))
+end

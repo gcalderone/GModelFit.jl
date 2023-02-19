@@ -87,3 +87,15 @@ function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit()
     status = fit(minimizer, fp)
     return ModelSnapshot(fp.model), FitStats(fp, status)
 end
+
+
+"""
+    compare(model::Model, data::Measures)
+
+Compare a model to a dataset and return a `FitStats` object.
+"""
+function compare(model::Model, data::Measures)
+    fp = FitProblem(model, data)
+    status = fit(dry(), fp)
+    return FitStats(fp, MinimizerStatus(MinDRY))
+end

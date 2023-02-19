@@ -28,7 +28,7 @@ import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
-    update!, isfreezed, thaw!, freeze!, fit
+    update!, isfreezed, thaw!, freeze!, fit, compare
 
 include("PV.jl")
 using .PV
