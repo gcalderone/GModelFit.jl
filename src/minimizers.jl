@@ -40,7 +40,7 @@ function fit(minimizer::lsqfit, fp::AbstractFitProblem)
     prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
     res = LsqFit.curve_fit((dummy, pvalues) -> begin
                            ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
-                           update!(fp, pvalues)
+                           update_step_fit(fp, pvalues)
                            end,
                            1.:ndata, fill(0., ndata),
                            getfield.(params, :val),
@@ -92,13 +92,13 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
         parinfo[i].limits  = (low[i], high[i])
     end
 
-    update!(fp, guess)
+    update_step_fit(fp, guess)
     last_fitstat = sum(abs2, residuals(fp))
     while true
         prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
         res = CMPFit.cmpfit((pvalues) -> begin
                             ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
-                            update!(fp, pvalues)
+                            update_step_fit(fp, pvalues)
                             end,
                             guess, parinfo=parinfo, config=minimizer.config)
         ProgressMeter.finish!(prog)

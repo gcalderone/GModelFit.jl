@@ -9,7 +9,6 @@ struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
     dof::Int
 
     function FitProblem(model::Model, data::T) where T <: AbstractMeasures
-        update_step0(model)
         update!(model)
         resid = fill(NaN, length(data))
         nfree = length(free_params(model))
@@ -21,28 +20,23 @@ end
 free_params(fp::FitProblem) = free_params(fp.model)
 residuals(fp::FitProblem) = fp.resid
 
-function update!(fp::FitProblem, pvalues::Vector{Float64})
-    update_step1(fp.model, pvalues)
-    update_step2(fp.model)
-    update_step3(fp.model)
-    update_residuals!(fp)
+function update_step_fit(fp::FitProblem, pvalues::Vector{Float64})
+    update_step_fit(fp.model, pvalues)
+    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
     return fp.resid
 end
 
-function update_residuals!(fp::FitProblem{Measures{N}}) where N
-    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
-end
 fit_stat(fp::FitProblem{Measures{N}}) where N =
     sum(abs2, fp.resid) / fp.dof
 
 function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     @assert fp.nfree == length(best) == length(uncerts)
-    update!(fp, best)
-    update_step4(fp.model, uncerts)
+    update_step_fit(fp, best)
+    update_step_finalize(fp.model, uncerts)
 end
 
 function error!(fp::FitProblem)
-    update_step4(fp.model, fill(NaN, fp.nfree))
+    update_step_finalize(fp.model, fill(NaN, fp.nfree))
 end
 
 

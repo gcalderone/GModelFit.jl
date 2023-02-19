@@ -397,17 +397,16 @@ end
 Evaluate a `Model` and update internal structures.
 """
 function update!(model::Model)
-    update_step0(model)
-    # update_step1()
-    update_step2(model)
-    update_step3(model)
-    update_step4(model)
+    update_step_init(model)
+    update_step_fit(model)
+    update_step_finalize(model)
     return model
 end
 
 
-# Evaluation step 0: update internal structures before fitting
-function update_step0(model::Model)
+# Evaluation step init:
+# - update internal structures before fitting
+function update_step_init(model::Model)
     empty!(model.pv)
 
     for (cname, ceval) in model.cevals
@@ -461,15 +460,17 @@ function update_step0(model::Model)
 end
 
 
-# Evaluation step 1: set new model parameters
-function update_step1(model::Model, pvalues::Vector{Float64})
-    items(model.pv.values)[model.pv.ifree] .= pvalues
-end
+# Evaluation step fit:
+# - set new model parameters;
+# - copy all parameter values into actual;
+# - update actual by invoking the patch functions;
+# - evaluation of all components
+function update_step_fit(model::Model, pvalues=Vector{Float64}[])
+    # set new model parameters
+    if length(pvalues) > 0
+        items(model.pv.values)[model.pv.ifree] .= pvalues
+    end
 
-
-# Evaluation step 2: copy all parameter values into actual, then
-# update the latter by invoking the user patch functions.
-function update_step2(model::Model)
     # Reset `updated` flag
     for (cname, ceval) in model.cevals
         ceval.updated = false
@@ -500,24 +501,23 @@ function update_step2(model::Model)
             end
         end
     end
-end
 
-
-# Evaluation step 3: actual evaluation of model components, starting
-# from the main one and following dependencies
-update_step3(model::Model) = update_step3(model, find_maincomp(model))
-function update_step3(model::Model, cname::Symbol)
-    # Recursive evaluation of dependencies
-    for d in dependencies(model, cname)
-        update_step3(model, d)
+    # Evaluation of all components, starting from the main one and
+    # following dependencies
+    function update_compeval_recursive(model::Model, cname::Symbol)
+        for d in dependencies(model, cname)
+            update_compeval_recursive(model, d)
+        end
+        update!(model.cevals[cname], model.domain,
+                collect(items(model.pv.actual[cname])))
     end
-    update!(model.cevals[cname], model.domain, collect(items(model.pv.actual[cname])))
+    update_compeval_recursive(model, find_maincomp(model))
 end
 
 
-# Evaluation step 4: copy back bestfit and actual values, as well as
-# uncertainties, into their original Parameter structures.
-function update_step4(model::Model, uncerts=Vector{Float64}[])
+# Evaluation step finalize:
+# - copy back bestfit, actual values and uncertainties into their original Parameter structures.
+function update_step_finalize(model::Model, uncerts=Vector{Float64}[])
     i = 1
     for (cname, comp) in model.pv.params
         for (pname, par) in comp
