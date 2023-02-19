@@ -9,6 +9,7 @@ struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
     dof::Int
 
     function FitProblem(model::Model, data::T) where T <: AbstractMeasures
+        update_step0(model)
         update!(model)
         resid = fill(NaN, length(data))
         nfree = length(free_params(model))
@@ -57,8 +58,8 @@ struct MultiFitProblem <: AbstractFitProblem
 
     function MultiFitProblem(multi::MultiModel, datasets::Vector{T}) where T <: AbstractMeasures
         @assert length(multi) == length(datasets)
-        update!(multi)
         fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
+        update!(multi)
         resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
         nfree = sum(getfield.(fp, :nfree))
         @assert nfree > 0 "No free parameter in the model"

@@ -10,14 +10,10 @@ You may access the individual `Model` objects the indexing syntax, as if it was 
 
 Just like a `Model` object you may need to manually trigger a `MultiModel` evaluation using the `update!()` function.
 """
-struct MultiModel <: AbstractMultiModel
+struct MultiModel
     models::Vector{Model}
-    pvalues::PMapMultiModel{Float64}
     function MultiModel(v::Vararg{Model})
-        multi = new([v...], PMapMultiModel{Float64}())
-        for m in v
-            m.parent = multi
-        end
+        multi = new([v...])
         update!(multi)
         return multi
     end
@@ -39,7 +35,6 @@ Push a new `Model` object into a `MultiModel`.
 """
 function push!(multi::MultiModel, model::Model)
     push!(multi.models, model)
-    model.parent = multi
     update!(multi)
 end
 
@@ -78,9 +73,10 @@ function update_step0(multi::MultiModel)
     for id in 1:length(multi)
         update_step0(multi.models[id])
     end
-    empty!(multi.pvalues)
-    for id in 1:length(multi)
-        push!(multi.pvalues, multi.models[id].pv.values)
+    for i in 1:length(multi)
+        for j in 1:length(multi)
+            push!(multi.models[i].pv.mvalues, multi.models[j].pv.values)
+        end
     end
 end
 

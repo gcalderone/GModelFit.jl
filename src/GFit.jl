@@ -118,20 +118,22 @@ mutable struct Parameter
 end
 Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 
-
 struct ParameterVectors
     params::PMapModel{Parameter}
     values::PMapModel{Float64}
     actual::PMapModel{Float64}
     ifree::Vector{Int}
+    mvalues::PMapMultiModel{Float64}
     ParameterVectors() = new(PMapModel{Parameter}(), PMapModel{Float64}(),
-                             PMapModel{Float64}(), Vector{Int}())
+                             PMapModel{Float64}(), Vector{Int}(),
+                             PMapMultiModel{Float64}())
 end
 function empty!(pv::ParameterVectors)
     empty!(pv.params)
     empty!(pv.values)
     empty!(pv.actual)
     empty!(pv.ifree)
+    empty!(pv.mvalues)
 end
 function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
     pv.params[cname][pname] = par
@@ -251,7 +253,6 @@ end
 # ====================================================================
 # Model
 #
-abstract type AbstractMultiModel end
 
 """
     Model
@@ -277,8 +278,7 @@ The most important function for a `Model` object is `fit()`, which allows to fit
 
 The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
 """
-mutable struct Model   # mutable because of parent and maincomp
-    parent::Union{Nothing, AbstractMultiModel}
+mutable struct Model   # mutable because of maincomp
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     pv::ParameterVectors
@@ -318,7 +318,7 @@ mutable struct Model   # mutable because of parent and maincomp
         parse_args(arg::FunctDesc) = parse_args(:main => FComp(arg))
         # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
 
-        model = new(nothing, domain, OrderedDict{Symbol, CompEval}(),
+        model = new(domain, OrderedDict{Symbol, CompEval}(),
                     ParameterVectors(),
                     OrderedDict{Symbol, Vector{Float64}}(),
                     Symbol(""))
@@ -408,6 +408,7 @@ end
 # Evaluation step 0: update internal structures before fitting
 function update_step0(model::Model)
     empty!(model.pv)
+
     for (cname, ceval) in model.cevals
         for (pname, _par) in getparams(ceval.comp)
             # Parameter may be changed here, hence we take a copy of the original one
@@ -434,7 +435,6 @@ function update_step0(model::Model)
                     end
                 end
             elseif !isnothing(par.mpatch)
-                @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
                 @assert length(par.mpatch.args) in [1,2]
                 if length(par.mpatch.args) == 1
                     par.fixed = true
@@ -479,7 +479,7 @@ function update_step2(model::Model)
     for (cname, comp) in model.pv.params
         for (pname, par) in comp
             if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
+                @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
                     model.pv.actual[cname][pname] = model.pv.values[par.patch][pname]
                 else                       # invoke a patch function
@@ -490,11 +490,11 @@ function update_step2(model::Model)
                     end
                 end
             elseif !isnothing(par.mpatch)
-                @assert !isnothing(model.parent) "Parameter [$cname].$pname has the mpatch field set but no MultiModel has been created"
+                @assert length(model.pv.mvalues) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
                 if length(par.mpatch.args) == 1
-                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pvalues)
+                    model.pv.actual[cname][pname] = par.mpatch(model.pv.mvalues)
                 else
-                    model.pv.actual[cname][pname] = par.mpatch(model.parent.pvalues, model.pv.values[cname][pname])
+                    model.pv.actual[cname][pname] = par.mpatch(model.pv.mvalues, model.pv.values[cname][pname])
                 end
             end
         end
