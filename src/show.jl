@@ -221,11 +221,11 @@ function show(io::IO, model::Model)
 end
 
 
-function show(io::IO, multi::MultiModel)
-    for id in 1:length(multi.models)
+function show(io::IO, multi::Vector{Model})
+    for id in 1:length(multi)
         println(io)
         section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
-        show(io, multi.models[id])
+        show(io, multi[id])
     end
     println(io)
 end

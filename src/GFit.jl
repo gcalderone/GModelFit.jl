@@ -28,7 +28,7 @@ import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @λ, select_maincomp!, SumReducer, domain, comptype,
-    MultiModel, update!, isfreezed, thaw!, freeze!, fit
+    update!, isfreezed, thaw!, freeze!, fit
 
 include("PV.jl")
 using .PV
@@ -676,7 +676,7 @@ function Base.getindex(model::ModelSnapshot, name::Symbol)
 end
 
 
-include("multimodel.jl")
+# include("multimodel.jl")
 
 abstract type AbstractFitProblem end
 include("minimizers.jl")

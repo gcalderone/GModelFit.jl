@@ -93,5 +93,5 @@ function mock(::Type{Measures}, model::Model; properr=0.01, rangeerr=0.05, abser
     values .+= err .* randn(rng, size(values))
     Measures(domain(model), values, err)
 end
-mock(T, multi::MultiModel; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]
+mock(T, multi::Vector{Model}; kws...) = [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 

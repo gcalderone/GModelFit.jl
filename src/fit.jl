@@ -46,70 +46,6 @@ function error!(fp::FitProblem)
 end
 
 
-
-# ====================================================================
-struct MultiFitProblem <: AbstractFitProblem
-    timestamp::DateTime
-    multi::MultiModel
-    fp::Vector{FitProblem}
-    resid::Vector{Float64}
-    nfree::Int
-    dof::Int
-
-    function MultiFitProblem(multi::MultiModel, datasets::Vector{T}) where T <: AbstractMeasures
-        @assert length(multi) == length(datasets)
-        fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
-        update!(multi)
-        resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
-        nfree = sum(getfield.(fp, :nfree))
-        @assert nfree > 0 "No free parameter in the model"
-        return new(now(), multi, fp, resid, nfree, length(resid) - nfree)
-    end
-end
-
-free_params(fp::MultiFitProblem) = free_params(fp.multi)
-residuals(fp::MultiFitProblem) = fp.resid
-
-function update!(fp::MultiFitProblem, pvalues::Vector{Float64})
-    # We need to copy all parameter values before evaluation to ensure
-    # all patch functions use the current parameter values
-    for (id, i1, i2) in free_params_indices(fp.multi)
-        update_step1(fp.multi[id], pvalues[i1:i2])
-    end
-    update_step2(fp.multi)
-    update_step3(fp.multi)
-
-    # Populate resid vector
-    i1 = 1
-    for id in 1:length(fp.multi)
-        update_residuals!(fp.fp[id])
-        nn = length(fp.fp[id].resid)
-        if nn > 0
-            i2 = i1 + nn - 1
-            fp.resid[i1:i2] .= fp.fp[id].resid
-            i1 += nn
-        end
-    end
-    return fp.resid
-end
-
-# TODO: Handle the case where at least one dataset is not a `Measures`
-fit_stat(fp::MultiFitProblem) =
-    sum(abs2, fp.resid) / fp.dof
-
-function finalize!(fp::MultiFitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
-    for (id, i1, i2) in free_params_indices(fp.multi)
-        finalize!(fp.fp[id], best[i1:i2], uncerts[i1:i2])
-    end
-end
-
-function error!(fp::MultiFitProblem)
-    for id in 1:length(fp.multi)
-        error!(fp.fp[id])
-    end
-end
-
-
 # ====================================================================
 """
     FitStats
@@ -161,17 +97,6 @@ function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit()
     return ModelSnapshot(fp.model), FitStats(fp, status)
 end
 
-"""
-    fit(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
-
-Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
-"""
-function fit(multi::MultiModel, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
-    fp = MultiFitProblem(multi, data)
-    status = fit(minimizer, fp)
-    return ModelSnapshot.(fp.multi.models), FitStats(fp, status)
-end
-
 
 """
     fit(model::Model; minimizer::AbstractMinimizer=lsqfit())
@@ -182,8 +107,4 @@ Fit a model against dataset(s) of zeros.
 fit(model::Model; minimizer::AbstractMinimizer=lsqfit()) =
     fit(model,
          Measures(domain(model), fill(0., length(domain(model))), 1.);
-         minimizer=minimizer)
-
-fit(model::MultiModel; minimizer::AbstractMinimizer=lsqfit()) =
-    fit(model, [Measures(domain(model[i]), fill(0., length(domain(model[i]))), 1.) for i in 1:length(model)];
          minimizer=minimizer)
