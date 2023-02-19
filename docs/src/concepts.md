@@ -16,7 +16,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 - *Model*: is the overall model description, whose evaluation is supposed to be compared to a single `Measures` objects and whose parameters are varied during fitting to reduce the residuals. All models are represented by an object of type [`Model`](@ref) containing a single `Domain` or `CartesianDomain` object representing the domain where the model will be evaluated, and one or more *components* characterizing the model itself.  Each component is identified by a unique name (actually a `Symbol`) within a model.
   - Component dependencies and *main component*: the evaluation of a component, say `A`, may use the output of another component, say `B`, to calculate its output.  In this case we say that `A` *depends* on `B`, and therefore `B` needs to be evaluated before `A` (circular dependencies are not allowed, and would raise an error if attempted).  The dependencies are automatically identified, and the last component being evaluated is dubbed *main component* since its output represent the overall model evaluation;
 
-- *Multi-model*: a container for two or more models, suitable to be compared to a corresponding number of `Measures` objects to perform [Multi-dataset fitting](@ref).  All models are identified by a unique integer identifier, starting from 1.  A multi-model is represented by an object of type `MultiModel`;
+- *Multi-model*: a `Vector{Model}` containing two or more models, suitable to be compared to a corresponding number of `Measures` objects to perform [Multi-dataset fitting](@ref);
 
 - *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit and the best fit parameter values and uncertainties, are returned by the [`fit()`](@ref) function in a [`GFit.FitStats`](@ref) structure.
 
@@ -35,8 +35,8 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 
 ## How to access the data structures
 
-**GFit.jl** interface aims to be easy to use and remember, and the number of exported function is purposely kept to a minimum.  As a consequence, many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or as field of a `struct`-like interface, starting from a single [`Model`](@ref) or a [`MultiModel`](@ref) object. In particular:
-- a `MultiModel` object can be considered as a vector of `Model`s, with the inidivudal element accessible via indexing with an integer number.  Also, the `length()` function will return the number of models in a `MultiModel`;
+**GFit.jl** interface aims to be easy to use and remember, and the number of exported function is purposely kept to a minimum.  As a consequence, many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or as field of a `struct`-like interface, starting from a single [`Model`](@ref) or a `Vector{Model}` object. In particular:
+- a *MultiModel* is a vector of `Model`s, with the inidivudal element accessible via indexing with an integer number;
 - a `Model` object can be considered as a dictionary of components, with `Symbol` keys. The `keys()` function will return the name of components in the model;
 - a component is a structure, either built-in (see [Built-in components](@ref)) or implemented by the user ([Custom components](@ref)).  One or more structure fields are supposed to represent the component parameters (i.e. objects of type [`GFit.Parameter`](@ref));
 - The fields of a component structure, as well as the fields of the [`GFit.Parameter`](@ref)) structures are accessed using the standard dot (`.`) notation.

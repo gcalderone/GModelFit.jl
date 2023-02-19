@@ -23,7 +23,7 @@ A parameter constraint is defined by explicitly modifiying the fields of the cor
 1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`).  In this case the parameter is assumed to be fixed;
 1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@λ`](@ref) macro) which must accept a single argument (which can be used as a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
 1. to define a parametrized patch expression: create a a λ-function with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
-1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the [`MultiModel`](@ref) object.
+1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the `Vector{Model}` object.
 
 The following examples show how to define constraints for each of the afore-mentioned cases.
 

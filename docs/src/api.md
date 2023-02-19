@@ -12,7 +12,6 @@ CartesianDomain{N}
 Domain{N}
 Measures{N}
 Model
-MultiModel
 @λ
 axis
 comptype
@@ -23,8 +22,6 @@ freeze!
 getindex
 haskey
 isfreezed
-length
-push!
 select_maincomp!
 thaw!
 update!

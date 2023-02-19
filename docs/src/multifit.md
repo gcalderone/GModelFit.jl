@@ -18,11 +18,11 @@ dumpjson(file, arg) = GFit.serialize("assets/$(file).json", arg)
 
 Fitting multiple datasets simultaneously may provide tighter constraints on the best fit parameters under the assumption that the models are somehow related, i.e. that their parameters are constrained (or *patched*).
 
-To perform a multi-dataset fitting we should create one `Model` for each dataset in the usual way, collect them in a `MultiModel` object, and define patch constraints among models.   The following example shows how to fit two Gaussian curves under the hypotesis that the center and normalization parameters are the same:
+To perform a multi-dataset fitting we should create one `Model` for each dataset in the usual way, collect them in a `Vector{Model}`, and define patch constraints among models.   The following example shows how to fit two Gaussian curves under the hypotesis that the center and normalization parameters are the same:
 ```@example abc
 using GFit
 
-# Create domain, individual models and the MultiModel container
+# Create domain, individual models and the Vector{Model} container
 dom = Domain(-5.:5)
 model1 = Model(dom, GFit.Gaussian(1, 0., 1.))
 model2 = Model(dom, GFit.Gaussian(1, 0., 1.))
@@ -40,7 +40,7 @@ dumpjson("ex_multifit", [[data1, data2], best, res]) # hide
 show((best, res)) # hide
 ```
 
-The `MultiModel` object is very similar to a vector, hence the inidividual models can be retrieved by a numeric index, as in `multi[2][:main].norm`.  Also, the best values can be retrieved by indexing the `best` field of the results, e.g.:
+The best fit models and values are returned as a `Vector{ModelSnapshot}` in `best`, i.e.:
 ```@example abc
 println("Width of Gaussian 1: ", best[1][:main].sigma.val, " ± ", best[1][:main].sigma.unc, "\n")
 println("Width of Gaussian 2: ", best[2][:main].sigma.val, " ± ", best[2][:main].sigma.unc, "\n")

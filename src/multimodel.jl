@@ -120,7 +120,6 @@ Fit a multi-model to a set of empirical data sets using the specified minimizer 
 function fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
-    return FitStats(fp, status)
-    # TODO return ModelSnapshot.(fp.multi), FitStats(fp, status)
+    return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
 
