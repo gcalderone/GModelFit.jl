@@ -42,7 +42,8 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
-_serialize(vv::Union{PVModel, PVComp, FunctDesc, Parameter, FitStats}) = _serialize_struct(vv)
+_serialize(vv::Parameter) = _serialize_struct(vv)
+_serialize(vv::FitStats) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
 _serialize(vv::MinimizerStatusCode) = Int(vv)
