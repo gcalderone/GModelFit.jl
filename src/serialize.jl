@@ -114,8 +114,18 @@ end
 # ====================================================================
 # Deserialization methods
 _deserialize(::Nothing) = nothing
-_deserialize(v::AbstractVector) = _deserialize.(v)
 _deserialize(v::Number) = v
+function _deserialize(v::AbstractVector)
+    tmp = _deserialize.(v)
+    tt = unique(typeof.(tmp))
+    if length(tt) == 1
+        out = similar(tmp, tt[1])
+        out .= tmp
+    else
+        out = tmp
+    end
+    return out
+end
 
 function _deserialize(v::String)
     if length(v) > 4
@@ -147,17 +157,17 @@ function _deserialize(dd::AbstractDict)
 
     if "_structtype" in keys(dd)
         if dd["_structtype"] == "GFit.PV.PVComp{GFit.Parameter}"
-            tmp = OrderedDict{Symbol, Int}()
-            for (k, v) in dd["params"]
-                tmp[Symbol(k)] = v
-            end
-            return PVComp{Parameter}(tmp, _deserialize(dd["data"]))
+            # tmp = OrderedDict{Symbol, Int}()
+            # for (k, v) in dd["params"]
+            #     tmp[Symbol(k)] = v
+            # end
+            return PVComp{Parameter}(_deserialize(dd["params"]), _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GFit.PV.PVModel{GFit.Parameter}"
-            tmp = OrderedDict{Symbol, PV.PVComp{GFit.Parameter}}()
-            for (k, v) in dd["comps"]
-                tmp[Symbol(k)] = _deserialize(v)
-            end
-            return PVModel{Parameter}(tmp, _deserialize(dd["data"]))
+            # tmp = OrderedDict{Symbol, PV.PVComp{GFit.Parameter}}()
+            # for (k, v) in dd["comps"]
+            #     tmp[Symbol(k)] = _deserialize(v)
+            # end
+            return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GFit.FunctDesc"
             return FunctDesc(deserialized_function,
                              _deserialize(dd["display"]),
