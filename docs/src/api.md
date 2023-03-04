@@ -37,6 +37,9 @@ The following symbols are not exported by the **GFit.jl** package since they are
 ```@docs
 GFit.FitStats
 GFit.FunctDesc
+GFit.ModelSnapshot
 GFit.Parameter
+GFit.comptypes
 GFit.mock
+GFit.serialize
 ```

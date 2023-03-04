@@ -28,14 +28,14 @@ multi[2][:main].center.mpatch = @λ m -> m[1][:main].center
 # Create datasets and fit
 data1 = Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04)
 data2 = Measures(dom, [-0.072, -0.033, -0.070,  0.108,  0.168,  0.765,  0.113, -0.054,  0.032,  0.013,  0.015], 0.04)
-best, res = fit(multi, [data1, data2])
-dumpjson("ex_multifit", [[data1, data2], best, res]) # hide
-show((best, res)) # hide
+best, fitstats = fit(multi, [data1, data2])
+dumpjson("ex_multifit", best, fitstats, [data1, data2]) # hide
+show((best, fitstats)) # hide
 ```
 
 The best fit models and values are returned as a `Vector{ModelSnapshot}` in `best`, i.e.:
 ```@example abc
 println("Width of Gaussian 1: ", best[1][:main].sigma.val, " ± ", best[1][:main].sigma.unc, "\n")
 println("Width of Gaussian 2: ", best[2][:main].sigma.val, " ± ", best[2][:main].sigma.unc, "\n")
-println("Reduced χ^2: ", res.fitstat)
+println("Reduced χ^2: ", fitstats.fitstat)
 ```

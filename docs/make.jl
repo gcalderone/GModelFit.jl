@@ -11,7 +11,6 @@ makedocs(sitename="Gfit.jl",
              "Custom components" => "customcomp.md",
              "Parameter constraints" => "parameter.md",
              "Multi-dataset fitting" => "multifit.md",
-             "Viewers" => "viewers.md",
              "Minimizers" => "minimizers.md",
              "Miscellaneous" => "misc.md",
              "API" => "api.md"

@@ -637,7 +637,13 @@ function select_maincomp!(model::Model, cname::Symbol)
     model.maincomp = cname
 end
 
+"""
+    ModelSnapshot
 
+A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A snapshot contains the same parameters and component evaluations of the original model, and provide the same user interface.  Moreover, a `ModelSnapshot` can be serialized to a file and de-serialized in another Julia session (see `GFit.serialize()`).
+
+The best fit model and best fit parameter values returned as a `ModelSnapshot` object by the `fit()` function.
+"""
 struct ModelSnapshot
     domain::AbstractDomain
     params::PVModel{Parameter}

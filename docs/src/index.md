@@ -68,20 +68,20 @@ data = Measures(dom, meas, unc)
 model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-best, res = fit(model, data)
+best, fitstats = fit(model, data)
 nothing # hide
 ```
 
 The **GFit.jl** package implements a `show` method for many of the data types involved, hence the above code results in the following output:
 ```@example abc
-show((best, res)) # hide
+show((best, fitstats)) # hide
 ```
 showing the best fit parameter values and the associated uncertaintites, as well as a few statistics concerning the fitting process.
 
 If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
 ```@example abc
 model[:main].a0.val = 5
-best, res = fit(model, data)
+best, fitstats = fit(model, data)
 nothing # hide
 ```
 
@@ -99,7 +99,7 @@ Also, you can easily access the numerical results for further analysis, e.g.:
 println("Best fit value for the offset parameter: ", 
 	best[:main].a0.val, " ± ", 
 	best[:main].a0.unc, "\n",
-	"Reduced χ^2: ", res.fitstat)
+	"Reduced χ^2: ", fitstats.fitstat)
 ```
 
 The above example is definitely a simple one, but even more complex ones follow essentially the same workflow.
