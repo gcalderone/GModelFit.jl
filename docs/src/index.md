@@ -1,7 +1,5 @@
 ```@setup abc
-using GFit, Gnuplot
-Gnuplot.quitall()
-saveas(file) = Gnuplot.save(term="pngcairo size 550,350 fontscale 0.8", output="assets/$(file).png")
+include("setup.jl")
 ```
 
 # Gfit.jl
