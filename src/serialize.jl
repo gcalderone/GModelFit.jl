@@ -25,12 +25,7 @@ function _serialize_struct(vv; add_show=false)
     out["_structtype"] = string(typeof(vv))
     for field in fieldnames(typeof(vv))
         ff = getfield(vv, field)
-        tt = typeof(ff)
-        if hasmethod(_serialize, (tt,))
-            out[String(field)] = _serialize(ff)
-        else
-            @warn "No _serialize method for $tt"
-        end
+        out[String(field)] = _serialize(ff)
     end
     if add_show
         io = IOBuffer()
@@ -56,8 +51,69 @@ _serialize(vv::MinimizerStatusCode) = Int(vv)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
+function save_json(filename::String, data; compress=false)
+    filename = ensure_file_extension(filename, "json")
+    if compress
+        filename = ensure_file_extension(filename, "gz")
+        io = GZip.open(filename, "w")
+    else
+        io = open(filename, "w")
+    end
+    JSON.print(io, data)
+    close(io)
+    return filename
+end
+
+"""
+    GFit.serialize(filename::String, ::ModelSnapshot[, ::FitStats[, ::Measures]]; compress=false)
+    GFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitStats[, ::Vector{Measures}]]; compress=false)
+
+Serialize GFit object(s) using a JSON format. The serializable objects are:
+- `ModelSnapshot` and `Vector{ModelSnapshot}` (mandatory argument);
+- `FitStats` (optional);
+- `Measures` and and `Vector{Measures}` (optional);
+
+If `compress=true` the resulting JSON file will be compressed using GZip.
+Objects can later be deserialized in a different Julia session with `GFit.deserialize`.
+
+Note: The `GFit.serialize` function also accepts `Model` and `Vector{Model}` but they will be internally converted to `ModelSnapshot`(s).
 
 
+## Example:
+```julia-repl
+# Create GFit objects
+using GFit
+dom  = Domain(1:5)
+model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+best, fitstats = fit(model, data)
+
+# Serialize objects and save in a file
+GFit.serialize("my_snapshot.json", best, fitstats, data)
+
+# Restore objects (possibly in a different Julia session)
+using GFit
+(best, fitstats, data) = GFit.deserialize("my_snapshot.json")
+```
+"""
+serialize(filename::String, model::Model        ; compress=false) = serialize(filename, ModelSnapshot(model); compress=compress)
+serialize(filename::String, model::ModelSnapshot; compress=false) = save_json(filename, _serialize(model); compress=compress)
+serialize(filename::String, model::ModelSnapshot, fitstats::FitStats; compress=false) =
+    save_json(filename, _serialize([model, fitstats]); compress=compress)
+serialize(filename::String, model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures; compress=false) =
+    save_json(filename, _serialize([model, fitstats, data]); compress=compress)
+
+serialize(filename::String, multi::Vector{Model        }; compress=false) = serialize(filename, ModelSnapshot.(multi); compress=compress)
+serialize(filename::String, multi::Vector{ModelSnapshot}; compress=false) = save_json(filename, _serialize(multi); compress=compress)
+serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats; compress=false) =
+    save_json(filename, _serialize([multi, fitstats]); compress=compress)
+serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}; compress=false) where T <: AbstractMeasures =
+    save_json(filename, _serialize([multi, fitstats, data]); compress=compress)
+
+
+
+
+# ====================================================================
 # Deserialization methods
 _deserialize(::Nothing) = nothing
 _deserialize(v::AbstractVector) = _deserialize.(v)
@@ -159,49 +215,6 @@ function _deserialize(dd::AbstractDict)
     end
 end
 
-
-
-"""
-    GFit.serialize(filename::String, args; compress=false)
-
-Serialize GFit object(s) using a JSON format. Objects can be deserialized in a different Julia session with `GFit.deserialize`.  The serializable objects are:
-- `ModelSnapshot` and `Vector{ModelSnapshot}`;
-- `FitStats`;
-- `Measures` and and `Vector{Measures}`;
-- A `Vector` of the above.
-
-## Example:
-```julia-repl
-# Create GFit objects
-using GFit
-dom  = Domain(1:5)
-model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-best, res = fit(model, data)
-
-# Serialize object and store them in a file
-GFit.serialize("my_snapshot.json", [data, best, res])
-
-# Restore objects (possibly in a different Julia session)
-using GFit
-(data, best, res) = GFit.deserialize("my_snapshot.json")
-```
-
-!!! note
-    The GFit binary serialization facility is **experimental**,
-"""
-function serialize(filename::String, arg; compress=false)
-    filename = ensure_file_extension(filename, "json")
-    if compress
-        filename = ensure_file_extension(filename, "gz")
-        io = GZip.open(filename, "w")
-    else
-        io = open(filename, "w")
-    end
-    JSON.print(io, _serialize(arg))
-    close(io)
-    return filename
-end
 
 
 function deserialize(filename::String)
