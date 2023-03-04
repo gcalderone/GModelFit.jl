@@ -48,6 +48,7 @@ end
 _serialize(vv::PV.PVComp) = _serialize_struct(vv)
 _serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
+_serialize(vv::FunctDesc) = _serialize_struct(vv)
 _serialize(vv::FitStats) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
@@ -167,6 +168,7 @@ Serialize GFit object(s) using a JSON format. Objects can be deserialized in a d
 - `ModelSnapshot` and `Vector{ModelSnapshot}`;
 - `FitStats`;
 - `Measures` and and `Vector{Measures}`;
+- A `Vector` of the above.
 
 ## Example:
 ```julia-repl
