@@ -1,7 +1,7 @@
 name = "GFit"
 uuid = "ac42e6ba-c0bf-4fcf-827d-deea44b16255"
 authors = ["Giorgio Calderone <giorgio.calderone@gmail.com>"]
-version = "0.0.1"
+version = "0.1.0"
 
 [deps]
 CMPFit = "a5944310-3432-5d93-8bb2-e3b5eb62a58f"
