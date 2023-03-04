@@ -52,11 +52,11 @@ best, fitstats, data = GFit.deserialize("save_for_future_use.json")
 ```
 
 
-## Viewers (only for 1D case)
+## Viewers (1D case)
 
 The [**GFitViewer.jl**](https://github.com/lnicastro/GFitViewer.jl) package provides a few tools to quickly inspect **GFit.jl** objects.  Specifically, it provides:
 - [**Gnuplot.jl**](https://github.com/gcalderone/Gnuplot.jl/) recipes to display `Measures{1}`, and `ModelSnapshot` objects;
-- The `viewer` function to generate an HTML files showing a plot of the model and data, as well as the same text output you would see in a Julia REPL session.
+- The `viewer()` function to generate an HTML files showing a plot of the model and data, as well as the same text output you would see in a Julia REPL session.
 
 ### Example
 
@@ -90,7 +90,8 @@ println(); # hide
 ```
 ![](assets/example_viewers.png)
 
-Also, you can generate an HTML file to be displayed with any modern browser with:
+
+Also, you can generate an HTML file (which will be automatically opened using your default browser) with:
 
 ```@example abc
 using GFitViewer

@@ -267,7 +267,7 @@ end
 
 
 function show(io::IO, mb::ModelSnapshot)
-    println(io, mb.show)
+    print(io, mb.show)
 end
 
 
