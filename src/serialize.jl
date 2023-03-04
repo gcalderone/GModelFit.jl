@@ -96,20 +96,18 @@ using GFit
 (best, fitstats, data) = GFit.deserialize("my_snapshot.json")
 ```
 """
-serialize(filename::String, model::Model        ; compress=false) = serialize(filename, ModelSnapshot(model); compress=compress)
-serialize(filename::String, model::ModelSnapshot; compress=false) = save_json(filename, _serialize(model); compress=compress)
-serialize(filename::String, model::ModelSnapshot, fitstats::FitStats; compress=false) =
-    save_json(filename, _serialize([model, fitstats]); compress=compress)
-serialize(filename::String, model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures; compress=false) =
-    save_json(filename, _serialize([model, fitstats, data]); compress=compress)
+serialize(filename::String, model::Model                                                     ; compress=false) = serialize(filename, ModelSnapshot(model)               ; compress=compress)
+serialize(filename::String, model::ModelSnapshot                                             ; compress=false) = save_json(filename, _serialize(model)                  ; compress=compress)
+serialize(filename::String, model::ModelSnapshot, fitstats::FitStats                         ; compress=false) = save_json(filename, _serialize([model, fitstats])      ; compress=compress)
+serialize(filename::String, model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures ; compress=false) = save_json(filename, _serialize([model, fitstats, data]); compress=compress)
 
-serialize(filename::String, multi::Vector{Model        }; compress=false) = serialize(filename, ModelSnapshot.(multi); compress=compress)
-serialize(filename::String, multi::Vector{ModelSnapshot}; compress=false) = save_json(filename, _serialize(multi); compress=compress)
-serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats; compress=false) =
-    save_json(filename, _serialize([multi, fitstats]); compress=compress)
-serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}; compress=false) where T <: AbstractMeasures =
+serialize(filename::String, multi::Vector{Model        }                                     ; compress=false) = serialize(filename, ModelSnapshot.(multi)              ; compress=compress)
+serialize(filename::String, multi::Vector{ModelSnapshot}                                     ; compress=false) = save_json(filename, _serialize(multi)                  ; compress=compress)
+serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats                 ; compress=false) = save_json(filename, _serialize([multi, fitstats])      ; compress=compress)
+function serialize(filename::String, multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}; compress=false) where T <: AbstractMeasures
+    @assert length(multi) == length(data)
     save_json(filename, _serialize([multi, fitstats, data]); compress=compress)
-
+end
 
 
 
