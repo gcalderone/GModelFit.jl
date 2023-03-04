@@ -25,8 +25,11 @@ function _serialize_struct(vv; add_show=false)
     out["_structtype"] = string(typeof(vv))
     for field in fieldnames(typeof(vv))
         ff = getfield(vv, field)
-        if hasmethod(_serialize, (typeof(ff),))
+        tt = typeof(ff)
+        if hasmethod(_serialize, (tt,))
             out[String(field)] = _serialize(ff)
+        else
+            @warn "No _serialize method for $tt"
         end
     end
     if add_show
@@ -42,6 +45,8 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
+_serialize(vv::PV.PVComp) = _serialize_struct(vv)
+_serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FitStats) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
@@ -87,18 +92,17 @@ function _deserialize(dd::AbstractDict)
 
     if "_structtype" in keys(dd)
         if dd["_structtype"] == "GFit.PV.PVComp{GFit.Parameter}"
-            out = PVComp{Parameter}(_deserialize(dd["data"]))
-            for (k, v) in dd["dict"]
-                getfield(out, :dict)[Symbol(k)] = _deserialize(v)
+            tmp = OrderedDict{Symbol, Int}()
+            for (k, v) in dd["params"]
+                tmp[Symbol(k)] = v
             end
-            return out
+            return PVComp{Parameter}(tmp, _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GFit.PV.PVModel{GFit.Parameter}"
-            out = PVModel{Parameter}()
-            for (k, v) in dd["dict"]
-                getfield(out, :dict)[Symbol(k)] = _deserialize(v)
+            tmp = OrderedDict{Symbol, PV.PVComp{GFit.Parameter}}()
+            for (k, v) in dd["comps"]
+                tmp[Symbol(k)] = _deserialize(v)
             end
-            append!(getfield(out, :data), _deserialize(dd["data"]))
-            return out
+            return PVModel{Parameter}(tmp, _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GFit.FunctDesc"
             return FunctDesc(deserialized_function,
                              _deserialize(dd["display"]),
@@ -127,9 +131,7 @@ function _deserialize(dd::AbstractDict)
                             _deserialize(dd["nfree"]),
                             _deserialize(dd["dof"]),
                             _deserialize(dd["fitstat"]),
-                            _deserialize(dd["status"]),
-                            convert(OrderedDict{Symbol, String},_deserialize(dd["comptypes"])),
-                            _deserialize(dd["bestfit"]))
+                            _deserialize(dd["status"]))
         elseif dd["_structtype"] == "GFit.MinimizerStatus"
             return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
                                    _deserialize(dd["message"]),
@@ -144,6 +146,8 @@ function _deserialize(dd::AbstractDict)
         elseif !isnothing(findfirst("Measures", dd["_structtype"]))
             tmp = _deserialize(dd["values"])
             return Measures(_deserialize(dd["domain"]), tmp[1], tmp[2])
+        else
+            error("Unrecognized structure in serialized data")
         end
     else
         out = OrderedDict{Symbol, Any}()
@@ -152,19 +156,17 @@ function _deserialize(dd::AbstractDict)
         end
         return out
     end
-
-    error("TODO")
 end
 
 
 
 """
-    GFit.serialize(filename::String, args...; compress=false)
+    GFit.serialize(filename::String, args; compress=false)
 
-Save a snapshot of one (or more) GFit object(s) using a JSON format.  The snapshot can be restored in a different Julia session with `GFit.deserialize`, and the resulting objects will be similar to the original ones, with the following notable differences:
-- `Model` objects are casted into `ModelSnapshot` ones containing just the latest component evaluations;
-- `MultiModel` objects are casted into `Vector{ModelSnapshot}`;
-- `FunctDesc` objects retain their textual representation, but the original function is lost;
+Serialize GFit object(s) using a JSON format. Objects can be deserialized in a different Julia session with `GFit.deserialize`.  The serializable objects are:
+- `ModelSnapshot` and `Vector{ModelSnapshot}`;
+- `FitStats`;
+- `Measures` and and `Vector{Measures}`;
 
 ## Example:
 ```julia-repl
@@ -180,7 +182,7 @@ GFit.serialize("my_snapshot.json", [data, best, res])
 
 # Restore snapshot (possibly in a different Julia session)
 using GFit
-(model, data, res) = GFit.deserialize("my_snapshot.json")
+(data, best, res) = GFit.deserialize("my_snapshot.json")
 ```
 
 !!! note

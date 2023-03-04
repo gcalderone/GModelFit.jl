@@ -7,7 +7,7 @@ import Base.getindex, Base.setindex!,
 Base.getproperty, Base.setproperty!, Base.propertynames,
 Base.keys, Base.empty!, Base.iterate
 
-export  PVComp, PVModel, PVMulti, items, set_items!
+export PVComp, PVModel, items
 
 struct PVComp{T}
     params::OrderedDict{Symbol, Int}
