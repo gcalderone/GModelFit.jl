@@ -211,8 +211,13 @@ function _deserialize(dd::AbstractDict)
             axis = _deserialize(dd["axis"])
             return Domain(axis...)
         elseif !isnothing(findfirst("Measures", dd["_structtype"]))
+            dom = _deserialize(dd["domain"])
             tmp = _deserialize(dd["values"])
-            return Measures(_deserialize(dd["domain"]), tmp[1], tmp[2])
+            if isa(dom, CartesianDomain)
+                return Measures(dom, reshape(tmp[1], size(dom)), reshape(tmp[2], size(dom)))
+            else
+                return Measures(dom, tmp[1], tmp[2])
+            end
         else
             error("Unrecognized structure in serialized data")
         end
