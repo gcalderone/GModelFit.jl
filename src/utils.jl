@@ -65,9 +65,9 @@ end
 
 """
     mock(::Type{Measures}, model::Model; keywords...)
-    mock(::Type{Measures}, multi::MultiModel; keywords...)
+    mock(::Type{Measures}, multi::Vector{Model}; keywords...)
 
-Generate mock dataset(s) using a ground truth `Model` or `MultiModel` object. The first version returns a single `Measures` object, while the second returns a `Vector{Measures}`.
+Generate mock dataset(s) using a ground truth `Model` or `Vector{Model}` object. The first version returns a single `Measures` object, while the second returns a `Vector{Measures}`.
 
 The measurement random errors added to the data points are drawn from a Normal distribution centered on the data value itself, and a width given by the sum of three contributions:
 - *proportional* part: error proportional to each data point value;
