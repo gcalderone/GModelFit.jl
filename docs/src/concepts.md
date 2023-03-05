@@ -30,7 +30,7 @@ In order to exploit the **GFit.jl** model expressiveness we need to introduce a 
 - *Minimizer*: the **GFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
-  Both are automatically installed with **GFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) function call).  However, for some complex cases `CMPFit` may be more robust and less sensitive to initial guess parameters.
+  Both are automatically installed with **GFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) function call).
 
 - *Mock data*: evaluating a a model may be useful even before actual data are available, e.g. to test its robustness and capabilities.  To this purpose **GFit.jl** provides the [`GFit.mock()`](@ref) function which is able to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process. This functionality is used in some of the examples presented in the next sections.
 

@@ -35,7 +35,7 @@ show((best, fitstats)) # hide
 
 The best fit models and values are returned as a `Vector{ModelSnapshot}` in `best`, i.e.:
 ```@example abc
-println("Width of Gaussian 1: ", best[1][:main].sigma.val, " ± ", best[1][:main].sigma.unc, "\n")
-println("Width of Gaussian 2: ", best[2][:main].sigma.val, " ± ", best[2][:main].sigma.unc, "\n")
+println("Width of Gaussian 1: ", best[1][:main].sigma.val, " ± ", best[1][:main].sigma.unc)
+println("Width of Gaussian 2: ", best[2][:main].sigma.val, " ± ", best[2][:main].sigma.unc)
 println("Reduced χ^2: ", fitstats.fitstat)
 ```
