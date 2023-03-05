@@ -67,35 +67,35 @@ end
 
 
 """
-    GFit.serialize(filename::String, ::ModelSnapshot[, ::FitStats[, ::Measures]]; compress=false)
-    GFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitStats[, ::Vector{Measures}]]; compress=false)
+    GModelFit.serialize(filename::String, ::ModelSnapshot[, ::FitStats[, ::Measures]]; compress=false)
+    GModelFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitStats[, ::Vector{Measures}]]; compress=false)
 
-Serialize GFit object(s) using a JSON format. The serializable objects are:
+Serialize GModelFit object(s) using a JSON format. The serializable objects are:
 - `ModelSnapshot` and `Vector{ModelSnapshot}` (mandatory argument);
 - `FitStats` (optional);
 - `Measures` and and `Vector{Measures}` (optional);
 
 If `compress=true` the resulting JSON file will be compressed using GZip.
-Objects can later be deserialized in a different Julia session with `GFit.deserialize`.
+Objects can later be deserialized in a different Julia session with `GModelFit.deserialize`.
 
-Note: The `GFit.serialize` function also accepts `Model` and `Vector{Model}` but they will be internally converted to `ModelSnapshot`(s).
+Note: The `GModelFit.serialize` function also accepts `Model` and `Vector{Model}` but they will be internally converted to `ModelSnapshot`(s).
 
 
 ## Example:
 ```julia-repl
-# Create GFit objects
-using GFit
+# Create GModelFit objects
+using GModelFit
 dom  = Domain(1:5)
 model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 
 # Serialize objects and save in a file
-GFit.serialize("my_snapshot.json", best, fitstats, data)
+GModelFit.serialize("my_snapshot.json", best, fitstats, data)
 
 # Restore objects (possibly in a different Julia session)
-using GFit
-(best, fitstats, data) = GFit.deserialize("my_snapshot.json")
+using GModelFit
+(best, fitstats, data) = GModelFit.deserialize("my_snapshot.json")
 ```
 """
 function serialize(filename::String, args...; compress=false)
@@ -158,24 +158,24 @@ function _deserialize(dd::AbstractDict)
     end
 
     if "_structtype" in keys(dd)
-        if dd["_structtype"] == "GFit.PV.PVComp{GFit.Parameter}"
+        if dd["_structtype"] == "GModelFit.PV.PVComp{GModelFit.Parameter}"
             # tmp = OrderedDict{Symbol, Int}()
             # for (k, v) in dd["params"]
             #     tmp[Symbol(k)] = v
             # end
             return PVComp{Parameter}(_deserialize(dd["params"]), _deserialize(dd["data"]))
-        elseif dd["_structtype"] == "GFit.PV.PVModel{GFit.Parameter}"
-            # tmp = OrderedDict{Symbol, PV.PVComp{GFit.Parameter}}()
+        elseif dd["_structtype"] == "GModelFit.PV.PVModel{GModelFit.Parameter}"
+            # tmp = OrderedDict{Symbol, PV.PVComp{GModelFit.Parameter}}()
             # for (k, v) in dd["comps"]
             #     tmp[Symbol(k)] = _deserialize(v)
             # end
             return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["data"]))
-        elseif dd["_structtype"] == "GFit.FunctDesc"
+        elseif dd["_structtype"] == "GModelFit.FunctDesc"
             return FunctDesc(deserialized_function,
                              _deserialize(dd["display"]),
                              _deserialize(dd["args"]),
                              _deserialize(dd["optargs"]))
-        elseif dd["_structtype"] == "GFit.Parameter"
+        elseif dd["_structtype"] == "GModelFit.Parameter"
             return Parameter(_deserialize(dd["val"]),
                              _deserialize(dd["low"]),
                              _deserialize(dd["high"]),
@@ -184,14 +184,14 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd["mpatch"]),
                              _deserialize(dd["actual"]),
                              _deserialize(dd["unc"]))
-        elseif dd["_structtype"] == "GFit.ModelSnapshot"
+        elseif dd["_structtype"] == "GModelFit.ModelSnapshot"
             return ModelSnapshot(_deserialize(dd["domain"]),
                                 _deserialize(dd["params"]),
                                 _deserialize(dd["buffers"]),
                                 _deserialize(dd["maincomp"]),
                                 _deserialize(dd["comptypes"]),
                                 _deserialize(dd["show"]))
-        elseif dd["_structtype"] == "GFit.FitStats"
+        elseif dd["_structtype"] == "GModelFit.FitStats"
             return FitStats(_deserialize(dd["timestamp"]),
                             _deserialize(dd["elapsed"]),
                             _deserialize(dd["ndata"]),
@@ -199,7 +199,7 @@ function _deserialize(dd::AbstractDict)
                             _deserialize(dd["dof"]),
                             _deserialize(dd["fitstat"]),
                             _deserialize(dd["status"]))
-        elseif dd["_structtype"] == "GFit.MinimizerStatus"
+        elseif dd["_structtype"] == "GModelFit.MinimizerStatus"
             return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
                                    _deserialize(dd["message"]),
                                    _deserialize(dd["internal"]))

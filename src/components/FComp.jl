@@ -47,7 +47,7 @@ end
 
 
 # ====================================================================
-struct FCompv <: GFit.AbstractComponent
+struct FCompv <: GModelFit.AbstractComponent
     funct::Function
     deps::Vector{Symbol}
     params::OrderedDict{Symbol, Parameter}

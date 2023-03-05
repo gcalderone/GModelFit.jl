@@ -5,7 +5,7 @@ include("setup.jl")
 
 # Multi-dataset fitting
 
-**GFit.jl** is able to simultaneously fit several models against a corresponding number of datasets, while placing constraints among the models. Typical use cases are:
+**GModelFit.jl** is able to simultaneously fit several models against a corresponding number of datasets, while placing constraints among the models. Typical use cases are:
 - a single phenomenon is observed with two (or more) instruments/detectors;
 - a single phenomenon is observed at different times;
 
@@ -13,12 +13,12 @@ Fitting multiple datasets simultaneously may provide tighter constraints on the 
 
 To perform a multi-dataset fitting we should create one `Model` for each dataset in the usual way, collect them in a `Vector{Model}`, and define patch constraints among models.   The following example shows how to fit two Gaussian curves under the hypotesis that the center and normalization parameters are the same:
 ```@example abc
-using GFit
+using GModelFit
 
 # Create domain, individual models and the Vector{Model} container
 dom = Domain(-5.:5)
-model1 = Model(dom, GFit.Gaussian(1, 0., 1.))
-model2 = Model(dom, GFit.Gaussian(1, 0., 1.))
+model1 = Model(dom, GModelFit.Gaussian(1, 0., 1.))
+model2 = Model(dom, GModelFit.Gaussian(1, 0., 1.))
 multi = [model1, model2]
 
 # Patch parameters

@@ -2,12 +2,12 @@
 include("setup.jl")
 ```
 
-# Gfit.jl
+# GModelFit.jl
 ## A model fitting framework for Julia.
-[![Stars](https://img.shields.io/github/stars/gcalderone/GFit.jl?style=social)](https://github.com/gcalderone/GFit.jl)
+[![Stars](https://img.shields.io/github/stars/gcalderone/GModelFit.jl?style=social)](https://github.com/gcalderone/GModelFit.jl)
 
 
-**Gfit.jl** is a general purpose, data-driven model fitting framework for Julia.
+**GModelFit.jl** is a general purpose, data-driven model fitting framework for Julia.
 
 It provides the basic tools to define, interactively manipulate and efficiently evaluate a (possibly very complex) model, and to fit the latter to empirical data. The main functionalities are:
 - it handles datasets of any dimensionality;
@@ -20,16 +20,16 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - it supports different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Minimizers](@ref));
 - it provides facilities for interactive fitting and quick plotting (see [Quick plot (1D)](@ref)).
 
-The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
+The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **GModelFit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
 
-Note that the main purpose of **GFit.jl** is to allow easy manipulation of complex models, and that there may be little advantage in using it for a simple linear regression or for models involving just a single parameter, although it is definitely possible to use it also in these cases.
+Note that the main purpose of **GModelFit.jl** is to allow easy manipulation of complex models, and that there may be little advantage in using it for a simple linear regression or for models involving just a single parameter, although it is definitely possible to use it also in these cases.
 
 
 ## Installation
 
 In the Julia REPL type:
 ```julia-repl
-julia> ]add GFit
+julia> ]add GModelFit
 ```
 The `]` character starts the Julia [package manager](https://julialang.github.io/Pkg.jl/v1/getting-started.html#Basic-Usage-1). Hit backspace key to return to Julia prompt.
 
@@ -41,7 +41,7 @@ julia> ]add Gnuplot
 
 ## Workflow
 
-The typical workflow to use **GFit.jl** is as follows:
+The typical workflow to use **GModelFit.jl** is as follows:
 - Wrap empirical data domain and measures into one (ore more) `Domain` and `Measures` object(s);
 - Create a `Model` object and build it by adding components or mathematical expressions, each representing a specific *aspect* of the theoretical model;
 - Optionally set initial guess parameter values, define constraints between model parameters, etc.;
@@ -51,14 +51,14 @@ The typical workflow to use **GFit.jl** is as follows:
 
 A very simple example showing the above workflow is:
 ```@example abc
-using GFit
+using GModelFit
 
 # Prepare vectors with domain points, empirical measures and their uncertainties
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]
 meas = [6.29, 7.27, 10.41, 18.67, 25.3]
 unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
 
-# Prepare GFit input objects
+# Prepare GModelFit input objects
 dom  = Domain(x)
 data = Measures(dom, meas, unc)
 
@@ -71,7 +71,7 @@ best, fitstats = fit(model, data)
 nothing # hide
 ```
 
-The **GFit.jl** package implements a `show` method for many of the data types involved, hence the above code results in the following output:
+The **GModelFit.jl** package implements a `show` method for many of the data types involved, hence the above code results in the following output:
 ```@example abc
 show((best, fitstats)) # hide
 ```

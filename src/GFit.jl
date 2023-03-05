@@ -1,4 +1,4 @@
-module GFit
+module GModelFit
 
 using Printf, PrettyTables
 using Statistics, Distributions
@@ -43,7 +43,7 @@ A "Julia function" descriptor containing the reference to the function itself, a
 
 ### Example:
 ```
-julia> f = GFit.FunctDesc((x, p=0) -> x + p,    # actual function definition
+julia> f = GModelFit.FunctDesc((x, p=0) -> x + p,    # actual function definition
                           "(x, p=0) -> x + p",  # string representation
                           [:x],                 # vector of argument namess
                           [:(p = 0)])           # vector of `Expr` with arguments default values
@@ -84,7 +84,7 @@ macro λ(_expr)
     def  = splitdef(expr)
     args    = convert(Vector{Symbol}, filter(x -> isa(x, Symbol), def[:args]))
     optargs = convert(Vector{Expr}  , filter(x -> isa(x, Expr)  , def[:args]))
-    return esc(:(GFit.FunctDesc($expr, string($(QuoteNode(expr))), $args, $optargs)))
+    return esc(:(GModelFit.FunctDesc($expr, string($(QuoteNode(expr))), $args, $optargs)))
 end
 
 
@@ -640,7 +640,7 @@ end
 """
     ModelSnapshot
 
-A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A snapshot contains the same parameters and component evaluations of the original model, and provide the same user interface.  Moreover, a `ModelSnapshot` can be serialized to a file and de-serialized in another Julia session (see `GFit.serialize()`).
+A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A snapshot contains the same parameters and component evaluations of the original model, and provide the same user interface.  Moreover, a `ModelSnapshot` can be serialized to a file and de-serialized in another Julia session (see `GModelFit.serialize()`).
 
 The best fit model and best fit parameter values returned as a `ModelSnapshot` object by the `fit()` function.
 """

@@ -18,7 +18,7 @@ struct MyComponent <: AbstractComponent
 end
 ```
 (see below for a complete example).
-Alternatively, the parameters may be specified as a single field of type `OrderedDict{Symbol, Parameter}` (see the [`Polynomial`](https://github.com/gcalderone/GFit.jl/blob/master/src/components/Polynomial.jl) component for an example);
+Alternatively, the parameters may be specified as a single field of type `OrderedDict{Symbol, Parameter}` (see the [`Polynomial`](https://github.com/gcalderone/GModelFit.jl/blob/master/src/components/Polynomial.jl) component for an example);
 
 - the `evaluate!` function shall be extended to provide the component-specific code for evaluation.
 Specifically, the `evaluate!` function should replace the content of a `buffer::Vector{Float64}` with the outcome of the new component evaluation, given the numerical values for the parameters, e.g.
@@ -65,18 +65,18 @@ println() # hide
 
 The following example shows how to implement a component aimed to interpolate the theoretical model onto a specific empirical domain, with the only parameter being a global scaling factor:
 ```@example abc
-using GFit, Interpolations
-import GFit.prepare!, GFit.evaluate!
+using GModelFit, Interpolations
+import GModelFit.prepare!, GModelFit.evaluate!
 
 # Define the component structure and constructor
-struct Interpolator <: GFit.AbstractComponent
+struct Interpolator <: GModelFit.AbstractComponent
 	theory_x::Vector{Float64}
 	theory_y::Vector{Float64}
 	interp_y::Vector{Float64}  # will contain the interpolated values
-	scale::GFit.Parameter
+	scale::GModelFit.Parameter
 
 	function Interpolator(theory_x, theory_y)
-		scale = GFit.Parameter(1)
+		scale = GModelFit.Parameter(1)
 		scale.low = 0                  # ensure scale parameter is positive
 		interp_y = Vector{Float64}()   # this will be populated in prepare!()
 		return new(theory_x, theory_y, interp_y, scale)
@@ -104,7 +104,7 @@ The following code shows how to prepare a `Model` including the interpolated the
 ```@example abc
 dom = Domain(obs_x)
 model = Model(dom, :theory => Interpolator(theory_x, theory_y),
-                   :background => GFit.OffsetSlope(1., 0., 0.2),
+                   :background => GModelFit.OffsetSlope(1., 0., 0.2),
                    :main => SumReducer(:theory, :background))
 data = Measures(dom, obs_y, 0.2)
 best, fitstats = fit(model, data)

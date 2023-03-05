@@ -4,13 +4,13 @@ include("setup.jl")
 
 # Parameter constraints
 
-Models are characterized by *parameters* (see [Basic concepts and data types](@ref)) whose values are modified during fitting until a convergence criterion is met, and the *best fit* values are identified.  In many cases, however, the parameters can not vary arbitrarily but should satisfy some constraints for their values to be meaningful.  **GFit.jl** supports the definition of constraints by fixing the parameter to a specific value, limiting the value in a user defined range, or by dynamically calculating its value using a mathematical expression involving other parameter values.  In the latter case the parameter is not free to vary in the fit since its actual value is determined by the patch constraint, hence it is dubbed a *patched* parameter.  Such unused parameter can optionally be repurposed as a new free parameter in a *parametrized patch expression* (see example below).
+Models are characterized by *parameters* (see [Basic concepts and data types](@ref)) whose values are modified during fitting until a convergence criterion is met, and the *best fit* values are identified.  In many cases, however, the parameters can not vary arbitrarily but should satisfy some constraints for their values to be meaningful.  **GModelFit.jl** supports the definition of constraints by fixing the parameter to a specific value, limiting the value in a user defined range, or by dynamically calculating its value using a mathematical expression involving other parameter values.  In the latter case the parameter is not free to vary in the fit since its actual value is determined by the patch constraint, hence it is dubbed a *patched* parameter.  Such unused parameter can optionally be repurposed as a new free parameter in a *parametrized patch expression* (see example below).
 
-An important concept to bear in mind is that the [`GFit.Parameter`](@ref) structure provides two field for the associated numerical value:
+An important concept to bear in mind is that the [`GModelFit.Parameter`](@ref) structure provides two field for the associated numerical value:
 - `val`: is the parameter value which is being varied by the minimizer during fitting.  The value set before the fitting is the *guess* value.  The value after fitting is the *best fit* one;
 - `actual`: is the result of the patch expression evaluation, and the actual value used when evaluating a component.  Note that this value will be overwitten at each model evaluation, hence setting this field has no effect. The `val` and `actual` values are identical if no patch constraint has been defined.
 
-A parameter constraint is defined by explicitly modifiying the fields of the corresponding [`GFit.Parameter`](@ref) structure. More specifically:
+A parameter constraint is defined by explicitly modifiying the fields of the corresponding [`GModelFit.Parameter`](@ref) structure. More specifically:
 1. to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
 1. to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
 1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`).  In this case the parameter is assumed to be fixed;
@@ -24,12 +24,12 @@ The following examples show how to define constraints for each of the afore-ment
 
 We will consider a model for a 1D domain consisting of the sum of a linear background component (named `bkg`) and two Gaussian-shaped features (`l1` and `l2`):
 ```@example abc
-using GFit
+using GModelFit
 
 dom = Domain(0:0.1:5)
-model = Model(dom, :bkg => GFit.OffsetSlope(1, 1, 0.1),
-                   :l1 => GFit.Gaussian(1, 2, 0.2),
-                   :l2 => GFit.Gaussian(1, 3, 0.4),
+model = Model(dom, :bkg => GModelFit.OffsetSlope(1, 1, 0.1),
+                   :l1 => GModelFit.Gaussian(1, 2, 0.2),
+                   :l2 => GModelFit.Gaussian(1, 3, 0.4),
                    :main => SumReducer(:bkg, :l1, :l2))
 println() # hide
 ```
@@ -64,7 +64,7 @@ println() # hide
 
 We can fit the model against a mock dataset (see [Generate mock datasets](@ref)):
 ```@example abc
-data = GFit.mock(Measures, model)
+data = GModelFit.mock(Measures, model)
 best, fitstats = fit(model, data)
 dumpjson("ex_Parameter", best, fitstats, data) # hide
 show((best, fitstats)) # hide

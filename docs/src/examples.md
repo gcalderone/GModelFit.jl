@@ -6,8 +6,8 @@
 x = Domain(1:0.05:10)
 model = Model(x,
     :offset => 4,
-    :line1  => GFit.Gaussian(1.1 , 4.4, 0.51),
-    :line2  => GFit.Gaussian(0.52, 5.5, 1.2 ))
+    :line1  => GModelFit.Gaussian(1.1 , 4.4, 0.51),
+    :line2  => GModelFit.Gaussian(0.52, 5.5, 1.2 ))
 
 using Random
 rng = MersenneTwister(0);
@@ -33,10 +33,10 @@ using Gnuplot
 ```julia
 dom = CartesianDomain(-5:0.1:5, -4:0.1:4)
 model = Model(dom,
-              :background => GFit.OffsetSlope(0, 0, 0., 2., 3.),
-              :psf => GFit.Gaussian(100., 0., 0., 1, 0.3, 15), 
+              :background => GModelFit.OffsetSlope(0, 0, 0., 2., 3.),
+              :psf => GModelFit.Gaussian(100., 0., 0., 1, 0.3, 15), 
 			  :main => SumReducer(:background, :psf))
-data = GFit.mock(Measures, model)
+data = GModelFit.mock(Measures, model)
 ret1 = fit(model, data)
 ```
 

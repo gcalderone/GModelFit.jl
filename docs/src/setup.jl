@@ -56,6 +56,6 @@ end
 
 
 function dumpjson(file, args...)
-    restored = GFit.deserialize(GFit.serialize("assets/$(file).json", args...))
+    restored = GModelFit.deserialize(GModelFit.serialize("assets/$(file).json", args...))
     # comparedata(restored, [args...])
 end

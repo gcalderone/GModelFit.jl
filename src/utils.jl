@@ -1,4 +1,4 @@
-version() = Pkg.TOML.parsefile(joinpath(pkgdir(GFit), "Project.toml"))["version"]
+version() = Pkg.TOML.parsefile(joinpath(pkgdir(GModelFit), "Project.toml"))["version"]
 
 
 function ensure_file_extension(_filename, _ext)
@@ -20,7 +20,7 @@ function print_param_covariance(fitres::FitStats;
     @assert isa(fitres.status.internal, CMPFit.Result) "Minimizer is not CMPFit"
 
     parnames = String[]
-    if isa(fitres.bestfit, Vector{GFit.HashHashVector{GFit.Parameter}})
+    if isa(fitres.bestfit, Vector{GModelFit.HashHashVector{GModelFit.Parameter}})
         for i in 1:length(fitres.bestfit)
             for (cname, hv) in fitres.bestfit[i]
                 for (pname, par) in hv

@@ -1,21 +1,21 @@
-# GFit.jl
+# GModelFit.jl
 
 [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
-[![DocumentationStatus](https://img.shields.io/badge/docs-stable-blue.svg?style=flat)](https://gcalderone.github.io/GFit.jl/)
+[![DocumentationStatus](https://img.shields.io/badge/docs-stable-blue.svg?style=flat)](https://gcalderone.github.io/GModelFit.jl/)
 
-`GFit` is a general purpose, data-driven model fitting framework for Julia.
+`GModelFit` is a general purpose, data-driven model fitting framework for Julia.
 
 ## Installation
 
 Install with:
 ```julia
-]add GFit
+]add GModelFit
 ```
 
 ## Example
 
 ```julia
-using GFit
+using GModelFit
 
 # Prepare vectors with domain points, empirical measures and uncertainties
 x    = [0.1, 1.1, 2.1, 3.1, 4.1]
@@ -38,7 +38,7 @@ The output is as follows:
 ╭───────────┬────────────┬─────────────┬───────────┬───────────┬───────────┬─────────╮
 │ Component │ Type       │ Eval. count │ Min       │ Max       │ Mean      │ NaN/Inf │
 ├───────────┼────────────┼─────────────┼───────────┼───────────┼───────────┼─────────┤
-│ main      │ GFit.FComp │ 76          │     6.088 │     25.84 │     13.56 │ 0       │
+│ main      │ GModelFit.FComp │ 76          │     6.088 │     25.84 │     13.56 │ 0       │
 ╰───────────┴────────────┴─────────────┴───────────┴───────────┴───────────┴─────────╯
 
 Parameters:

@@ -107,7 +107,7 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
     fixed = Vector{Bool}()
 
     ctype = split(string(typeof(comp)), ".")
-    (ctype[1] == "GFit")  &&   (ctype = ctype[2:end])
+    (ctype[1] == "GModelFit")  &&   (ctype = ctype[2:end])
     ctype = join(ctype, ".")
 
     for (pname, param) in getparams(comp)
