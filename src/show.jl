@@ -260,7 +260,7 @@ end
 function show(io::IO, res::FitStats)
     section(io, "Fit results:")
     println(io, @sprintf("    #Data : %8d         Red. fit stat.: %10.5g  (DOF: %d)", res.ndata, res.fitstat, res.dof))
-    println(io, @sprintf("    #Free : %8d         Elapsed time  : %10.5g", res.nfree, res.elapsed))
+    println(io, @sprintf("    #Free : %8d         Elapsed time  : %10.5g s", res.nfree, res.elapsed))
     print(io, "    ")
     show(io, res.status)
 end

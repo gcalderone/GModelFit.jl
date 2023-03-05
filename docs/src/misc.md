@@ -50,3 +50,42 @@ The same objects can be de-serialized in a different Julia session:
 using GFit
 best, fitstats, data = GFit.deserialize("save_for_future_use.json")
 ```
+
+
+
+## Quick plot (1D)
+
+The **GFit.jl** package implements [**Gnuplot.jl**](https://github.com/gcalderone/Gnuplot.jl/) recipes to display plots of `Measures{1}` and `ModelSnapshot` objects., e.g.:
+
+### Example
+
+Create a model, a mock dataset and run a fit:
+```@example abc
+using GFit
+
+dom = Domain(0:0.01:5)
+model = Model(dom, :bkg => GFit.OffsetSlope(1, 1, 0.1),
+                   :l1 => GFit.Gaussian(1, 2, 0.2),
+                   :l2 => GFit.Gaussian(1, 3, 0.4),
+                   :main => SumReducer(:bkg, :l1, :l2))
+data = GFit.mock(Measures, model)
+best, res = fit(model, data)
+println(); # hide
+```
+
+A plot of the dataset and of the best fit model can be simply obtained with
+```@example abc
+using Gnuplot
+@gp data best
+saveas("gnuplot1") # hide
+```
+![](assets/gnuplot1.png)
+
+You may also specify axis range, labels, title, etc. using the standard [**Gnuplot.jl**](https://github.com/gcalderone/Gnuplot.jl/) keyword syntax, e.g.:
+
+```@example abc
+using Gnuplot
+@gp xr=[1, 4.5] xlabel="Wavelength" ylab="Flux" "set key outside" data best
+saveas("gnuplot2") # hide
+```
+![](assets/gnuplot2.png)

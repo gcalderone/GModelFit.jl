@@ -18,7 +18,7 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters (see [Parameter constraints](@ref));
 - multiple data sets can be fitted simultaneously against different models whose parameters can be patched (see [Multi-dataset fitting](@ref));
 - it support different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Minimizers](@ref));
-- it provides several facilities for interactive fitting and result displaying (see [Viewers](@ref)).
+- it provides facilities for interactive fitting and quick plotting (see [Quick plot (1D)](@ref)).
 
 The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **Gfit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
 
@@ -34,9 +34,8 @@ julia> ]add GFit
 The `]` character starts the Julia [package manager](https://julialang.github.io/Pkg.jl/v1/getting-started.html#Basic-Usage-1). Hit backspace key to return to Julia prompt.
 
 
-In order to easily visualize the outcomes of 1D analysis you may be interested in installing also [GFitViewer](https://github.com/lnicastro/GFitViewer.jl) and/or [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
+In order to easily visualize the outcomes of 1D analysis you may be interested in installing also [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
 ```julia-repl
-julia> ]add GFitViewer
 julia> ]add Gnuplot
 ```
 

@@ -34,7 +34,6 @@ best, res = fit(model, data)
 
 The output is as follows:
 ```julia
-Model (dof=2) evaluations: 73 	 Time: 0:00:03 (44.03 ms/it)
 (Components:
 ╭───────────┬────────────┬─────────────┬───────────┬───────────┬───────────┬─────────╮
 │ Component │ Type       │ Eval. count │ Min       │ Max       │ Mean      │ NaN/Inf │
@@ -52,6 +51,6 @@ Parameters:
 ╰───────────┴────────┴───────┴───────────┴───────────┴────────┴───────╯
 , Fit results:
     #Data :        5         Red. fit stat.:     1.0129  (DOF: 2)
-    #Free :        3         Elapsed time  :      4.456
+    #Free :        3         Elapsed time  :      0.004
     Status:       OK
 ```

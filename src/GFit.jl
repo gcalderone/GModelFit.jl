@@ -688,5 +688,6 @@ include("multimodel.jl")
 include("serialize.jl")
 include("show.jl")
 include("utils.jl")
+include("gnuplot_recipe.jl")
 
 end
