@@ -63,6 +63,9 @@ struct FCompv <: GModelFit.AbstractComponent
         new(funct, deps, params)
     end
 end
+
+propertynames(comp::FCompv) = collect(keys(getfield(comp, :params)))
+getproperty(comp::FCompv, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FCompv) = getfield(comp, :deps)
 
 
