@@ -73,7 +73,7 @@ end
 Serialize GModelFit object(s) using a JSON format. The serializable objects are:
 - `ModelSnapshot` and `Vector{ModelSnapshot}` (mandatory argument);
 - `FitStats` (optional);
-- `Measures` and and `Vector{Measures}` (optional);
+- `Measures` and `Vector{Measures}` (optional);
 
 If `compress=true` the resulting JSON file will be compressed using GZip.
 Objects can later be deserialized in a different Julia session with `GModelFit.deserialize`.
