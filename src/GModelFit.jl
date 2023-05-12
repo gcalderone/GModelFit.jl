@@ -690,4 +690,6 @@ include("show.jl")
 include("utils.jl")
 include("gnuplot_recipe.jl")
 
+include("precompile.jl")
+
 end
