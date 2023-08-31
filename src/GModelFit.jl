@@ -259,7 +259,7 @@ A structure containing a model description, whose evaluation is suitable to be c
 
 Constructor is: `Model(domain::AbstractDomain, components...)`
 where the first argument is either a `Domain` or `CartesianDomain` object, and the remaining one(s) is (are) the model component(s), which may be given as:
-- a single `Dict{Symbol, AbstractComponent}`, where the keys are the names and the values the component objects;
+- a single `OrderedDict{Symbol, AbstractComponent}`, where the keys are the names and the values the component objects;
 - a single component, which will have a default name is assigned (`:main`);
 - a single `FunctDesc`, which will be wrapped into an `LComp` component and a default name will be assigned (`:main`);
 - one or more `Pair{Symbol, AbstractComponent}`, where the first element is the name and the second is the component.
