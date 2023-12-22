@@ -52,15 +52,12 @@ _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
 
-allowed_serializable(model::Model                                                     ) = allowed_serializable(ModelSnapshot(model))
-allowed_serializable(model::ModelSnapshot                                             ) = _serialize(model)
-allowed_serializable(model::ModelSnapshot, fitstats::FitStats                         ) = _serialize([model, fitstats])
-allowed_serializable(model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures ) = _serialize([model, fitstats, data])
-
-allowed_serializable(multi::Vector{Model        }                                     ) = allowed_serializable(ModelSnapshot.(multi))
-allowed_serializable(multi::Vector{ModelSnapshot}                                     ) = _serialize(multi)
-allowed_serializable(multi::Vector{ModelSnapshot}, fitstats::FitStats                 ) = _serialize([multi, fitstats])
-function allowed_serializable(multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}; compress=false) where T <: AbstractMeasures
+_serialize(model::Model                                                     ) = _serialize(ModelSnapshot(model))
+_serialize(model::ModelSnapshot, fitstats::FitStats                         ) = _serialize([model, fitstats])
+_serialize(model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures ) = _serialize([model, fitstats, data])
+_serialize(multi::Vector{Model        }                                     ) = _serialize(ModelSnapshot.(multi))
+_serialize(multi::Vector{ModelSnapshot}, fitstats::FitStats                 ) = _serialize([multi, fitstats])
+function _serialize(multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}) where T <: AbstractMeasures
     @assert length(multi) == length(data)
     _serialize([multi, fitstats, data])
 end
@@ -99,7 +96,7 @@ using GModelFit
 ```
 """
 function serialize(filename::String, args...; compress=false)
-    data = allowed_serializable(args...)
+    data = _serialize(args...)
     filename = ensure_file_extension(filename, "json")
     if compress
         filename = ensure_file_extension(filename, "gz")
@@ -186,11 +183,11 @@ function _deserialize(dd::AbstractDict)
                              _deserialize(dd["unc"]))
         elseif dd["_structtype"] == "GModelFit.ModelSnapshot"
             return ModelSnapshot(_deserialize(dd["domain"]),
-                                _deserialize(dd["params"]),
-                                _deserialize(dd["buffers"]),
-                                _deserialize(dd["maincomp"]),
-                                _deserialize(dd["comptypes"]),
-                                _deserialize(dd["show"]))
+                                 _deserialize(dd["params"]),
+                                 _deserialize(dd["buffers"]),
+                                 _deserialize(dd["maincomp"]),
+                                 _deserialize(dd["comptypes"]),
+                                 _deserialize(dd["show"]))
         elseif dd["_structtype"] == "GModelFit.FitStats"
             return FitStats(_deserialize(dd["timestamp"]),
                             _deserialize(dd["elapsed"]),

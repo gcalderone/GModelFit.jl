@@ -37,7 +37,7 @@ struct lsqfit <: AbstractMinimizer; end
 function fit(minimizer::lsqfit, fp::AbstractFitProblem)
     params = free_params(fp)
     ndata = length(residuals(fp))
-    prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
+    prog = ProgressUnknown(desc="Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
     res = LsqFit.curve_fit((dummy, pvalues) -> begin
                            ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
                            residuals(fp, pvalues)
@@ -94,7 +94,7 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
     residuals(fp, guess)
     last_fitstat = sum(abs2, residuals(fp))
     while true
-        prog = ProgressUnknown("Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
+        prog = ProgressUnknown(desc="Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true)
         res = CMPFit.cmpfit((pvalues) -> begin
                             ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
                             residuals(fp, pvalues)
