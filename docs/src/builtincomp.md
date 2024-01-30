@@ -269,8 +269,8 @@ using Random, GModelFit, Gnuplot
 hh = hist(randn(10000), bs=0.25)
 
 # Prepare domain and data and fit a model
-dom = Domain(hh.bins)
-data = Measures(dom, hh.counts, 1.)
+dom = Domain((hh.edges[1][1:end-1] .+ hh.edges[1][2:end]) ./ 2)
+data = Measures(dom, hh.weights .* 1., 1.)
 model = Model(dom, GModelFit.Gaussian(1e3, 0, 1))
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian2", best, fitstats, data) # hide
@@ -295,8 +295,8 @@ using Random, GModelFit, Gnuplot
 hh = hist(1 .+ randn(10000), 2 .* randn(10000))
 
 # Prepare domain and data and fit a model
-dom = CartesianDomain(hh.bins1, hh.bins2)
-data = Measures(dom, hh.counts, 1.)
+dom = CartesianDomain(hist_bins(hh, 1), hist_bins(hh, 2))
+data = Measures(dom, hist_weights(hh) .* 1., 1.)
 model = Model(dom, GModelFit.Gaussian(1e3, 0, 0, 1, 1, 0))
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian2D", best, fitstats, data) # hide
