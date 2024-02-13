@@ -610,9 +610,9 @@ domain(model::Model) = model.domain
 """
     comptype(model::Model, cname::Symbol)
 
-Return a component type as a string
+Return a component type as a string.
 """
-comptype(model::Model, cname::Symbol) = string(typeof(model[cname]))
+comptype(model::Model, cname::Symbol) = replace(string(typeof(model[cname])), "GModelFit." => "")
 
 
 """
@@ -621,6 +621,22 @@ comptype(model::Model, cname::Symbol) = string(typeof(model[cname]))
 Return a `OrderedDict{Symbol, String}` with the model component types.
 """
 comptypes(model::Model) = OrderedDict([cname => comptype(model, cname) for cname in keys(model)])
+
+
+"""
+    evalcounter(model::Model, cname::Symbol)
+
+Return the number of times a component has been evaluated.
+"""
+evalcounter(model::Model, cname::Symbol) = model.cevals[cname].counter
+
+
+"""
+    evalcounters(model::Model)
+
+Return a `OrderedDict{Symbol, Int}` with the number of times each model component has been evaluated.
+"""
+evalcounters(model::Model) = OrderedDict([cname => evalcounter(model, cname) for cname in keys(model)])
 
 
 # Return model evaluations
@@ -650,27 +666,32 @@ struct ModelSnapshot
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
     comptypes::OrderedDict{Symbol, String}
-    show::String
+    isfreezed::OrderedDict{Symbol, Bool}
+    deps::OrderedDict{Symbol, Vector{Symbol}}
+    evalcounters::OrderedDict{Symbol, Int}
 end
 function ModelSnapshot(model::Model)
-    io = IOBuffer()
-    if showsettings.plain
-        show(io , model)
-    else
-        ctx = IOContext(io, :color => true)
-        show(ctx, model)
+    deps = OrderedDict{Symbol, Vector{Symbol}}()
+    for cname in keys(model)
+        deps[cname] = dependencies(model, cname)
     end
-    s = String(take!(io))
     ModelSnapshot(deepcopy(domain(model)), deepcopy(model.pv.params),
                   deepcopy(model.buffers), find_maincomp(model),
-                  comptypes(model), s)
+                  comptypes(model),
+                  OrderedDict([Pair(cname, isfreezed(model, cname)) for cname in keys(model)]),
+                  deps, evalcounters(model))
 end
 
 domain(model::ModelSnapshot) = model.domain
 Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
 (model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
 (model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
+find_maincomp(model::ModelSnapshot) = model.maincomp
+isfreezed(model::ModelSnapshot, cname::Symbol) = model.isfreezed[cname]
+dependencies(model::ModelSnapshot, cname::Symbol) = model.deps[cname]
+evalcounter(model::ModelSnapshot, cname::Symbol) = model.evalcounters[cname]
 comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
+comptypes(model::ModelSnapshot) = model.comptypes
 Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.params, name)
 function Base.getindex(model::ModelSnapshot, name::Symbol)
     if name in keys(model.params)
@@ -678,6 +699,15 @@ function Base.getindex(model::ModelSnapshot, name::Symbol)
     end
     error("Name $name not defined")
 end
+
+function getparams(comp::GModelFit.PV.PVComp{GModelFit.Parameter})
+    out = OrderedDict{Symbol, Parameter}()
+    for pname in propertynames(comp)
+        out[pname] = getproperty(comp, pname)
+    end
+    return out
+end
+
 
 
 abstract type AbstractFitProblem end

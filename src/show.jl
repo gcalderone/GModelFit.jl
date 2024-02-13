@@ -20,9 +20,7 @@ const showsettings = ShowSettings()
 
 function printtable(io, table, header, args...; formatters=(), hlines=:none, kw...)
     if showsettings.plain
-        c = crayon"default"
         pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
-                     border_crayon=c, header_crayon=c, subheader_crayon=c,
                      highlighters=())
     else
         pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
@@ -82,9 +80,14 @@ function show(io::IO, data::AbstractMeasures)
         table = vcat(table, [data.labels[i] minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
     push!(hrule, 0, size(table)[1]+1)
+    if showsettings.plain
+        highlighters = nothing
+    else
+        highlighters = Highlighter((data,i,j) -> error[i], showsettings.error)
+    end
     printtable(io, table, ["", "Min", "Max", "Mean", "Median", "Std. dev.", "Nan/Inf"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 2:6),
-               highlighters=(Highlighter((data,i,j) -> error[i], showsettings.error)))
+               highlighters=highlighters)
 end
 
 
@@ -103,13 +106,10 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
+function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}};
+                      cname::String="?", ctype="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
-
-    ctype = split(string(typeof(comp)), ".")
-    (ctype[1] == "GModelFit")  &&   (ctype = ctype[2:end])
-    ctype = join(ctype, ".")
 
     for (pname, param) in getparams(comp)
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
@@ -135,11 +135,17 @@ function preparetable(comp::AbstractComponent; cname::String="?", cfixed=false)
 end
 
 
-function show(io::IO, comp::AbstractComponent)
-    (table, fixed) = preparetable(comp)
+function show(io::IO, comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}})
+    ctype = isa(comp, AbstractComponent)  ?  string(typeof(comp))  :  "?"
+    (table, fixed) = preparetable(comp, ctype=ctype)
+    if showsettings.plain
+        highlighters = nothing
+    else
+        highlighters = (Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed))
+    end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed)))
+               highlighters=highlighters)
 end
 
 
@@ -148,7 +154,7 @@ function show(io::IO, red::FunctDesc)
 end
 
 
-function tabledeps(model::Model)
+function tabledeps(model::Union{Model, ModelSnapshot})
     out0 = tabledeps(model, find_maincomp(model), 0)
     levels = getindex.(out0, 1)
     out = Vector{Tuple}()
@@ -165,24 +171,29 @@ function tabledeps(model::Model)
         final = out[i][1]
         level = out[i][2]
         prefix = ""
-        (level > 1)  &&  (prefix  = join(fill(" │", level-1)))
-        (level > 0)  &&  (prefix *= (final  ?  " └─ "  :  " ├─ "))
+        if showsettings.plain
+            (level > 1)  &&  (prefix  = join(fill(" :", level-1)))
+            (level > 0)  &&  (prefix *= " - ")
+        else
+            (level > 1)  &&  (prefix  = join(fill(" │", level-1)))
+            (level > 0)  &&  (prefix *= (final  ?  " └─ "  :  " ├─ "))
+        end
         table[i, 1] = prefix * out[i][3]
         for j in 2:7
             table[i, j] = out[i][j+2]
         end
-        push!(fixed, model.cevals[Symbol(out[i][3])].cfixed)
+        push!(fixed, isfreezed(model, Symbol(out[i][3])))
     end
     return table, fixed
 end
 
-function tabledeps(model::Model, cname::Symbol, level::Int)
+function tabledeps(model::Union{Model, ModelSnapshot}, cname::Symbol, level::Int)
     out = Vector{Tuple}()
-    result = model.cevals[cname].buffer
+    result = model(cname)
     v = view(result, findall(isfinite.(result)))
     push!(out, (level, string(cname),
-                string(typeof(model[cname])),
-                model.cevals[cname].counter,
+                comptype(model, cname),
+                evalcounter(model, cname),
                 minimum(v), maximum(v), mean(v),
                 count(isnan.(result)) + count(isinf.(result))))
     deps = dependencies(model, cname)
@@ -193,36 +204,49 @@ function tabledeps(model::Model, cname::Symbol, level::Int)
 end
 
 
-function show(io::IO, model::Model)
+function show(io::IO, model::Union{Model, ModelSnapshot})
     section(io, "Components:")
     table, fixed = tabledeps(model)
+    if showsettings.plain
+        highlighters = nothing
+    else
+        highlighters = Highlighter((data,i,j) -> fixed[i], showsettings.fixed)
+    end
     printtable(io, table, ["Component", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, size(table)[1]+1],
                formatters=ft_printf(showsettings.floatformat, 4:6),
-               highlighters=Highlighter((data,i,j) -> fixed[i], showsettings.fixed))
+               highlighters=highlighters)
     println(io)
     section(io, "Parameters:")
-    (length(model.cevals) == 0)  &&  (return nothing)
+    (length(keys(model)) == 0)  &&  (return nothing)
 
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
-    for (cname, ceval) in model.cevals
-        comp = ceval.comp
-        (t, f) = preparetable(comp, cname=string(cname), cfixed=ceval.cfixed)
+    for cname in keys(model)
+        comp = model[cname]
+        (t, f) = preparetable(comp,
+                              cname=string(cname),
+                              ctype=comptype(model, cname),
+                              cfixed=isfreezed(model, cname))
         table = vcat(table, t)
-        append!(fixed, f .| ceval.cfixed)
+        append!(fixed, f .| isfreezed(model, cname))
         push!(hrule, length(fixed)+1)
     end
-    table = table[:, [1; 3:end]]  # drop the Type column
-    printtable(io, table, ["Component", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 4:6),
-               highlighters=(Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)))
+
+    if showsettings.plain
+        highlighters = nothing
+    else
+        highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed))
+    end
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
+               highlighters=highlighters)
 end
 
 
-function show(io::IO, multi::Vector{Model})
+function show(io::IO, multi::Union{Vector{Model}, Vector{ModelSnapshot}})
     for id in 1:length(multi)
         println(io)
         section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
@@ -235,26 +259,25 @@ end
 function show(io::IO, status::MinimizerStatus)
     print(io, "Status: ")
     if status.code == MinOK
-        ss = (crayon"green", "OK")
+        color, ss = crayon"green", "OK"
     elseif status.code == MinWARN
-        ss = (crayon"bold yellow", "WARNING")
+        color, ss = crayon"bold yellow", "WARNING"
     elseif status.code == MinERROR
-        ss = (crayon"bold red", "ERROR")
+        color, ss = crayon"bold red", "ERROR"
     elseif status.code == MinDRY
-        ss = (crayon"bold red", "DRY")
+        color, ss = crayon"bold red", "DRY"
     else
         error("Unsupported minimizer status code: $(status.code)")
     end
 
     if showsettings.plain
-        print(io, @sprintf("%-8s", ss[2]))
+        print(io, @sprintf("%-8s", ss))
     else
-        print(io, ss[1], @sprintf("%-8s", ss[2]), crayon"default")
+        print(io, color, @sprintf("%-8s", ss), crayon"default")
     end
     if status.message != ""
-        println(io, ss[1], ": ", status.message)
+        println(io, ": ", status.message)
     end
-    print(io, crayon"default")
 end
 
 
@@ -262,19 +285,5 @@ function show(io::IO, res::FitStats)
     section(io, "Fit results:", newline=false)
     print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %10.5g, ", res.ndata, res.nfree, res.fitstat))
     show(io, res.status)
-    println(io)
-end
-
-
-function show(io::IO, mb::ModelSnapshot)
-    print(io, mb.show)
-end
-
-
-function show(io::IO, mb::Vector{ModelSnapshot})
-    for id in 1:length(mb)
-        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
-        println(io, mb[id].show)
-    end
     println(io)
 end
