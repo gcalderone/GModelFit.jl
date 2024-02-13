@@ -70,8 +70,8 @@ function FitStats(fp::AbstractFitProblem, status::MinimizerStatus)
     # gof_stat = sum(abs2, residuals(fp))
     # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
     FitStats(fp.timestamp, (now() - fp.timestamp).value / 1e3,
-              length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
-              status)
+             length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
+             status)
 end
 
 

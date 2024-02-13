@@ -31,11 +31,12 @@ function printtable(io, table, header, args...; formatters=(), hlines=:none, kw.
     end
 end
 
-function section(io, args...)
+function section(io, args...; newline=true)
+    nl = newline  ?  "\n"  :  ""
     if showsettings.plain
-        println(io, args...,)
+        print(io, args..., nl)
     else
-        println(io, showsettings.section, args..., crayon"default")
+        print(io, showsettings.section, args..., nl, crayon"default")
     end
 end
 
@@ -246,23 +247,22 @@ function show(io::IO, status::MinimizerStatus)
     end
 
     if showsettings.plain
-        print(io, @sprintf("%8s", ss[2]))
+        print(io, @sprintf("%-8s", ss[2]))
     else
-        print(io, ss[1], @sprintf("%8s", ss[2]), crayon"default")
+        print(io, ss[1], @sprintf("%-8s", ss[2]), crayon"default")
     end
     if status.message != ""
         println(io, ss[1], ": ", status.message)
     end
-    println(io, crayon"default")
+    print(io, crayon"default")
 end
 
 
 function show(io::IO, res::FitStats)
-    section(io, "Fit results:")
-    println(io, @sprintf("    #Data : %8d         Red. fit stat.: %10.5g  (DOF: %d)", res.ndata, res.fitstat, res.dof))
-    println(io, @sprintf("    #Free : %8d         Elapsed time  : %10.5g s", res.nfree, res.elapsed))
-    print(io, "    ")
+    section(io, "Fit results:", newline=false)
+    print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %10.5g, ", res.ndata, res.nfree, res.fitstat))
     show(io, res.status)
+    println(io)
 end
 
 

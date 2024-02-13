@@ -228,7 +228,6 @@ function _deserialize(dd::AbstractDict)
 end
 
 
-
 function deserialize(filename::String)
     if filename[end-2:end] == ".gz"
         io = GZip.open(filename)
