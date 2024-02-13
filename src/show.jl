@@ -172,8 +172,8 @@ function tabledeps(model::Union{Model, ModelSnapshot})
         level = out[i][2]
         prefix = ""
         if showsettings.plain
-            (level > 1)  &&  (prefix  = join(fill(" :", level-1)))
-            (level > 0)  &&  (prefix *= " - ")
+            (level > 1)  &&  (prefix  = join(fill(" |", level-1)))
+            (level > 0)  &&  (prefix *= " + ")
         else
             (level > 1)  &&  (prefix  = join(fill(" │", level-1)))
             (level > 0)  &&  (prefix *= (final  ?  " └─ "  :  " ├─ "))
