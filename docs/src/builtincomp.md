@@ -48,7 +48,7 @@ where the mathematical expression returns a `Vector{Float64}` with the same leng
 
 The previous example can be rewritten as follows:
 
-#### Examples
+#### Example
 ```@example abc
 using GModelFit
 
@@ -141,7 +141,7 @@ The parameters are:
   - `slopeY::Parameter` (only 2D): the slope of the plane along the Y direction;
 
 
-#### Examples
+#### Example
 ```@example abc
 using GModelFit
 
@@ -191,7 +191,7 @@ The constructor is defined as follows:
 
 The parameters are accessible via the `p` vector, as: `p[1]`, `p[2]`, etc.
 
-#### Examples
+#### Example
 ```@example abc
 using GModelFit
 
@@ -245,7 +245,7 @@ The parameters are:
 
 
 
-#### Examples
+#### Example
 ```@example abc
 using GModelFit
 
@@ -269,8 +269,8 @@ using Random, GModelFit, Gnuplot
 hh = hist(randn(10000), bs=0.25)
 
 # Prepare domain and data and fit a model
-dom = Domain((hh.edges[1][1:end-1] .+ hh.edges[1][2:end]) ./ 2)
-data = Measures(dom, hh.weights .* 1., 1.)
+dom = Domain(hist_bins(hh, side=:center, pad=false))
+data = Measures(dom, hist_weights(hh, pad=false), 1.)
 model = Model(dom, GModelFit.Gaussian(1e3, 0, 1))
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian2", best, fitstats, data) # hide

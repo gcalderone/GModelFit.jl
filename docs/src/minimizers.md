@@ -34,7 +34,7 @@ The above minimizers typically provide the same results, although in some comple
 ## The `cmpfit()` minimizer
 
 The `cmpfit()` minimizer allows to specify several options to fine-tune the minimizer behaviour.  Specifically:
-- the `CMPFit.Config` structure allows to specify the convergence criteria, the maximum number of iterations, etc. (see the "*CONFIGURING MPFIT()*" section [here](https://pages.physics.wisc.edu/~craigm/idl/cmpfit.html);
+- the `CMPFit.Config` structure allows to specify the convergence criteria, the maximum number of iterations, etc. (see the "CONFIGURING MPFIT()" section [here](https://pages.physics.wisc.edu/~craigm/idl/cmpfit.html);
 - the `Δfitstat_threshold` allows to specify a threshold on the difference in fit statistics before and after the `mpfit()` execution to stop the fitting.  If such difference is greater than the `Δfitstat_threshold` the minimization process continue regardless of the number of iterations.
 
 ```@example abc

@@ -1,4 +1,4 @@
-# Version 1.0.0
+# Version 0.2.0
 - New features:
 	* using PrecompileTools to reduce time-to-first-run in Julia v1.9;
 

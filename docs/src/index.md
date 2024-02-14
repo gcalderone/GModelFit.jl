@@ -89,7 +89,7 @@ Once done, you may plot the data and the best fit model with a plotting framewor
 using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
 @gp :- coords(dom) model() "w l t 'Best fit model'"
-saveas("simple_example") # hide
+saveas("simple_example"); # hide
 ```
 ![](assets/simple_example.png)
 

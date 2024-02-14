@@ -42,8 +42,8 @@ All components "live" within `Model` object, which has a well defined domain ass
 1. the component is created invoking its constructor and providing an initial guess values for all parameters;
 1. the component is added to the model. In this step the `prepare!` function is called to precompute component quantities (according to the domain associated to the `Model` object) and to allocate the buffer for evaluations.  Note that the `prepare!` function is invoked only once for each component;
 1. the user may optionally modify the component parameter guess values, as well as their [Parameter constraints](@ref), before starting the fit;
-1. before starting the fit process a dependency tree is generated to identify all component dependencies (by invoking the `dependencies()` function for all components). The tree is used to identify the proper order for component evaluations: leaves will be evaluated first, and the remaining ones following the tree branches.  The evaluation of the last component (the root of the tree) will be compared to the data;
-1. during the fitting process the component `evaluate!` function is invoked whenever the minimizer change one of its parameter values, until a convergence criterion is satisfied.
+1. before starting the fit process a dependency tree is generated to identify all component dependencies (by invoking the `dependencies()` function for all components). The tree is used to identify the proper order for component evaluations: the leaves will be evaluated first, and the remaining ones will be evaluated following the tree branches.  The evaluation of the last component (the root of the tree) will be compared to the data;
+1. during the fitting process the component `evaluate!()` function is invoked whenever a change in its parameter values is detected, until a convergence criterion is satisfied.
 
 
 ### Example

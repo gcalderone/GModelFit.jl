@@ -35,6 +35,8 @@ values
 The following symbols are not exported by the **GModelFit.jl** package since they are typically not used in every day work, or aimed to debugging purposes.  Still, they can be useful in some case, hence they are documented here.
 
 ```@docs
+GModelFit.evalcounter
+GModelFit.evalcounters
 GModelFit.FitStats
 GModelFit.FunctDesc
 GModelFit.ModelSnapshot
