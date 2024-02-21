@@ -93,7 +93,7 @@ end
 
 function show(io::IO, par::Parameter)
     if par.fixed
-        println(io, "Value : ", par.val, "   (FIXED)")
+        println(io, "Value : ", par.val, "   (fixed)")
     elseif isnan(par.unc)
         println(io, "Value : ", par.val, "  [", par.low , " : ", par.high, "]")
     else
@@ -121,13 +121,14 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
         isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
-                     permutedims([cname * (cfixed  ?  " (FIXED)"  :  ""), ctype,
+                     permutedims([cname * (cfixed  ?  " (fixed)"  :  ""), ctype,
                                   string(pname), range, param.val,
-                                  (param.fixed | cfixed  ?  " (FIXED)"  :  (isnan(param.unc)  ?  ""  :  param.unc)),
+                                  (param.fixed | cfixed  ?  " (fixed)"  :  param.unc),
                                   (patch == ""  ?  ""  :  param.actual), patch]))
         push!(fixed, param.fixed)
         if !param.fixed  &&  (isnan(param.unc)  ||  (param.unc <= 0.))
             push!(warns, true)
+            # table[end,6] = " (null)"
         else
             push!(warns, false)
         end
