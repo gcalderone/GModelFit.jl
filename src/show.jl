@@ -128,7 +128,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
         push!(fixed, param.fixed)
         if !param.fixed  &&  (isnan(param.unc)  ||  (param.unc <= 0.))
             push!(warns, true)
-            # table[end,6] = " (null)"
+            table[end,6] = " ???"
         else
             push!(warns, false)
         end
@@ -163,53 +163,87 @@ end
 
 
 function tabledeps(model::Union{Model, ModelSnapshot})
-    out0 = tabledeps(model, find_maincomp(model), 0)
-    levels = getindex.(out0, 1)
-    out = Vector{Tuple}()
-    for i in 1:length(out0)
-        isamelevel = findfirst(levels[i+1:end] .== levels[i])
-        isuper     = findfirst(levels[i+1:end] .<  levels[i])
-        final = isnothing(isamelevel)  ||  (!isnothing(isuper)  &&  (isuper < isamelevel))
-        push!(out, (final, out0[i]...))
+    function alldeps(model::Union{Model, GModelFit.ModelSnapshot}, cname=nothing, level=0)
+        out = Vector{Tuple}()
+        if isnothing(cname)
+            cname = GModelFit.find_maincomp(model)
+            append!(out, alldeps(model, cname, level+1))
+        else
+            push!(out, (level, cname))
+            for d in GModelFit.dependencies(model, cname)
+                append!(out, alldeps(model, d, level+1))
+            end
+        end
+        return out
     end
 
-    table = Matrix{Union{String,Int,Float64}}(undef, length(out), 7)
+    allcomps = alldeps(model)
+    maxdepth = maximum(getindex.(allcomps, 1))
+    prefix = fill("", length(allcomps), maxdepth)
+    for i in 1:length(allcomps)
+        prefix[i, allcomps[i][1]] = string(allcomps[i][2])
+    end
+
+    BRANCH = " ├─ "
+    BRCONT = " │  "
+    BREND  = " └─ "
+    for i in 2:length(allcomps)
+        for j in 1:(maxdepth-1)
+            if prefix[i,j] == ""                    # empty cell
+                if any(prefix[1:(i-1), j] .!= "")   # ...it has a parent
+                    if prefix[i,j+1] != ""          # ...it is a branch
+                        prefix[i,j] = BRANCH        # Add a branch
+                    end
+                end
+            end
+        end
+    end
+    for i in 2:length(allcomps)
+        for j in 1:(maxdepth-1)
+            if prefix[i,j] == BRANCH                  # it is a branch
+                # Check if this is the last row for this branch
+                if all(prefix[(i+1):end,j] .== "")
+                    prefix[i,j] = BREND
+                elseif (prefix[i+1,j] != "")  &&  (prefix[i+1,j] != BRANCH)
+                    prefix[i,j] = BREND
+                end
+            end
+        end
+    end
+    # Join branches with vertical lines
+    for i in 2:length(allcomps)
+        for j in 1:(maxdepth-1)
+            if (prefix[i,j] == "")  &&  (prefix[i-1,j] in [BRANCH, BRCONT])
+                prefix[i,j] = BRCONT
+            end
+        end
+    end
+    prefix[prefix .== ""] .= " "^length(BRANCH)
+
+    prefix = [string(rstrip(join(prefix[i,:]))) for i in 1:length(allcomps)]
+    if showsettings.plain
+        prefix = [replace(p,
+                          BRANCH => "+ ",
+                          BRCONT => "| ",
+                          BREND  => "+ ") for p in prefix]
+    end
+
+    table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 7)
     fixed = Vector{Bool}()
-    for i in 1:length(out)
-        final = out[i][1]
-        level = out[i][2]
-        prefix = ""
-        if showsettings.plain
-            (level > 1)  &&  (prefix  = join(fill(" |", level-1)))
-            (level > 0)  &&  (prefix *= " + ")
-        else
-            (level > 1)  &&  (prefix  = join(fill(" │", level-1)))
-            (level > 0)  &&  (prefix *= (final  ?  " └─ "  :  " ├─ "))
-        end
-        table[i, 1] = prefix * out[i][3]
-        for j in 2:7
-            table[i, j] = out[i][j+2]
-        end
-        push!(fixed, isfreezed(model, Symbol(out[i][3])))
+    for i in 1:length(allcomps)
+        cname = allcomps[i][2]
+        table[i, 1] = prefix[i]
+        table[i, 2] = comptype(model, cname)
+        table[i, 3] = evalcounter(model, cname)
+        result = model(cname)
+        v = view(result, findall(isfinite.(result)))
+        table[i, 4:6] .= [minimum(v), maximum(v), mean(v)]
+        table[i, 7] = count(isnan.(result)) + count(isinf.(result))
+        push!(fixed, isfreezed(model, cname))
     end
     return table, fixed
 end
 
-function tabledeps(model::Union{Model, ModelSnapshot}, cname::Symbol, level::Int)
-    out = Vector{Tuple}()
-    result = model(cname)
-    v = view(result, findall(isfinite.(result)))
-    push!(out, (level, string(cname),
-                comptype(model, cname),
-                evalcounter(model, cname),
-                minimum(v), maximum(v), mean(v),
-                count(isnan.(result)) + count(isinf.(result))))
-    deps = dependencies(model, cname)
-    for i in 1:length(deps)
-        append!(out, tabledeps(model, deps[i], level+1))
-    end
-    return out
-end
 
 
 function show(io::IO, model::Union{Model, ModelSnapshot})
