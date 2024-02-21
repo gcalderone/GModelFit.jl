@@ -184,9 +184,9 @@ function tabledeps(model::Union{Model, ModelSnapshot})
         prefix[i, allcomps[i][1]] = string(allcomps[i][2])
     end
 
-    BRANCH = " ├─ "
-    BRCONT = " │  "
-    BREND  = " └─ "
+    BRANCH = "├─╴"
+    BRCONT = "│  "
+    BREND  = "└─╴"
     for i in 2:length(allcomps)
         for j in 1:(maxdepth-1)
             if prefix[i,j] == ""                    # empty cell
@@ -228,22 +228,23 @@ function tabledeps(model::Union{Model, ModelSnapshot})
                           BREND  => "+ ") for p in prefix]
     end
 
-    table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 7)
+    table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 8)
     fixed = Vector{Bool}()
     for i in 1:length(allcomps)
         cname = allcomps[i][2]
         table[i, 1] = prefix[i]
         table[i, 2] = comptype(model, cname)
-        table[i, 3] = evalcounter(model, cname)
+        table[i, 3] = count(getproperty.(values(getparams(model[cname])), :fixed) .== false)
+        (table[i, 3] == 0)  &&  (table[i, 3] = "")
+        table[i, 4] = evalcounter(model, cname)
         result = model(cname)
         v = view(result, findall(isfinite.(result)))
-        table[i, 4:6] .= [minimum(v), maximum(v), mean(v)]
-        table[i, 7] = count(isnan.(result)) + count(isinf.(result))
+        table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+        table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         push!(fixed, isfreezed(model, cname))
     end
     return table, fixed
 end
-
 
 
 function show(io::IO, model::Union{Model, ModelSnapshot})
@@ -254,11 +255,12 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     else
         highlighters = Highlighter((data,i,j) -> fixed[i], showsettings.fixed)
     end
-    printtable(io, table, ["Component", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+    printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
                hlines=[0,1, size(table)[1]+1],
-               formatters=ft_printf(showsettings.floatformat, 4:6),
+               formatters=ft_printf(showsettings.floatformat, 5:7),
                highlighters=highlighters)
     println(io)
+
     section(io, "Parameters:")
     (length(keys(model)) == 0)  &&  (return nothing)
 
