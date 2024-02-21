@@ -13,7 +13,7 @@ mutable struct ShowSettings
     ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true,
                          crayon"light_blue", crayon"light_blue negative bold",
                          crayon"dark_gray bold", crayon"dark_gray",
-                         crayon"light_red blink", crayon"negative", crayon"green bold")
+                         crayon"light_red", crayon"negative", crayon"green bold")
 end
 
 const showsettings = ShowSettings()
@@ -110,6 +110,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
                       cname::String="?", ctype="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
+    warns = Vector{Bool}()
 
     for (pname, param) in getparams(comp)
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
@@ -125,23 +126,29 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
                                   (param.fixed | cfixed  ?  " (FIXED)"  :  (isnan(param.unc)  ?  ""  :  param.unc)),
                                   (patch == ""  ?  ""  :  param.actual), patch]))
         push!(fixed, param.fixed)
+        if !param.fixed  &&  (isnan(param.unc)  ||  (param.unc <= 0.))
+            push!(warns, true)
+        else
+            push!(warns, false)
+        end
         if !showsettings.plain
             cname = ""  # delete from following lines within the same component box
             ctype = ""
             cfixed = false
         end
     end
-    return (table, fixed)
+    return (table, fixed, warns)
 end
 
 
 function show(io::IO, comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}})
     ctype = isa(comp, AbstractComponent)  ?  string(typeof(comp))  :  "?"
-    (table, fixed) = preparetable(comp, ctype=ctype)
+    (table, fixed, warns) = preparetable(comp, ctype=ctype)
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = (Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5))), showsettings.fixed))
+        highlighters = (Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed),
+                        Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                formatters=ft_printf(showsettings.floatformat, 5:7),
@@ -222,23 +229,26 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
 
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
+    warns = Vector{Bool}()
     hrule = Vector{Int}()
     push!(hrule, 0, 1)
     for cname in keys(model)
         comp = model[cname]
-        (t, f) = preparetable(comp,
-                              cname=string(cname),
-                              ctype=comptype(model, cname),
-                              cfixed=isfreezed(model, cname))
+        (t, f, w) = preparetable(comp,
+                                 cname=string(cname),
+                                 ctype=comptype(model, cname),
+                                 cfixed=isfreezed(model, cname))
         table = vcat(table, t)
         append!(fixed, f .| isfreezed(model, cname))
+        append!(warns, w)
         push!(hrule, length(fixed)+1)
     end
 
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed))
+        highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                        Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
