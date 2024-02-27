@@ -160,13 +160,13 @@ function _deserialize(dd::AbstractDict)
             # for (k, v) in dd["params"]
             #     tmp[Symbol(k)] = v
             # end
-            return PVComp{Parameter}(_deserialize(dd["params"]), _deserialize(dd["data"]))
+            return PVComp{Parameter}(_deserialize(dd["pnames"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GModelFit.PV.PVModel{GModelFit.Parameter}"
             # tmp = OrderedDict{Symbol, PV.PVComp{GModelFit.Parameter}}()
             # for (k, v) in dd["comps"]
             #     tmp[Symbol(k)] = _deserialize(v)
             # end
-            return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["data"]))
+            return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GModelFit.FunctDesc"
             return FunctDesc(deserialized_function,
                              _deserialize(dd["display"]),
