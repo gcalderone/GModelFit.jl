@@ -61,8 +61,6 @@ function free_params(multi::Vector{Model})
 end
 
 
-
-
 # ====================================================================
 struct MultiFitProblem <: AbstractFitProblem
     timestamp::DateTime
@@ -120,8 +118,17 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
 function fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+    # Ensure Model.maincomp has a value
+    maincomps = Vector{Symbol}()
+    for i in 1:length(multi)
+        push!(maincomps, multi[i].maincomp)
+        multi[i].maincomp = find_maincomp(multi[i])
+    end
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
+    for i in 1:length(multi)
+        multi[i].maincomp = maincomps[i] # possibly restore empty value
+    end
     return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
 

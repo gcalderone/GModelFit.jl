@@ -115,7 +115,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
     for (pname, param) in getparams(comp)
         (!showsettings.showfixed)  &&  param.fixed  &&  continue
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
-        (range == "-Inf:Inf")  &&  (range = "")
+        # (range == "-Inf:Inf")  &&  (range = "")
         patch = ""
         isa(param.patch, Symbol)  &&  (patch = string(param.patch))
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
@@ -239,7 +239,11 @@ function tabledeps(model::Union{Model, ModelSnapshot})
         table[i, 4] = evalcounter(model, cname)
         result = model(cname)
         v = view(result, findall(isfinite.(result)))
-        table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+        if length(v) > 0
+            table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+        else
+            table[i, 5:7] .= ["", "", ""]
+        end
         table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         push!(fixed, isfreezed(model, cname))
     end

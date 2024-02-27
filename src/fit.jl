@@ -83,8 +83,12 @@ end
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
 function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+    # Ensure Model.maincomp has a value
+    maincomp = model.maincomp
+    model.maincomp = find_maincomp(model)
     fp = FitProblem(model, data)
     status = fit(minimizer, fp)
+    model.maincomp = maincomp  # possibly restore empty value
     return ModelSnapshot(fp.model), FitStats(fp, status)
 end
 

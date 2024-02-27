@@ -196,6 +196,24 @@ prepare!(comp::AbstractComponent, domain::AbstractDomain) =
 evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent=
     error("No evaluate!() method implemented for $T")
 
+# Evaluate component on the given domain.  Parmeter values are the
+# ones stored in the component unless a custom value is provided via a
+# keyword.
+function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
+    buffer = prepare!(comp, domain)
+    par_values = Float64[]
+    params = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
+    for (pname, pval) in kws
+        if pname in keys(params)
+            params[pname] = pval
+        else
+            @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(params)), ", ")
+        end
+    end
+    evaluate!(buffer, comp, domain, values(params)...)
+end
+
+
 # Built-in components
 include("components/FComp.jl")
 include("components/OffsetSlope.jl")
