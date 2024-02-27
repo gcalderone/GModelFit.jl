@@ -6,8 +6,11 @@
 	comp = GModelFit.Gaussian(1, 0, 1);
 	comp(Domain(-5:5))
 	```
-- Performance improvement
-	* During a fit the `Model.maincomp` is temporarily set to the main component name.  This allow repeated invocations `find_maincomp()` during model evaluation;
+- Performance improvements:
+	* During a fit the `Model.maincomp` is temporarily set to the main component name.  This allow avoiding unnecessay invocations of `find_maincomp()` during model evaluation;
+
+	* Refactored code in GModelFit.PV
+
 
 - Bugfix:
 	* Fixed a bug in `show()` when a component evaluates to NaN;

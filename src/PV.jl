@@ -3,84 +3,82 @@ module PV
 
 using DataStructures
 
-import Base.getindex, Base.setindex!,
-Base.getproperty, Base.setproperty!, Base.propertynames,
-Base.keys, Base.empty!, Base.iterate
+import Base.keys, Base.getindex, Base.setindex!,
+       Base.propertynames, Base.getproperty, Base.setproperty!,
+       Base.push!, Base.empty!, Base.iterate
 
 export PVComp, PVModel, items
 
 struct PVComp{T}
-    params::OrderedDict{Symbol, Int}
+    pnames::Vector{Symbol}
+    indices::Vector{Int}
     data::Vector{T}
 end
 
 struct PVModel{T}
-    comps::OrderedDict{Symbol, PVComp}
+    comps::OrderedDict{Symbol, PVComp{T}}
+    indices::Vector{Int}
     data::Vector{T}
 end
 
 
-PVComp(parent::PVModel{T}) where T = PVComp{T}(OrderedDict{Symbol, Int}(), parent.data)
-internal_vector(pv::PVComp)  = getfield(pv, :data)
-internal_dict(  pv::PVComp)  = getfield(pv, :params)
-propertynames(pv::PVComp) = collect(keys(internal_dict(pv)))
+PVComp(parent::PVModel{T}) where T = PVComp{T}(Vector{Symbol}(), Vector{Int}(), parent.data)
+propertynames(comp::PVComp) = getfield(comp, :pnames)
 
-getindex(pv::PVComp, key::Symbol) =
-    internal_vector(pv)[internal_dict(pv)[key]]
-getproperty(pv::PVComp, key::Symbol) = getindex(pv, key)
-
-function setindex!(pv::PVComp, value, key::Symbol)
-    if haskey(internal_dict(pv), key)
-        setindex!(internal_vector(pv), value, internal_dict(pv)[key])
-    else
-        i = length(internal_vector(pv)) + 1
-        push!(internal_vector(pv), value)
-        internal_dict(pv)[key] = i
-    end
-    nothing
+function index(comp::PVComp, pname::Symbol)
+    i = findfirst(getfield(comp, :pnames) .== pname)
+    @assert !isnothing(i) "Unknwon parameter name: $pname"
+    return getfield(comp, :indices)[i]
 end
-setproperty!(pv::PVComp, key::Symbol, value) =
-    setindex!(pv, value, key)
+getindex(comp::PVComp, pname::Symbol) = getfield(comp, :data)[index(comp, pname)]
+setindex!(comp::PVComp, value, pname::Symbol) = setindex!(getfield(comp, :data),
+                                                          value, index(comp, pname))
+getproperty( comp::PVComp, pname::Symbol) = getindex(comp, pname)
+setproperty!(comp::PVComp, pname::Symbol, value) = setindex!(comp, value, pname)
 
-items(pv::PVComp) =
-    view(internal_vector(pv), collect(values(internal_dict(pv))))
+items(comp::PVComp) = view(getfield(comp, :data), getfield(comp, :indices))
 
-function iterate(pv::PVComp, state...)
-    out = iterate(internal_dict(pv), state...)
-    isnothing(out)  &&  (return nothing)
-    return (out[1][1] => getproperty(pv, out[1][1]), out[2])
+function iterate(comp::PVComp, i=1)
+    (i > length(getfield(comp, :pnames)))  &&  return nothing
+    return (getfield(comp, :pnames)[i] => getfield(comp, :data)[getfield(comp, :indices)[i]], i+=1)
 end
 
 
 
-
-
-PVModel{T}() where T = PVModel{T}(OrderedDict{Symbol, PVComp{T}}(), Vector{T}())
-
-internal_vector(pv::PVModel) = pv.data
+PVModel{T}() where T = PVModel{T}(OrderedDict{Symbol, PVComp{T}}(), Vector{Int}(), Vector{T}())
 
 function empty!(pv::PVModel)
     empty!(pv.comps)
+    empty!(pv.indices)
     empty!(pv.data)
 end
 
 keys(pv::PVModel) = collect(keys(pv.comps))
 
-function getindex(pv::PVModel{T}, key::Symbol) where T
-    if !haskey(pv.comps, key)
-        pv.comps[key] = PVComp(pv)
+function push!(pv::PVModel{T}, cname::Symbol, pname::Symbol, value::T) where T
+    comp = pv[cname]
+    if pname in getfield(comp, :pnames)
+        comp[pname] = value
+    else
+        i = length(getfield(comp, :data)) + 1
+        push!(getfield(comp, :pnames), pname)
+        push!(getfield(comp, :indices), i)
+        push!(getfield(comp, :data), value)
     end
-    return pv.comps[key]
+    # Collect indices from components
+    empty!(pv.indices)
+    for (cname, comp) in pv.comps
+        append!(pv.indices, getfield(comp, :indices))
+    end
+    return value
 end
 
-function items(pv::PVModel)
-    ids = Vector{Int}()
-    for (cname, comp) in pv
-        append!(ids, collect(values(internal_dict(comp))))
-    end
-    return view(internal_vector(pv), ids)
+function getindex(pv::PVModel{T}, cname::Symbol) where T
+    (cname in keys(pv.comps))  ||  (pv.comps[cname] = PVComp(pv))
+    return pv.comps[cname]
 end
 
+items(pv::PVModel) = view(pv.data, pv.indices)
 iterate(pv::PVModel, state...) = iterate(pv.comps, state...)
 
 end

@@ -4,13 +4,13 @@ using Random, Test, GModelFit, GModelFit.PV
 mm = PVModel{Float64}()
 @assert typeof(mm) == PVModel{Float64}
 
-mm[:comp] # empty component
-mm[:comp3][:par] = 3.1
-mm[:comp1][:par] = 1.1
-mm[:comp1][:alt] = 1.2
-mm[:comp3].par = 99
+mm[:comp]  # empty component
+push!(mm, :comp3, :par, 3.1)
+push!(mm, :comp1, :par, 1.1)
+push!(mm, :comp1, :alt, 1.2)
+mm[:comp3][:par] = 99
 
-@assert PV.internal_vector(mm) == [99, 1.1, 1.2]
+@assert getfield(mm, :data) == [99, 1.1, 1.2]
 
 @assert mm[:comp1].par == 1.1
 @assert mm[:comp1].alt == 1.2

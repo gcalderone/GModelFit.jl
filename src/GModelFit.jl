@@ -134,9 +134,9 @@ function empty!(pv::ParameterVectors)
     empty!(pv.ifree)
 end
 function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
-    pv.params[cname][pname] = par
-    pv.values[cname][pname] = par.val
-    pv.actual[cname][pname] = par.actual
+    push!(pv.params, cname, pname, par)
+    push!(pv.values, cname, pname, par.val)
+    push!(pv.actual, cname, pname, par.actual)
     if !par.fixed
         push!(pv.ifree, length(items(pv.params)))
     end
@@ -294,13 +294,13 @@ The most important function for a `Model` object is `fit()`, which allows to fit
 
 The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
 """
-mutable struct Model   # mutable because of maincomp
+struct Model  # performances are slightly better if this structure is mutable
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     pv::ParameterVectors
     pvmulti::Vector{PVModel{Float64}}
     buffers::OrderedDict{Symbol, Vector{Float64}}
-    maincomp::Symbol
+    maincomp::Vector{Symbol}
 
     function Model(domain::AbstractDomain, args...)
         function parse_args(args::AbstractDict)
@@ -338,7 +338,7 @@ mutable struct Model   # mutable because of maincomp
         model = new(domain, OrderedDict{Symbol, CompEval}(),
                     ParameterVectors(), Vector{PVModel{Float64}}(),
                     OrderedDict{Symbol, Vector{Float64}}(),
-                    Symbol(""))
+                    Vector{Symbol}())
 
         for (name, item) in parse_args(args...)
             model[name] = item
@@ -349,8 +349,8 @@ end
 
 
 function find_maincomp(model::Model)
-    if model.maincomp != Symbol("")
-        return model.maincomp
+    if length(model.maincomp) > 0
+        return model.maincomp[end]
     end
 
     if length(model.cevals) == 1
@@ -481,6 +481,7 @@ end
 function update_step_newpvalues(model::Model, pvalues::Vector{Float64})
     items(model.pv.values)[model.pv.ifree] .= pvalues
 end
+
 
 # Evaluation step fit:
 # - copy all parameter values into actual;
@@ -668,8 +669,10 @@ Force a component to be the final one for model evaluation.
 """
 function select_maincomp!(model::Model, cname::Symbol)
     @assert haskey(model, cname)
-    model.maincomp = cname
+    empty!(model.maincomp)
+    push!(model.maincomp, cname)
 end
+
 
 """
     ModelSnapshot
