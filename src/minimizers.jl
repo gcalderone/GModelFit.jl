@@ -96,14 +96,13 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
 
     residuals(fp, guess)
     last_fitstat = sum(abs2, residuals(fp))
+    prog = ProgressUnknown(desc="Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
-        prog = ProgressUnknown(desc="Model (dof=$(fp.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
         res = CMPFit.cmpfit((pvalues) -> begin
                                 ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(fp))])
                                 residuals(fp, pvalues)
                             end,
                             guess, parinfo=parinfo, config=minimizer.config)
-        ProgressMeter.finish!(prog)
         if res.status <= 0
             return MinimizerStatus(MinError, "Status = $(res.status)", res)
         end
@@ -118,6 +117,7 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
             end
         end
 
+        ProgressMeter.finish!(prog)
         finalize!(fp,
                   getfield.(Ref(res), :param),
                   getfield.(Ref(res), :perror))
