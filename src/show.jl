@@ -327,7 +327,7 @@ function show(io::IO, status::MinimizerStatus)
         print(io, color, @sprintf("%-8s", ss), crayon"default")
     end
     if status.message != ""
-        println(io, ": ", status.message)
+        println(io, "\n", status.message)
     end
 end
 

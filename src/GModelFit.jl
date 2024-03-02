@@ -9,6 +9,7 @@ using Dates
 using ProgressMeter
 using Random
 using JSON, GZip
+using Polyester
 
 import Base.show
 import Base.ndims
@@ -32,6 +33,24 @@ export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
 
 include("PV.jl")
 using .PV
+
+
+macro batch_when_threaded(args...)
+    if Threads.nthreads() > 1
+        out = Expr(:macrocall, Symbol("@batch"), LineNumberNode(1, nothing))
+        append!(out.args, args)
+        return esc(out)
+    else
+        for arg in args
+            if isa(arg, Expr)
+                if arg.head == :for
+                    return esc(arg)
+                end
+            end
+        end
+    end
+end
+
 
 include("domain.jl")
 
@@ -199,7 +218,7 @@ evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) whe
 # Evaluate component on the given domain.  Parmeter values are the
 # ones stored in the component unless a custom value is provided via a
 # keyword.
-function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
+function (comp::AbstractComponent)(domain::AbstractDomain, args...; kws...)
     buffer = prepare!(comp, domain)
     par_values = Float64[]
     params = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
@@ -210,7 +229,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(params)), ", ")
         end
     end
-    evaluate!(buffer, comp, domain, values(params)...)
+    evaluate!(buffer, comp, domain, values(params)..., args...)
 end
 
 
@@ -522,7 +541,7 @@ function update_step_evaluation(model::Model)
     # Evaluation of all components, starting from the main one and
     # following dependencies
     function update_compeval_recursive(model::Model, cname::Symbol)
-        for d in dependencies(model, cname)
+        @batch_when_threaded per=core for d in dependencies(model, cname)
             update_compeval_recursive(model, d)
         end
         update!(model.cevals[cname], model.domain,
