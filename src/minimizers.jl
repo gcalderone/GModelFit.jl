@@ -76,7 +76,7 @@ mutable struct cmpfit <: AbstractMinimizer
     config::CMPFit.Config
     function cmpfit()
         out = new(CMPFit.Config())
-        out.config.maxiter = 2000
+        out.config.maxiter = 1000
         return out
     end
 end
@@ -111,7 +111,7 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
         if (res.status == 5)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
             if Δfitstat > 0
-                println("⇏eached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_threshold), continue minimization...\n")
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat), continue minimization...\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue
