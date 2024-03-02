@@ -74,8 +74,11 @@ iterated for the maximum allowed number of times.
 
 mutable struct cmpfit <: AbstractMinimizer
     config::CMPFit.Config
-    Δfitstat_threshold::Float64
-    cmpfit() = new(CMPFit.Config(), NaN)
+    function cmpfit()
+        out = new(CMPFit.Config())
+        out.config.maxiter = 2000
+        return out
+    end
 end
 
 function fit(minimizer::cmpfit, fp::AbstractFitProblem)
@@ -101,15 +104,14 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
                             end,
                             guess, parinfo=parinfo, config=minimizer.config)
         ProgressMeter.finish!(prog)
-
         if res.status <= 0
             return MinimizerStatus(MinError, "Status = $(res.status)", res)
         end
 
-        if (res.status == 5)  &&  isfinite(minimizer.Δfitstat_threshold)
+        if (res.status == 5)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
-            if Δfitstat > minimizer.Δfitstat_threshold
-                println("\nReached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_threshold), continue minimization...\n")
+            if Δfitstat > 0
+                println("⇏eached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.Δfitstat_threshold), continue minimization...\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue
@@ -122,6 +124,8 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
 
         if res.status == 2
             return MinimizerStatus(MinWARN, "CMPFit status = 2 may imply one (or more) guess values are too far from optimum", res)
+        elseif res.status == 5
+            return MinimizerStatus(MinWARN, "CMPFit status = 5, reached maximum allowed number of iteration.", res)
         end
         return MinimizerStatus(MinOK, "", res)
     end
