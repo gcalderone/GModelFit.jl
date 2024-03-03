@@ -1,4 +1,4 @@
-function free_params_indices(multi::Vector{Model})
+function free_params_indices(multi::Vector{ModelEval})
     out = Vector{NTuple{3, Int}}()
     i1 = 1
     for id in 1:length(multi)
@@ -13,14 +13,14 @@ function free_params_indices(multi::Vector{Model})
 end
 
 
-function update!(multi::Vector{Model})
+function update!(multi::Vector{ModelEval})
     update_step_init(multi)
     update_step_evaluation(multi)
     update_step_finalize(multi)
     return multi
 end
 
-function update_step_init(multi::Vector{Model})
+function update_step_init(multi::Vector{ModelEval})
     # Populate pvmulti fields in all Model structures to notify we are
     # going to perform a multi-model fitting
     for i in 1:length(multi)
@@ -32,17 +32,17 @@ function update_step_init(multi::Vector{Model})
     update_step_init.(multi)
 end
 
-function update_step_newpvalues(multi::Vector{Model}, pvalues::Vector{Float64})
+function update_step_newpvalues(multi::Vector{ModelEval}, pvalues::Vector{Float64})
     for (id, i1, i2) in free_params_indices(multi)
         update_step_newpvalues(multi[id], pvalues[i1:i2])
     end
 end
 
-function update_step_evaluation(multi::Vector{Model})
+function update_step_evaluation(multi::Vector{ModelEval})
     update_step_evaluation.(multi)
 end
 
-function update_step_finalize(multi::Vector{Model}, uncerts=Vector{Float64}[])
+function update_step_finalize(multi::Vector{ModelEval}, uncerts=Vector{Float64}[])
     if length(uncerts) > 0
         for (id, i1, i2) in free_params_indices(multi)
             update_step_finalize(multi[id], pvalues[i1:i2])
@@ -52,7 +52,7 @@ function update_step_finalize(multi::Vector{Model}, uncerts=Vector{Float64}[])
     end
 end
 
-function free_params(multi::Vector{Model})
+function free_params(multi::Vector{ModelEval})
     out = Vector{Parameter}()
     for id in 1:length(multi)
         append!(out, free_params(multi[id]))
@@ -64,13 +64,13 @@ end
 # ====================================================================
 struct MultiFitProblem <: AbstractFitProblem
     timestamp::DateTime
-    multi::Vector{Model}
+    multi::Vector{ModelEval}
     fp::Vector{FitProblem}
     resid::Vector{Float64}
     nfree::Int
     dof::Int
 
-    function MultiFitProblem(multi::Vector{Model}, datasets::Vector{T}) where T <: AbstractMeasures
+    function MultiFitProblem(multi::Vector{ModelEval}, datasets::Vector{T}) where T <: AbstractMeasures
         @assert length(multi) == length(datasets)
         update!(multi)
         fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
@@ -117,18 +117,12 @@ end
 
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
-function fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
-    # Ensure Model.maincomp has a fixed value
-    for i in 1:length(multi)
-        push!(multi[i].maincomp, find_maincomp(multi[i]))
-    end
+function fit(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
-    for i in 1:length(multi)
-        deleteat!(multi[i].maincomp, length(multi[i].maincomp))  # restore original empty value
-    end
     return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
+fit(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
 
 
 """
@@ -136,8 +130,9 @@ end
 
 Compare a multi-model to a multi-dataset and return a `FitStats` object.
 """
-function compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N
+function compare(multi::Vector{ModelEval}, data::Vector{Measures{N}}) where N
     fp = MultiFitProblem(multi, data)
     status = fit(dry(), fp)
     return FitStats(fp, MinimizerStatus(MinDRY))
 end
+compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N = compare([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data)

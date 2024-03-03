@@ -82,9 +82,8 @@ No systematic error is considered when generating mock dataset(s).
 - `abserr=0.`: absolute error;
 - `seed=nothing`: seed for the `Random.MersenneTwister` generator.
 """
-function mock(::Type{Measures}, model::Model, domain::AbstractDomain; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
+function mock(::Type{Measures}, meval::ModelEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     rng = MersenneTwister(seed);
-    meval = ModelEval(model, domain)
     update!(meval)
     values = meval()
     ee = extrema(values)
@@ -92,10 +91,15 @@ function mock(::Type{Measures}, model::Model, domain::AbstractDomain; properr=0.
     @assert range > 0
     err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
     values .+= err .* randn(rng, size(values))
-    Measures(domain, values, err)
+    Measures(meval.domain, values, err)
+end
+mock(::Type{T}, model::Model, domain::AbstractDomain; kws...) where T =
+    mock(T, ModelEval(model, domain); kws...)
+
+function mock(T, multi::Vector{ModelEval}; kws...)
+    update!(multi)
+    return [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 end
 
-# TODO function mock(T, multi::Vector{Model}; kws...)
-# TODO     update!(multi)
-# TODO     return [mock(T, multi[i]; kws...) for i in 1:length(multi)]
-# TODO end
+mock(::Type{T}, models::Vector{Model}, domains::Vector{<: AbstractDomain}; kws...) where T =
+    mock(T, [ModelEval(models[i], domains[i]) for i in 1:length(models)])

@@ -82,12 +82,12 @@ end
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
-function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
-    meval = ModelEval(model, data.domain)
+function fit(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     fp = FitProblem(meval, data)
     status = fit(minimizer, fp)
     return ModelSnapshot(fp.meval), FitStats(fp, status)
 end
+fit(model::Model, data::Measures; kws...) = fit(ModelEval(model, data.domain), data; kws...)
 
 
 """
@@ -95,8 +95,9 @@ end
 
 Compare a model to a dataset and return a `FitStats` object.
 """
-function compare(model::Model, data::Measures)
-    fp = FitProblem(model, data)
+function compare(meval::ModelEval, data::Measures)
+    fp = FitProblem(meval, data)
     status = fit(dry(), fp)
     return FitStats(fp, MinimizerStatus(MinDRY))
 end
+compare(model::Model, data::Measures) = compare(ModelEval(model, data.domain), data)

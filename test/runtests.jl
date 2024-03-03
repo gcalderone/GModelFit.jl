@@ -76,7 +76,7 @@ f2 = @λ (x, p4=4, p5=5) -> @. p4 * sin(p5 * x)
 f3 = @λ (x) -> cos.(x)
 
 x = 1.:50:10000
-model = Model(:f1 => f1, 
+model = Model(:f1 => f1,
               :f2 => f2,
               :f3 => f3,
               :main => @λ (x, f1, f2, f3) -> (f1 .+ f2) .* f3)
@@ -121,25 +121,25 @@ model2 = Model(:l1  => GModelFit.Gaussian(0.8, 2.1, 0.1),
                :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
                :main => SumReducer(:l1, :l2, :bkg));
 
-model = [model1, model2]
-freeze!(model[1], :bkg);
-freeze!(model[2], :bkg);
-data = GModelFit.mock(Measures, model, [Domain(x), Domain(x)], seed=1)
-res = fit(model, data, minimizer=GModelFit.cmpfit())
+models = [model1, model2]
+freeze!(models[1], :bkg);
+freeze!(models[2], :bkg);
+data = GModelFit.mock(Measures, models, [Domain(x), Domain(x)], seed=1)
+res = fit(models, data, minimizer=GModelFit.cmpfit())
 # GModelFit.print_param_covariance(res, sort=true, select=["[2][l1].norm"])
 
 
 
-thaw!(model[1], :bkg);
-thaw!(model[2], :bkg);
+thaw!(models[1], :bkg);
+thaw!(models[2], :bkg);
 
-model[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
-model[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope
+models[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
+models[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope
 
 
-model[1][:l2].center.mpatch = @λ m -> m[2][:l2].center
+models[1][:l2].center.mpatch = @λ m -> m[2][:l2].center
 
-@time res = fit(model, data)
+@time res = fit(models, data)
 
 #=
 @gp x y1 "w l t 'True model'" x values(data1) uncerts(data1) "w yerr t 'Data'" x model1() "w l t 'Best fit'"
