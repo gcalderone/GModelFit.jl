@@ -91,12 +91,12 @@ coords(d::Domain{1}) = d.axis[1]
 coords(d::Domain, dim::Integer) = d.axis[dim]
 coords(d::CartesianDomain, dim::Integer) = coords(flatten(d), dim)
 
-"""
-    getindex(d::Union{Domain, CartesianDomain}, dim::Integer)
-
-Shortcut for `coords(d, dim)`.
-"""
-getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = coords(d, dim)
+# TODO """
+# TODO     getindex(d::Union{Domain, CartesianDomain}, dim::Integer)
+# TODO 
+# TODO Shortcut for `coords(d, dim)`.
+# TODO """
+# TODO getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = coords(d, dim)
 
 # Iterate through domain dimensions returning coordinates
 function iterate(d::Union{Domain, CartesianDomain}, ii=1)

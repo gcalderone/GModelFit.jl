@@ -162,7 +162,7 @@ function show(io::IO, red::FunctDesc)
 end
 
 
-function tabledeps(model::Union{Model, ModelSnapshot})
+function tabledeps(model::Union{Model, ModelEval, ModelSnapshot})
     function alldeps(model::Union{Model, GModelFit.ModelSnapshot}, cname=nothing, level=0)
         out = Vector{Tuple}()
         if isnothing(cname)
@@ -236,22 +236,24 @@ function tabledeps(model::Union{Model, ModelSnapshot})
         table[i, 2] = comptype(model, cname)
         table[i, 3] = count(getproperty.(values(getparams(model[cname])), :fixed) .== false)
         (table[i, 3] == 0)  &&  (table[i, 3] = "")
-        table[i, 4] = evalcounter(model, cname)
-        result = model(cname)
-        v = view(result, findall(isfinite.(result)))
-        if length(v) > 0
-            table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
-        else
-            table[i, 5:7] .= ["", "", ""]
+        if !isa(model, Model)
+            table[i, 4] = evalcounter(model, cname)
+            result = model(cname)
+            v = view(result, findall(isfinite.(result)))
+            if length(v) > 0
+                table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+            else
+                table[i, 5:7] .= ["", "", ""]
+            end
+            table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         end
-        table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         push!(fixed, isfreezed(model, cname))
     end
     return table, fixed
 end
 
 
-function show(io::IO, model::Union{Model, ModelSnapshot})
+function show(io::IO, model::Union{Model, ModelEval, ModelSnapshot})
     section(io, "Components:")
     table, fixed = tabledeps(model)
     if showsettings.plain
@@ -259,10 +261,17 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     else
         highlighters = Highlighter((data,i,j) -> fixed[i], showsettings.fixed)
     end
-    printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-               hlines=[0,1, size(table)[1]+1],
-               formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=highlighters)
+    if !isa(model, Model)
+        printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+                   hlines=[0,1, size(table)[1]+1],
+                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   highlighters=highlighters)
+    else
+        printtable(io, table[:, 1:3], ["Component", "Type", "#Free"],
+                   hlines=[0,1, size(table)[1]+1],
+                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   highlighters=highlighters)
+    end
     println(io)
 
     section(io, "Parameters:")
@@ -288,12 +297,22 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
-                        Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+        if !isa(model, Model)
+            highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                            Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+        else
+            highlighters = Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)
+        end
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=highlighters)
+    if !isa(model, Model)
+        printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
+                   highlighters=highlighters)
+    else
+        printtable(io, table[:, 1:5], ["Component", "Type", "Param.", "Range", "Value"],
+                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5),
+                   highlighters=highlighters)
+    end
 end
 
 

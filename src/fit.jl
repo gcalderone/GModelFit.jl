@@ -2,28 +2,28 @@
 # ====================================================================
 struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
     timestamp::DateTime
-    model::Model
+    meval::ModelEval
     measures::AbstractMeasures
     resid::Vector{Float64}
     nfree::Int
     dof::Int
 
-    function FitProblem(model::Model, data::T) where T <: AbstractMeasures
-        update!(model)
+    function FitProblem(meval::ModelEval, data::T) where T <: AbstractMeasures
+        update!(meval)
         resid = fill(NaN, length(data))
-        nfree = length(free_params(model))
+        nfree = length(free_params(meval))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T}(now(), model, data, resid, nfree, length(resid) - nfree)
+        return new{T}(now(), meval, data, resid, nfree, length(resid) - nfree)
     end
 end
 
-free_params(fp::FitProblem) = free_params(fp.model)
+free_params(fp::FitProblem) = free_params(fp.meval)
 
 residuals(fp::FitProblem) = fp.resid
 function residuals(fp::FitProblem, pvalues::Vector{Float64})
-    update_step_newpvalues(fp.model, pvalues)
-    update_step_evaluation(fp.model)
-    fp.resid .= reshape((fp.model() .- values(fp.measures)) ./ uncerts(fp.measures), :)
+    update_step_newpvalues(fp.meval, pvalues)
+    update_step_evaluation(fp.meval)
+    fp.resid .= reshape((fp.meval() .- values(fp.measures)) ./ uncerts(fp.measures), :)
     return fp.resid
 end
 
@@ -33,7 +33,7 @@ fit_stat(fp::FitProblem{Measures{N}}) where N =
 function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
     @assert fp.nfree == length(best) == length(uncerts)
     residuals(fp, best)
-    update_step_finalize(fp.model, uncerts)
+    update_step_finalize(fp.meval, uncerts)
 end
 
 
@@ -83,12 +83,10 @@ end
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
 function fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
-    # Ensure Model.maincomp has a fixed value
-    push!(model.maincomp, find_maincomp(model))
-    fp = FitProblem(model, data)
+    meval = ModelEval(model, data.domain)
+    fp = FitProblem(meval, data)
     status = fit(minimizer, fp)
-    deleteat!(model.maincomp, length(model.maincomp))  # restore original empty value
-    return ModelSnapshot(fp.model), FitStats(fp, status)
+    return ModelSnapshot(fp.meval), FitStats(fp, status)
 end
 
 
