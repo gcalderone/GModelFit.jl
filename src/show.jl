@@ -301,7 +301,7 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
             highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
                             Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
         else
-            table[:, 6] .= ""
+            table[:, 6:7] .= ""
             highlighters = Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)
         end
     end

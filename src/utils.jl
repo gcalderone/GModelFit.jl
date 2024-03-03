@@ -99,4 +99,3 @@ end
 # TODO     update!(multi)
 # TODO     return [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 # TODO end
-

@@ -250,8 +250,8 @@ mutable struct Model
                 error("Unsupported data type: " * string(typeof(arg[2])) *
                     ".  (accepted types ar T <: AbstractComponent or FunctDesc.")
             end
-            return model
         end
+        return model
     end
     Model(arg::AbstractComponent) = Model(:main => arg)
     Model(arg::FunctDesc) = Model(:main => FComp(arg))
@@ -397,12 +397,10 @@ abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
 # TODO include("multimodel.jl")
-# TODO 
 # TODO include("serialize.jl")
 include("show.jl")
 include("utils.jl")
 include("gnuplot_recipe.jl")
-# TODO 
 # TODO include("precompile.jl")
 
 end
