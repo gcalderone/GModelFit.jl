@@ -301,18 +301,13 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
             highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
                             Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
         else
+            table[:, 6] .= ""
             highlighters = Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)
         end
     end
-    if !isa(model, Model)
-        printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
-                   highlighters=highlighters)
-    else
-        printtable(io, table[:, 1:5], ["Component", "Type", "Param.", "Range", "Value"],
-                   hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5),
-                   highlighters=highlighters)
-    end
+    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
+               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
+               highlighters=highlighters)
 end
 
 

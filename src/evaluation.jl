@@ -46,13 +46,9 @@ end
 
 
 function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
-                 pvalues::Vector{Float64}, deps=Vector{Vector{Float64}}())
-    if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(deps) > 0)
-        if length(deps) > 0
-            evaluate!(ceval, deps, pvalues...)
-        else
-            evaluate!(ceval, pvalues...)
-        end
+                 pvalues::Vector{Float64})
+    if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
+        evaluate!(ceval, pvalues...)
         ceval.lastparvalues .= pvalues
         ceval.counter += 1
     end

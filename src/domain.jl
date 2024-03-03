@@ -158,6 +158,9 @@ struct Measures{N} <: AbstractMeasures{N}
     values::NTuple{2, Vector{Float64}}
     labels::NTuple{2, String}
 
+    # If no domain is provided we generate one
+    Measures(values::AbstractVector, uncerts) = Measures(Domain(length(values)), values, uncerts)
+
     # Measures with linear domain are built using 1D vector(s).
     function Measures(domain::Domain{N}, values::AbstractVector{T}, uncerts::AbstractVector{T}) where {T <: AbstractFloat, N}
         @assert length(domain) == length(values) == length(uncerts) "Domain and dataset have incompatible length"

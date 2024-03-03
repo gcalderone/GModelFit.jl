@@ -33,17 +33,14 @@ getproperty(comp::FComp, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FComp) = getfield(comp, :deps)
 
 
-# We need to implement two evaluate! methods, with/without deps argument respectively
 function evaluate!(ceval::CompEval{FComp, <: AbstractDomain},
                    params...)
-    ceval.buffer .= getfield(ceval.comp, :func)(params...)
+    if length(ceval.deps) > 0
+        ceval.buffer .= getfield(ceval.comp, :func)(ceval.deps..., params...)
+    else
+        ceval.buffer .= getfield(ceval.comp, :func)(params...)
+    end
 end
-
-function evaluate!(ceval::CompEval{FComp, <: AbstractDomain},
-                   deps, params...)
-    ceval.buffer .= getfield(ceval.comp, :func)(deps..., params...)
-end
-
 
 
 # ====================================================================
@@ -69,13 +66,11 @@ getproperty(comp::FCompv, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FCompv) = getfield(comp, :deps)
 
 
-# We need to implement two evaluate! methods, with/without deps argument respectively
 function evaluate!(ceval::CompEval{FCompv, <: AbstractDomain},
                    params::Vararg{Float64})
-    ceval.buffer .= getfield(ceval.comp, :funct)([params...])
-end
-
-function evaluate!(ceval::CompEval{FCompv, <: AbstractDomain},
-                   deps, params...)
-    ceval.buffer .= getfield(ceval.comp, :func)(deps..., [params...])
+    if length(ceval.deps) > 0
+        ceval.buffer .= getfield(ceval.comp, :func)(deps..., [params...])
+    else
+        ceval.buffer .= getfield(ceval.comp, :funct)([params...])
+    end
 end

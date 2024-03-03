@@ -11,12 +11,7 @@ dependencies(comp::SumReducer) = comp.list
 
 function evaluate!(ceval::CompEval{SumReducer, <: AbstractDomain})
     ceval.buffer .= 0.
-end
-
-function evaluate!(ceval::CompEval{SumReducer, <: AbstractDomain},
-                   args)
-    ceval.buffer .= 0.
-    for i in 1:length(args)
-        ceval.buffer .+= args[i]
+    for i in 1:length(ceval.deps)
+        ceval.buffer .+= ceval.deps[i]
     end
 end

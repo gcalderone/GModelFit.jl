@@ -27,11 +27,10 @@ myfunc(x, b, m) = b .+ x .* m
 
 # Prepare domain and a model with a FComp wrapping the previously defined function.
 # Also specify the initial guess parameters.
-dom = Domain(1:5)
-model = Model(dom, :linear => GModelFit.FComp(myfunc, [:x], b=2, m=0.5))
+model = Model(:linear => GModelFit.FComp(myfunc, [:x], b=2, m=0.5))
 
 # Fit model against data
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 dumpjson("ex_FComp", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -53,11 +52,10 @@ The previous example can be rewritten as follows:
 using GModelFit
 
 # Prepare domain and a linear model (with initial guess parameters)
-dom = Domain(1:5)
-model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+model = Model(:linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
 
 # Fit model against data
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 dumpjson("ex_FComp2", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -104,14 +102,13 @@ println() # hide
 
 To define the model we will rewrite the equation as `Ax - b = 0`, and define a model as follows
 ```@example abc
-dom = Domain(length(b))  # dummy domain
-model = Model(dom, GModelFit.FCompv(x -> A*x - b,
+model = Model(GModelFit.FCompv(x -> A*x - b,
                                [1, 1, 1]))
 println() # hide
 ```
 where `x = [1, 1, 1]` are the initial guess values for the three parameters in the fit.  In this case the *empirical data* to compare the model to are just zeros, and we will assume a constant uncertainty of 1 for all samples:
 ```@example abc
-data = Measures(domain(model), fill(0., length(domain(model))), 1.)
+data = Measures(fill(0., length(b)), 1.)
 best, fitstats = fit(model, data)
 dumpjson("ex_FCompv", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -146,11 +143,10 @@ The parameters are:
 using GModelFit
 
 # Prepare domain and a linear model using the OffsetSlope component
-dom = Domain(1:5)
-model = Model(dom, :linear => GModelFit.OffsetSlope(2, 0, 0.5))
+model = Model(:linear => GModelFit.OffsetSlope(2, 0, 0.5))
 
 # Fit model against data
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 dumpjson("ex_OffsetSlope", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -164,10 +160,10 @@ A similar example in 2D is as follows:
 using GModelFit
 
 # Prepare domain and a linear model using the OffsetSlope component
-dom = CartesianDomain(1:5, 1:5)
-model = Model(dom, :plane => GModelFit.OffsetSlope(2, 0, 0, 0.5, 0.5))
+model = Model(:plane => GModelFit.OffsetSlope(2, 0, 0, 0.5, 0.5))
 
 # Fit model against data
+dom = CartesianDomain(1:5, 1:5)
 data = Measures(dom, [ 3.08403  3.46719  4.07612  4.25611  5.04716
                        3.18361  3.88546  4.52338  5.12838  5.7864
                        3.80219  4.90894  5.24232  5.06982  6.29545
@@ -196,11 +192,10 @@ The parameters are accessible via the `p` vector, as: `p[1]`, `p[2]`, etc.
 using GModelFit
 
 # Prepare domain and a linear model using the Polynomial component
-dom = Domain(1:5)
-model = Model(dom, GModelFit.Polynomial(2, 0.5))
+model = Model(GModelFit.Polynomial(2, 0.5))
 
 # Fit model against data
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 dumpjson("ex_Polynomial", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -250,10 +245,10 @@ The parameters are:
 using GModelFit
 
 # Prepare domain and model
-dom = Domain(1:0.5:5)
-model = Model(dom, GModelFit.Gaussian(1, 3, 0.5))
+model = Model(GModelFit.Gaussian(1, 3, 0.5))
 
 # Fit model against data
+dom = Domain(1:0.5:5)
 data = Measures(dom, [0, 0.3, 6.2, 25.4, 37.6, 23., 7.1, 0.4, 0], 0.6)
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian", best, fitstats, data) # hide
@@ -271,7 +266,7 @@ hh = hist(randn(10000), bs=0.25)
 # Prepare domain and data and fit a model
 dom = Domain(hist_bins(hh, side=:center, pad=false))
 data = Measures(dom, hist_weights(hh, pad=false), 1.)
-model = Model(dom, GModelFit.Gaussian(1e3, 0, 1))
+model = Model(GModelFit.Gaussian(1e3, 0, 1))
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian2", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -297,14 +292,11 @@ hh = hist(1 .+ randn(10000), 2 .* randn(10000))
 # Prepare domain and data and fit a model
 dom = CartesianDomain(hist_bins(hh, 1), hist_bins(hh, 2))
 data = Measures(dom, hist_weights(hh) .* 1., 1.)
-model = Model(dom, GModelFit.Gaussian(1e3, 0, 0, 1, 1, 0))
+model = Model(GModelFit.Gaussian(1e3, 0, 0, 1, 1, 0))
 best, fitstats = fit(model, data)
 dumpjson("ex_Gaussian2D", best, fitstats, data) # hide
 show((best, fitstats)) # hide
 ```
-
-
-
 
 
 
@@ -327,8 +319,7 @@ The `SumReducer` component has no parameter.
 using GModelFit
 
 # Prepare domain and a linear model (with initial guess parameters)
-dom = Domain(1:5)
-model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+model = Model(:linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
 
 # Add a quadratic component to the model
 model[:quadratic] = @λ (x, p2=1) -> (p2 .* x.^2)
@@ -337,6 +328,7 @@ model[:quadratic] = @λ (x, p2=1) -> (p2 .* x.^2)
 model[:main] = SumReducer(:linear, :quadratic)
 
 # Fit model against data
+dom = Domain(1:5)
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 dumpjson("ex_SumReducer", best, fitstats, data) # hide
