@@ -1,25 +1,4 @@
 
-prepare!(comp::AbstractComponent, domain::AbstractDomain) =
-    fill(NaN, length(domain))
-
-# Evaluate component on the given domain.  Parmeter values are the
-# ones stored in the component unless a custom value is provided via a
-# keyword.
-function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Float64}}(); kws...)
-    ceval = CompEval(comp, domain)
-    pvalues = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
-    for (pname, pval) in kws
-        if pname in keys(pvalues)
-            pvalues[pname] = pval
-        else
-            @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
-        end
-    end
-    update!(ceval, collect(values(pvalues)), deps)
-    return ceval.buffer
-end
-
-
 # ====================================================================
 # CompEval: a container for a component evaluated on a specific domain
 #
@@ -52,6 +31,25 @@ function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
         ceval.lastparvalues .= pvalues
         ceval.counter += 1
     end
+end
+
+
+# Evaluate component on the given domain.  Parameter values are the
+# ones stored in the component unless a custom value is provided via a
+# keyword.
+function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Float64}}(); kws...)
+    ceval = CompEval(comp, domain)
+    append!(ceval.deps, deps)
+    pvalues = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
+    for (pname, pval) in kws
+        if pname in keys(pvalues)
+            pvalues[pname] = pval
+        else
+            @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
+        end
+    end
+    update!(ceval, collect(values(pvalues)))
+    return ceval.buffer
 end
 
 
@@ -275,7 +273,18 @@ Return a `OrderedDict{Symbol, Int}` with the number of times each model componen
 evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
 
 
-
 # Return model evaluations
 (meval::ModelEval)() = meval(meval.maincomp)
 (meval::ModelEval)(name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
+
+
+# ====================================================================
+# Evaluate Model on the given domain
+function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
+    meval = ModelEval(model, domain)
+    if isnothing(cname)
+        return meval()
+    else
+        return meval(cname)
+    end
+end

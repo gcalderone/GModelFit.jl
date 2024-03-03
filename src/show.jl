@@ -255,6 +255,7 @@ end
 
 function show(io::IO, model::Union{Model, ModelSnapshot})
     section(io, "Components:")
+    (length(keys(model)) == 0)  &&  (return nothing)
     table, fixed = tabledeps(model)
     if showsettings.plain
         highlighters = nothing

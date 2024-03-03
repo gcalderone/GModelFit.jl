@@ -185,9 +185,9 @@ function setparams!(comp::AbstractComponent, params::PVComp{Parameter})
 end
 
 
-# Fall back method
+# Fall back methods
+prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
 dependencies(comp::AbstractComponent) = Symbol[]
-
 
 
 # ====================================================================
