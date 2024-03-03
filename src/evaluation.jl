@@ -45,10 +45,11 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain}, pvalues::Vector{Float64}, deps=Vector{Vector{Float64}}())
+function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
+                 pvalues::Vector{Float64}, deps=Vector{Vector{Float64}}())
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(deps) > 0)
         if length(deps) > 0
-            evaluate!(ceval, pvalues..., deps)
+            evaluate!(ceval, deps, pvalues...)
         else
             evaluate!(ceval, pvalues...)
         end
@@ -59,12 +60,12 @@ end
 
 
 # Built-in components
-# include("components/FComp.jl")
-# include("components/OffsetSlope.jl")
-# include("components/Polynomial.jl")
+include("components/FComp.jl")
+include("components/OffsetSlope.jl")
+include("components/Polynomial.jl")
 include("components/Gaussian.jl")
-# include("components/Lorentzian.jl")
-# include("components/SumReducer.jl")
+include("components/Lorentzian.jl")
+include("components/SumReducer.jl")
 
 
 struct ParameterVectors
@@ -103,6 +104,7 @@ struct ModelEval
         out = new(model, domain, OrderedDict{Symbol, CompEval}(),
                   ParameterVectors(), Vector{PVModel{Float64}}(),
                   find_maincomp(model))
+        update!(out)
         return out
     end
 end

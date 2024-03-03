@@ -34,14 +34,14 @@ dependencies(comp::FComp) = getfield(comp, :deps)
 
 
 # We need to implement two evaluate! methods, with/without deps argument respectively
-function evaluate!(buffer::Vector{Float64}, comp::FComp, domain::AbstractDomain,
+function evaluate!(ceval::CompEval{FComp, <: AbstractDomain},
                    params...)
-    buffer .= getfield(comp, :func)(params...)
+    ceval.buffer .= getfield(ceval.comp, :func)(params...)
 end
 
-function evaluate!(buffer::Vector{Float64}, comp::FComp, domain::AbstractDomain,
+function evaluate!(ceval::CompEval{FComp, <: AbstractDomain},
                    deps, params...)
-    buffer .= getfield(comp, :func)(deps..., params...)
+    ceval.buffer .= getfield(ceval.comp, :func)(deps..., params...)
 end
 
 
@@ -70,12 +70,12 @@ dependencies(comp::FCompv) = getfield(comp, :deps)
 
 
 # We need to implement two evaluate! methods, with/without deps argument respectively
-function evaluate!(buffer::Vector{Float64}, comp::FCompv, x::AbstractDomain,
+function evaluate!(ceval::CompEval{FCompv, <: AbstractDomain},
                    params::Vararg{Float64})
-    buffer .= getfield(comp, :funct)([params...])
+    ceval.buffer .= getfield(ceval.comp, :funct)([params...])
 end
 
-function evaluate!(buffer::Vector{Float64}, comp::FCompv, domain::AbstractDomain,
+function evaluate!(ceval::CompEval{FCompv, <: AbstractDomain},
                    deps, params...)
-    buffer .= getfield(comp, :func)(deps..., [params...])
+    ceval.buffer .= getfield(ceval.comp, :func)(deps..., [params...])
 end

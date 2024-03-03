@@ -308,7 +308,7 @@ end
 
 
 # User interface
-setindex!(model::Model, f::FunctDesc, cname::Symbol) = model.comps[cname] = FComp(f)
+setindex!(model::Model, f::FunctDesc, cname::Symbol) = model[cname] = FComp(f)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     model.comps[cname] = comp
     model.fixed[cname] = false

@@ -61,7 +61,7 @@ function evaluate!(ceval::CompEval{Gaussian_1D, Domain{1}},
 end
 
 
-function evaluate!(ceval::CompEval{Gaussian_2D, Domain{2}},
+function evaluate!(ceval::CompEval{Gaussian_2D, <: AbstractDomain{2}},
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -71,7 +71,7 @@ function evaluate!(ceval::CompEval{Gaussian_2D, Domain{2}},
     x = coords(ceval.domain, 1)
     y = coords(ceval.domain, 2)
 
-    @. (buffer = norm *
+    @. (ceval.buffer = norm *
         exp(
             -(
                 a * (x - centerX)^2. +

@@ -162,7 +162,7 @@ function show(io::IO, red::FunctDesc)
 end
 
 
-function tabledeps(model::Union{Model, ModelEval, ModelSnapshot})
+function tabledeps(model::Union{Model, ModelSnapshot})
     function alldeps(model::Union{Model, GModelFit.ModelSnapshot}, cname=nothing, level=0)
         out = Vector{Tuple}()
         if isnothing(cname)
@@ -253,7 +253,7 @@ function tabledeps(model::Union{Model, ModelEval, ModelSnapshot})
 end
 
 
-function show(io::IO, model::Union{Model, ModelEval, ModelSnapshot})
+function show(io::IO, model::Union{Model, ModelSnapshot})
     section(io, "Components:")
     table, fixed = tabledeps(model)
     if showsettings.plain
