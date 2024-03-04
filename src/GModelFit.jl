@@ -308,7 +308,7 @@ end
 # User interface
 setindex!(model::Model, f::FunctDesc, cname::Symbol) = model[cname] = FComp(f)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
-    model.comps[cname] = comp
+    model.comps[cname] = deepcopy(comp)
     model.fixed[cname] = false
 end
 
