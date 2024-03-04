@@ -25,7 +25,7 @@ end
 
 
 function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
-                 pvalues::Vector{Float64})
+                 pvalues::AbstractVector{Float64})
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
         evaluate!(ceval, pvalues...)
         ceval.lastparvalues .= pvalues
@@ -226,7 +226,7 @@ function update_evaluation!(meval::ModelEval)
         @batch_when_threaded per=core for d in dependencies(meval.model, cname)
             update_compeval_recursive(meval, d)
         end
-        update!(meval.cevals[cname], collect(items(meval.pv.actual[cname])))
+        update!(meval.cevals[cname], items(meval.pv.actual[cname]))
     end
     update_compeval_recursive(meval, meval.maincomp)
 end
