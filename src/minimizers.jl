@@ -74,8 +74,9 @@ iterated for the maximum allowed number of times.
 
 mutable struct cmpfit <: AbstractMinimizer
     config::CMPFit.Config
+    ftol_after_maxiter::Float64
     function cmpfit()
-        out = new(CMPFit.Config())
+        out = new(CMPFit.Config(), 1e-4)
         out.config.maxiter = 1000
         return out
     end
@@ -109,8 +110,8 @@ function fit(minimizer::cmpfit, fp::AbstractFitProblem)
 
         if (res.status == 5)
             Δfitstat = (last_fitstat - res.bestnorm) / last_fitstat
-            if Δfitstat > 0
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat), continue minimization...\n")
+            if Δfitstat > minimizer.ftol_after_maxiter
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(minimizer.ftol_after_maxiter), continue minimization...\n")
                 last_fitstat = res.bestnorm
                 guess = getfield.(Ref(res), :param)
                 continue
