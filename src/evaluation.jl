@@ -251,7 +251,7 @@ function update_step_finalize(meval::ModelEval, uncerts=Vector{Float64}[])
 
     # Also update Model's parameters
     for (cname, ceval) in meval.cevals
-        setparams!(ceval.comp, meval.pv.params[cname])
+        setparams!(meval.model[cname], meval.pv.params[cname])
     end
 end
 

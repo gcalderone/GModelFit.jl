@@ -26,7 +26,7 @@ data = Measures(dom, meas, unc)
 
 # Create a model using an explicit mathematical expression, and provide the
 # initial guess values:
-model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
+model = Model(@λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
 best, res = fit(model, data)

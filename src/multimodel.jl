@@ -117,12 +117,13 @@ end
 
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
-function fit(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
     return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
-fit(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
+fit!(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
+fit(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)
 
 
 """

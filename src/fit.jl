@@ -82,12 +82,13 @@ end
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
-function fit(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     fp = FitProblem(meval, data)
     status = fit(minimizer, fp)
     return ModelSnapshot(fp.meval), FitStats(fp, status)
 end
-fit(model::Model, data::Measures; kws...) = fit(ModelEval(model, data.domain), data; kws...)
+fit!(model::Model, data::Measures; kws...) = fit!(ModelEval(model, data.domain), data; kws...)
+fit(model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
 
 
 """
