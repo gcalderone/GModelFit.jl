@@ -24,7 +24,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function evaluate_if_needed!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
+function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
                              pvalues::Vector{Float64})
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
         evaluate!(ceval, pvalues...)
@@ -48,7 +48,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Fl
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
         end
     end
-    evaluate!(ceval, collect(values(pvalues)))
+    update!(ceval, collect(values(pvalues)))
     return ceval.buffer
 end
 
@@ -113,16 +113,16 @@ free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
 Evaluate a `Model` and update internal structures.
 """
 function update!(meval::ModelEval)
-    update_step_init(meval)
-    update_step_evaluation(meval)
-    update_step_finalize(meval)
+    update_init!(meval)
+    update_evaluation!(meval)
+    update_finalize!(meval)
     return meval
 end
 
 
 # Evaluation step init:
 # - update internal structures before fitting
-function update_step_init(meval::ModelEval)
+function update_init!(meval::ModelEval)
     empty!(meval.pv)
 
     for (cname, comp) in meval.model.comps
@@ -183,7 +183,7 @@ end
 
 
 # Set new model parameters
-function update_step_setparvals(meval::ModelEval, pvalues::Vector{Float64})
+function update_setparvals(meval::ModelEval, pvalues::Vector{Float64})
     items(meval.pv.values)[meval.pv.ifree] .= pvalues
 end
 
@@ -192,7 +192,7 @@ end
 # - copy all parameter values into actual;
 # - update actual by invoking the patch functions;
 # - evaluation of all components
-function update_step_evaluation(meval::ModelEval)
+function update_evaluation!(meval::ModelEval)
     # Copy pvalues into actual
     items(meval.pv.actual) .= items(meval.pv.values)
     # Patch parameter values
@@ -226,7 +226,7 @@ function update_step_evaluation(meval::ModelEval)
         @batch_when_threaded per=core for d in dependencies(meval.model, cname)
             update_compeval_recursive(meval, d)
         end
-        evaluate_if_needed!(meval.cevals[cname], collect(items(meval.pv.actual[cname])))
+        update!(meval.cevals[cname], collect(items(meval.pv.actual[cname])))
     end
     update_compeval_recursive(meval, meval.maincomp)
 end
@@ -234,7 +234,7 @@ end
 
 # Evaluation step finalize:
 # - copy back bestfit, actual values and uncertainties into their original Parameter structures.
-function update_step_finalize(meval::ModelEval, uncerts=Vector{Float64}[])
+function update_finalize!(meval::ModelEval, uncerts=Vector{Float64}[])
     i = 1
     for (cname, comp) in meval.pv.params
         for (pname, par) in comp

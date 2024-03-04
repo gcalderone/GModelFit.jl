@@ -14,13 +14,13 @@ end
 
 
 function update!(multi::Vector{ModelEval})
-    update_step_init(multi)
-    update_step_evaluation(multi)
-    update_step_finalize(multi)
+    update_init!(multi)
+    update_evaluation!(multi)
+    update_finalize!(multi)
     return multi
 end
 
-function update_step_init(multi::Vector{ModelEval})
+function update_init!(multi::Vector{ModelEval})
     # Populate pvmulti fields in all Model structures to notify we are
     # going to perform a multi-model fitting
     for i in 1:length(multi)
@@ -29,26 +29,26 @@ function update_step_init(multi::Vector{ModelEval})
             push!(multi[i].pvmulti, multi[j].pv.values)
         end
     end
-    update_step_init.(multi)
+    update_init!.(multi)
 end
 
-function update_step_setparvals(multi::Vector{ModelEval}, pvalues::Vector{Float64})
+function update_setparvals(multi::Vector{ModelEval}, pvalues::Vector{Float64})
     for (id, i1, i2) in free_params_indices(multi)
-        update_step_setparvals(multi[id], pvalues[i1:i2])
+        update_setparvals(multi[id], pvalues[i1:i2])
     end
 end
 
-function update_step_evaluation(multi::Vector{ModelEval})
-    update_step_evaluation.(multi)
+function update_evaluation!(multi::Vector{ModelEval})
+    update_evaluation!.(multi)
 end
 
-function update_step_finalize(multi::Vector{ModelEval}, uncerts=Vector{Float64}[])
+function update_finalize!(multi::Vector{ModelEval}, uncerts=Vector{Float64}[])
     if length(uncerts) > 0
         for (id, i1, i2) in free_params_indices(multi)
-            update_step_finalize(multi[id], pvalues[i1:i2])
+            update_finalize!(multi[id], pvalues[i1:i2])
         end
     else
-        update_step_finalize.(multi)
+        update_finalize!.(multi)
     end
 end
 
@@ -86,7 +86,7 @@ free_params(fp::MultiFitProblem) = free_params(fp.multi)
 residuals(fp::MultiFitProblem) = fp.resid
 function residuals(fp::MultiFitProblem, pvalues::Vector{Float64})
     # Must set pvalues on all models before any evaluation
-    update_step_setparvals(fp.multi, pvalues)
+    update_setparvals(fp.multi, pvalues)
 
     # Populate residuals
     j1 = 1
