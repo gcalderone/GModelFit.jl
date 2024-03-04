@@ -32,9 +32,9 @@ function update_step_init(multi::Vector{ModelEval})
     update_step_init.(multi)
 end
 
-function update_step_newpvalues(multi::Vector{ModelEval}, pvalues::Vector{Float64})
+function update_step_setparvals(multi::Vector{ModelEval}, pvalues::Vector{Float64})
     for (id, i1, i2) in free_params_indices(multi)
-        update_step_newpvalues(multi[id], pvalues[i1:i2])
+        update_step_setparvals(multi[id], pvalues[i1:i2])
     end
 end
 
@@ -86,7 +86,7 @@ free_params(fp::MultiFitProblem) = free_params(fp.multi)
 residuals(fp::MultiFitProblem) = fp.resid
 function residuals(fp::MultiFitProblem, pvalues::Vector{Float64})
     # Must set pvalues on all models before any evaluation
-    update_step_newpvalues(fp.multi, pvalues)
+    update_step_setparvals(fp.multi, pvalues)
 
     # Populate residuals
     j1 = 1
@@ -118,12 +118,13 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+    update!(multi)
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
     return ModelSnapshot.(fp.multi), FitStats(fp, status)
 end
 fit!(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
-fit(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)
+fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)
 
 
 """

@@ -1,3 +1,11 @@
+# Version 0.3.0
+- Breaking Changes:
+	* `Model` constructor no longer accepts a `Domain` argument;
+
+	* fix -> fix!
+
+
+
 # Version 0.2.1
 
 - New features:

@@ -24,8 +24,8 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
-function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
-                 pvalues::Vector{Float64})
+function evaluate_if_needed!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
+                             pvalues::Vector{Float64})
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
         evaluate!(ceval, pvalues...)
         ceval.lastparvalues .= pvalues
@@ -48,7 +48,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Fl
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
         end
     end
-    update!(ceval, collect(values(pvalues)))
+    evaluate!(ceval, collect(values(pvalues)))
     return ceval.buffer
 end
 
@@ -98,7 +98,7 @@ struct ModelEval
         out = new(model, domain, OrderedDict{Symbol, CompEval}(),
                   ParameterVectors(), Vector{PVModel{Float64}}(),
                   find_maincomp(model))
-        update!(out)
+        # update!(out)  This would cause error in the multimodel case
         return out
     end
 end
@@ -183,7 +183,7 @@ end
 
 
 # Set new model parameters
-function update_step_newpvalues(meval::ModelEval, pvalues::Vector{Float64})
+function update_step_setparvals(meval::ModelEval, pvalues::Vector{Float64})
     items(meval.pv.values)[meval.pv.ifree] .= pvalues
 end
 
@@ -226,7 +226,7 @@ function update_step_evaluation(meval::ModelEval)
         @batch_when_threaded per=core for d in dependencies(meval.model, cname)
             update_compeval_recursive(meval, d)
         end
-        update!(meval.cevals[cname], collect(items(meval.pv.actual[cname])))
+        evaluate_if_needed!(meval.cevals[cname], collect(items(meval.pv.actual[cname])))
     end
     update_compeval_recursive(meval, meval.maincomp)
 end
@@ -282,6 +282,7 @@ evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname)
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     meval = ModelEval(model, domain)
+    update!(meval)
     if isnothing(cname)
         return meval()
     else

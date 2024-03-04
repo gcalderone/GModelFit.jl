@@ -21,7 +21,7 @@ free_params(fp::FitProblem) = free_params(fp.meval)
 
 residuals(fp::FitProblem) = fp.resid
 function residuals(fp::FitProblem, pvalues::Vector{Float64})
-    update_step_newpvalues(fp.meval, pvalues)
+    update_step_setparvals(fp.meval, pvalues)
     update_step_evaluation(fp.meval)
     fp.resid .= reshape((fp.meval() .- values(fp.measures)) ./ uncerts(fp.measures), :)
     return fp.resid
@@ -83,12 +83,13 @@ end
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+    update!(meval)
     fp = FitProblem(meval, data)
     status = fit(minimizer, fp)
     return ModelSnapshot(fp.meval), FitStats(fp, status)
 end
 fit!(model::Model, data::Measures; kws...) = fit!(ModelEval(model, data.domain), data; kws...)
-fit(model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
+fit( model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
 
 
 """
