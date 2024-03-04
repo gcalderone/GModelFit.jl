@@ -53,6 +53,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Fl
 end
 
 
+# ====================================================================
 # Built-in components
 include("components/FComp.jl")
 include("components/OffsetSlope.jl")
@@ -62,6 +63,7 @@ include("components/Lorentzian.jl")
 include("components/SumReducer.jl")
 
 
+# ====================================================================
 struct ParameterVectors
     params::PVModel{Parameter}
     values::PVModel{Float64}
@@ -86,6 +88,7 @@ function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Paramete
 end
 
 
+# ====================================================================
 struct ModelEval
     model::Model
     domain::AbstractDomain
@@ -123,13 +126,12 @@ end
 # Evaluation step init:
 # - update internal structures before fitting
 function update_init!(meval::ModelEval)
-    empty!(meval.pv)
-
     for (cname, comp) in meval.model.comps
         (cname in keys(meval.cevals))  &&  continue
         meval.cevals[cname] = CompEval(comp, meval.domain)
     end
 
+    empty!(meval.pv)
     for (cname, ceval) in meval.cevals
         for (pname, _par) in getparams(ceval.comp)
             # Parameter may be changed here, hence we take a copy of the original one
