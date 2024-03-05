@@ -170,9 +170,10 @@ function update_init!(meval::ModelEval)
         end
 
         empty!(ceval.deps)
-        i = 1   # TODO: check this
+        i = 1
         for d in dependencies(meval.model, cname, select_domain=true)
             push!(ceval.deps, coords(meval.domain, i))
+            i += 1
         end
         for d in dependencies(meval.model, cname, select_domain=false)
             push!(ceval.deps, meval.cevals[d].buffer)
