@@ -27,10 +27,10 @@ We will consider a model for a 1D domain consisting of the sum of a linear backg
 using GModelFit
 
 dom = Domain(0:0.1:5)
-model = Model(dom, :bkg => GModelFit.OffsetSlope(1, 1, 0.1),
-                   :l1 => GModelFit.Gaussian(1, 2, 0.2),
-                   :l2 => GModelFit.Gaussian(1, 3, 0.4),
-                   :main => SumReducer(:bkg, :l1, :l2))
+model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
+              :l1 => GModelFit.Gaussian(1, 2, 0.2),
+              :l2 => GModelFit.Gaussian(1, 3, 0.4),
+              :main => SumReducer(:bkg, :l1, :l2))
 println() # hide
 ```
 
@@ -64,7 +64,7 @@ println() # hide
 
 We can fit the model against a mock dataset (see [Generate mock datasets](@ref)):
 ```@example abc
-data = GModelFit.mock(Measures, model)
+data = GModelFit.mock(Measures, model, dom)
 best, fitstats = fit(model, data)
 dumpjson("ex_Parameter", best, fitstats, data) # hide
 show((best, fitstats)) # hide
@@ -73,7 +73,7 @@ and plot the results with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl)
 ```@example abc 
 using Gnuplot
 @gp    coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
-@gp :- coords(dom) model() "w l t 'Model'"
+@gp :- coords(dom) model(dom) "w l t 'Model'"
 saveas("example_patch1") # hide
 ```
 ![](assets/example_patch1.png)

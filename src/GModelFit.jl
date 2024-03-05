@@ -355,6 +355,13 @@ Base.keys(model::Model) = collect(keys(model.comps))
 Check whether a component exists in model.
 """
 Base.haskey(model::Model, cname::Symbol) = haskey(model.comps, cname)
+
+
+"""
+    getindex(model::Model, cname::Symbol)
+
+Return the model component with name `cname`.
+"""
 function Base.getindex(model::Model, cname::Symbol)
     @assert cname in keys(model.comps) "Component $cname is not defined"
     return model.comps[cname]

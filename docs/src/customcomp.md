@@ -93,9 +93,9 @@ function prepare!(comp::Interpolator, domain::AbstractDomain{1})
 end
 
 # Component evaluation
-function evaluate!(buffer::Vector{Float64}, comp::Interpolator, domain::AbstractDomain{1},
+function evaluate!(ceval::GModelFit.CompEval{Interpolator, <: AbstractDomain{1}},
                    scale)
-	buffer .= scale .* comp.interp_y
+	ceval.buffer .= scale .* ceval.comp.interp_y
 end
 println() # hide
 ```
@@ -103,9 +103,9 @@ println() # hide
 The following code shows how to prepare a `Model` including the interpolated theoretical model, and to take into account the possible background introduced by the detector used to obtain empirical data:
 ```@example abc
 dom = Domain(obs_x)
-model = Model(dom, :theory => Interpolator(theory_x, theory_y),
-                   :background => GModelFit.OffsetSlope(1., 0., 0.2),
-                   :main => SumReducer(:theory, :background))
+model = Model(:theory => Interpolator(theory_x, theory_y),
+              :background => GModelFit.OffsetSlope(1., 0., 0.2),
+              :main => SumReducer(:theory, :background))
 data = Measures(dom, obs_y, 0.2)
 best, fitstats = fit(model, data)
 dumpjson("ex_Customcomp", best, fitstats, data) # hide

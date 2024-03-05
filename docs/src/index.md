@@ -64,7 +64,7 @@ data = Measures(dom, meas, unc)
 
 # Create a model using an explicit mathematical expression, and provide the
 # initial guess values:
-model = Model(dom, @λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
+model = Model(@λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
 best, fitstats = fit(model, data)
@@ -88,7 +88,7 @@ Once done, you may plot the data and the best fit model with a plotting framewor
 ```@example abc
 using Gnuplot
 @gp coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
-@gp :- coords(dom) model() "w l t 'Best fit model'"
+@gp :- coords(dom) model(dom) "w l t 'Best fit model'"
 saveas("simple_example"); # hide
 ```
 ![](assets/simple_example.png)

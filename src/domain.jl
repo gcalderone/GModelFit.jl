@@ -117,7 +117,13 @@ axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
 
 abstract type AbstractMeasures{N} end
 
+"""
+    domain(d::AbstractMeasures)
+
+Return the domain associated to an AbstractMeasures object.
+"""
 domain(d::AbstractMeasures) = d.domain
+
 ndims(d::AbstractMeasures) = ndims(domain(d))
 length(d::AbstractMeasures) = length(domain(d))
 size(d::AbstractMeasures) = size(domain(d))

@@ -86,6 +86,13 @@ end
 
 
 # ====================================================================
+"""
+    ModelEval(model::Model, domain::AbstractDomain)
+
+A structure containing the required informations to evaluate a model on a specific domain, and to compare the outcomes to a single empirical dataset.
+
+The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
+"""
 struct ModelEval
     model::Model
     domain::AbstractDomain
@@ -108,9 +115,9 @@ free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
 
 
 """
-    update!(model::Model)
+    update!(meval::ModelEval)
 
-Evaluate a `Model` and update internal structures.
+Evaluate a `Model` and update `ModelEval` internal structures.
 """
 function update!(meval::ModelEval)
     update_init!(meval)

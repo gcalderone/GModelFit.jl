@@ -14,10 +14,10 @@ In some case it is useful to test a model for robustness before the emprical dat
 using GModelFit
 
 dom = Domain(1:0.1:50)
-model = Model(dom, :main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 
 # Generate a mock dataset
-data = GModelFit.mock(Measures, model, seed=1)
+data = GModelFit.mock(Measures, model, dom, seed=1)
 
 # Fit model against the mock dataset
 best, fitstats = fit(model, data)
@@ -36,8 +36,8 @@ In the following we will generate a few **GModelFit.jl** objects and serialized 
 using GModelFit
 
 dom = Domain(1:0.1:50)
-model = Model(dom, :main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
-data = GModelFit.mock(Measures, model, seed=1)
+model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+data = GModelFit.mock(Measures, model, dom, seed=1)
 best, fitstats = fit(model, data)
 
 # Serialize objects and save in a file
@@ -64,11 +64,11 @@ Create a model, a mock dataset and run a fit:
 using GModelFit
 
 dom = Domain(0:0.01:5)
-model = Model(dom, :bkg => GModelFit.OffsetSlope(1, 1, 0.1),
-                   :l1 => GModelFit.Gaussian(1, 2, 0.2),
-                   :l2 => GModelFit.Gaussian(1, 3, 0.4),
-                   :main => SumReducer(:bkg, :l1, :l2))
-data = GModelFit.mock(Measures, model)
+model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
+              :l1 => GModelFit.Gaussian(1, 2, 0.2),
+              :l2 => GModelFit.Gaussian(1, 3, 0.4),
+              :main => SumReducer(:bkg, :l1, :l2))
+data = GModelFit.mock(Measures, model, dom)
 best, res = fit(model, data)
 println(); # hide
 ```

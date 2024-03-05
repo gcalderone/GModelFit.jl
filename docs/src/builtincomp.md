@@ -274,7 +274,7 @@ show((best, fitstats)) # hide
 
 
 ```@example abc
-@gp hh coords(dom) model() "w l t 'Model' lw 3"
+@gp hh coords(dom) model(dom) "w l t 'Model' lw 3"
 saveas("gaussian") # hide
 ```
 ![](assets/gaussian.png)

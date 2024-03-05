@@ -17,8 +17,8 @@ using GModelFit
 
 # Create domain, individual models and the Vector{Model} container
 dom = Domain(-5.:5)
-model1 = Model(dom, GModelFit.Gaussian(1, 0., 1.))
-model2 = Model(dom, GModelFit.Gaussian(1, 0., 1.))
+model1 = Model(GModelFit.Gaussian(1, 0., 1.))
+model2 = Model(GModelFit.Gaussian(1, 0., 1.))
 multi = [model1, model2]
 
 # Patch parameters

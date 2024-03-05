@@ -19,13 +19,13 @@ comptype
 coords
 domain
 fit
+fit!
 freeze!
 getindex
 haskey
 isfreezed
 select_maincomp!
 thaw!
-update!
 uncerts
 values
 ```
@@ -39,9 +39,11 @@ GModelFit.evalcounter
 GModelFit.evalcounters
 GModelFit.FitStats
 GModelFit.FunctDesc
+GModelFit.ModelEval
 GModelFit.ModelSnapshot
 GModelFit.Parameter
 GModelFit.comptypes
 GModelFit.mock
 GModelFit.serialize
+GModelFit.update!
 ```
