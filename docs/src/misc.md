@@ -20,7 +20,7 @@ model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
 
 # Fit model against the mock dataset
-best, fitstats = fit(model, data)
+bestfit, stats = fit(model, data)
 ```
 
 
@@ -38,17 +38,17 @@ using GModelFit
 dom = Domain(1:0.1:50)
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
-best, fitstats = fit(model, data)
+bestfit, stats = fit(model, data)
 
 # Serialize objects and save in a file
-GModelFit.serialize("save_for_future_use.json", best, fitstats, data)
+GModelFit.serialize("save_for_future_use.json", bestfit, stats, data)
 println(); # hide
 ```
 
 The same objects can be de-serialized in a different Julia session:
 ```@example abc
 using GModelFit
-best, fitstats, data = GModelFit.deserialize("save_for_future_use.json")
+bestfit, stats, data = GModelFit.deserialize("save_for_future_use.json")
 ```
 
 
@@ -69,14 +69,14 @@ model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
               :l2 => GModelFit.Gaussian(1, 3, 0.4),
               :main => SumReducer(:bkg, :l1, :l2))
 data = GModelFit.mock(Measures, model, dom)
-best, res = fit(model, data)
+bestfit, stats = fit(model, data)
 println(); # hide
 ```
 
 A plot of the dataset and of the best fit model can be simply obtained with
 ```@example abc
 using Gnuplot
-@gp data best
+@gp data bestfit
 saveas("gnuplot1") # hide
 ```
 ![](assets/gnuplot1.png)
@@ -85,7 +85,7 @@ You may also specify axis range, labels, title, etc. using the standard [**Gnupl
 
 ```@example abc
 using Gnuplot
-@gp xr=[1, 4.5] xlabel="Wavelength" ylab="Flux" "set key outside" data best
+@gp xr=[1, 4.5] xlabel="Wavelength" ylab="Flux" "set key outside" data bestfit
 saveas("gnuplot2") # hide
 ```
 ![](assets/gnuplot2.png)

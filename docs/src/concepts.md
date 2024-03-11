@@ -22,22 +22,16 @@ In order to exploit the **GModelFit.jl** model expressiveness a few concepts nee
 
   - Component dependencies and *main component*: the evaluation of a component, say `A`, may use the outcome of another component, say `B`, to calculate its output, thus inducing a dependency between the two. In this case we say that `A` *depends* on `B`, and therefore `B` needs to be evaluated before `A` (circular dependencies are not allowed, and would raise an error if attempted).  The dependencies are automatically identified, and the last component being evaluated is dubbed *main component* since its output represent the overall model evaluation;
 
-- *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit, are returned by the [`fit()`](@ref) function in a [`GModelFit.FitStats`](@ref) structure;
-
-- *Model snapshot*: the best fit model, as well as the best fit parameter values and associated uncertainties, are returned by the [`fit()`](@ref) function as a [`GModelFit.ModelSnapshot`](@ref) structure, namely a *frozen snapshot* of the evaluation of a `Model` object on a given `Domain`.  Components, parameters and evaluations outcomes are accessed in exactly the same way on both `Model` and `ModelSnapshot` objects, the only difference being that the latter can't be re-evaluated on different domains or parameter values.
-
-An overview of the fit workflow is as follows:
-
-![](assets/schema.svg)
-
-Further relevant concepts are:
-
 - *Multi-model*: a `Vector{Model}` containing two or more models, suitable to be compared to a corresponding `Vector{Measures}` to perform [Multi-dataset fitting](@ref);
 
 - *Minimizer*: the **GModelFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
   Both are automatically installed with **GModelFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) function call).
+
+- *Model snapshot*: the best fit model, as well as the best fit parameter values and associated uncertainties, are returned by the [`fit()`](@ref) function as a [`GModelFit.ModelSnapshot`](@ref) structure, namely a *frozen snapshot* of the evaluation of a `Model` object on a given `Domain`.  Components, parameters and evaluations outcomes are accessed in exactly the same way on both `Model` and `ModelSnapshot` objects, the only difference being that the latter can't be re-evaluated on different domains or parameter values.
+
+- *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit, are returned by the [`fit()`](@ref) function in a [`GModelFit.FitStats`](@ref) structure;
 
 - *function descriptor*: **GModelFit.jl** uses standard Julia function in two different contexts:
   - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when performing [Multi-dataset fitting](@ref);
@@ -47,17 +41,26 @@ Further relevant concepts are:
 
 
 
-## Main functionalities
+## Main functions
+
+- *Preparation of empirical data*: both the data domain and empirical values (with associated uncertainties) should be wrapped into `Domain` (or `CartesianDomain`) and `Measures` objects respectively.  Such objects are created by simply passing `AbstractVector{<: Real}` to their respective constructors, e.g.:
+```@example abc
+using GModelFit
+dom  = Domain([0.1, 1.1, 2.1, 3.1, 4.1])
+data = Measures(dom, [6.29, 7.27, 10.41, 18.67, 25.3],
+                      [1.1,  1.1,   1.1,   1.2, 1.2])
+println() # hide
+```
 
 - *Model definition* and *manipulation*: a [`Model`](@ref) object is essentially a dictionary of components with `Symbol` keys.  The `keys()`, `haskey()` and `iterate()` methods defined for the `Model` object provide the usual functionalities as for any dictionary.  Each entry in the dictionary is a component, namely a structure inheriting `GModelFit.AbstractComponent` and hosting one or more fields with type [`GModelFit.Parameter`](@ref).  A model object can be manipulated as follows:
 ```@example abc
 using GModelFit
 
-# Create the object
+# Create an empty model
 model = Model()
 
 # Add a component
-model[:comp1] = GModelFit.Gaussian(1, 0, 1)  # numbers represent the guess parameter
+model[:comp1] = GModelFit.Gaussian(1, 0, 1)  # numbers represent the guess values
 
 # Modify a parameter value:
 model[:comp1].center.val = 5
@@ -67,7 +70,9 @@ model(Domain(0:0.1:10))
 println() # hide
 ```
 
-- *Fitting*: the main functions to fit an empirical dataset (represented by one or more [`Measures`](@ref) objects) to a (multi-)model (represented by one or more [`Model`](@ref) objects) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object(s) will have their parameters set to the best fit values;
+- *Fitting*: the main functions to fit an empirical dataset (represented by one or more [`Measures`](@ref) objects) to a (multi-)model (represented by one or more [`Model`](@ref) objects) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object will have their parameters set to the best fit values.  An overview of the fit workflow is as follows:
+
+![](assets/schema.svg)
 
 - *Mock data*: testing the capabilities of a model to in identifying the best fit parameters may be useful even before actual data are available.  To this purpose, the [`GModelFit.mock()`](@ref) function provides the possibility to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process.  This functionality is used in some of the examples presented in the next sections.
 
@@ -79,10 +84,12 @@ println() # hide
 
 ### GModelFit internals
 
-This section deals with **GModelFit.jl** internals.  Feel free to skip if not interested.
+This section deals with **GModelFit.jl** internals, feel free to skip if not interested.
 
 During fitting a number of data structures are created to avoid reallocating heap memory at each minimizer iteration.  The most important of such structures are:
 
-- [`GModelFit.CompEval`](@ref): a container for a component to allow evaluation on a specific domain.  This structure is managed internally by **GModelFit.jl** and is never returned by user.  Its use is, however, necessary to implement the `evaluate!` method when defining [Custom components](@ref) the custom `evaluate!` method shall accept one such structure
+- [`GModelFit.CompEval`](@ref): a container for a component evaluation on a specific domain.  This structure is relevant when defining [Custom components](@ref) as it is used to dispatch component evaluation to the proper `evaluate!` method;
 
-- [`GModelFit.ModelEval`](@ref): a container for a `Model` object to allow evaluation on a specific domain. This structure is managed internally by **GModelFit.jl** and is never returned by user.
+- [`GModelFit.ModelEval`](@ref): a container for a `Model` evaluation on a specific domain. This structure contains a `CompEval` structure for each component in a model and is updated at each iteration of the minimizer to reflect the current state;
+
+- `GModelFit.FitProblem`: container for a `ModelEval` object, a `Measures` object, and a `Vector{Float64}` to store the normalized residuals of the comparison between the model and the data.  The `GModelFit.MultiFitProblem` has the same purpose in a [Multi-dataset fitting](@ref) case.

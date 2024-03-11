@@ -19,12 +19,12 @@ using GModelFit
 dom = Domain(1:0.1:50)
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
-best, fitstats = fit(model, data, minimizer=GModelFit.lsqfit())
+bestfit, stats = fit(model, data, minimizer=GModelFit.lsqfit())
 println(); # hide
 ```
 or
 ```@example abc
-best, fitstats = fit(model, data, minimizer=GModelFit.cmpfit())
+bestfit, stats = fit(model, data, minimizer=GModelFit.cmpfit())
 println(); # hide
 ```
 
@@ -50,6 +50,6 @@ mzer.ftol_after_maxiter = 1e-8
 
 # Run the fit
 model[:main].T.val = 10  # guess value, purposely far from true one
-best, fitstats = fit(model, data, minimizer=mzer)
+bestfit, stats = fit(model, data, minimizer=mzer)
 println(); # hide
 ```

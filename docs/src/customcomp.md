@@ -107,7 +107,7 @@ model = Model(:theory => Interpolator(theory_x, theory_y),
               :background => GModelFit.OffsetSlope(1., 0., 0.2),
               :main => SumReducer(:theory, :background))
 data = Measures(dom, obs_y, 0.2)
-best, fitstats = fit(model, data)
-dumpjson("ex_Customcomp", best, fitstats, data) # hide
-show((best, fitstats)) # hide
+bestfit, stats = fit(model, data)
+dumpjson("ex_Customcomp", bestfit, stats, data) # hide
+show((bestfit, stats)) # hide
 ```

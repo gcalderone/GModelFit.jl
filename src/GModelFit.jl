@@ -312,6 +312,12 @@ function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
     model.fixed[cname] = false
 end
 
+function iterate(model::Model, i=1)
+    k = collect(keys(model))
+    (i > length(k))  &&  return nothing
+    return (k[i] => model[k[i]], i+1)
+end
+
 
 """
     isfreezed(model::Model, cname::Symbol)

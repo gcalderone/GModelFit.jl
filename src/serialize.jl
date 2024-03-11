@@ -85,14 +85,14 @@ using GModelFit
 dom  = Domain(1:5)
 model = Model(dom, :linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-best, fitstats = fit(model, data)
+bestfit, stats = fit(model, data)
 
 # Serialize objects and save in a file
-GModelFit.serialize("my_snapshot.json", best, fitstats, data)
+GModelFit.serialize("my_snapshot.json", bestfit, stats, data)
 
 # Restore objects (possibly in a different Julia session)
 using GModelFit
-(best, fitstats, data) = GModelFit.deserialize("my_snapshot.json")
+(bestit, stats, data) = GModelFit.deserialize("my_snapshot.json")
 ```
 """
 function serialize(filename::String, args...; compress=false)

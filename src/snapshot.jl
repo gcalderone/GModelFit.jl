@@ -46,6 +46,12 @@ function Base.getindex(model::ModelSnapshot, name::Symbol)
     error("Name $name not defined")
 end
 
+function iterate(model::ModelSnapshot, i=1)
+    k = collect(keys(model))
+    (i > length(k))  &&  return nothing
+    return (k[i] => model[k[i]], i+1)
+end
+
 function getparams(comp::GModelFit.PV.PVComp{GModelFit.Parameter})
     out = OrderedDict{Symbol, Parameter}()
     for pname in propertynames(comp)

@@ -68,7 +68,7 @@ iteration the improvement is particularly small).
 The best approach is probably to use default tolerance values and
 either increase the maximum allowed number of iterations
 (config.maxiter) or set a threshold for relative fit statistic
-improvements (Δfitstat_threshold) to be checked after the minimizer
+improvements (ftol_after_maxiter) to be checked after the minimizer
 iterated for the maximum allowed number of times.
 =#
 
