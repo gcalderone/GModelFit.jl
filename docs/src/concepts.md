@@ -32,16 +32,18 @@ An overview of the fit workflow is as follows:
 
 Further relevant concepts are:
 
-- *λ-function*: a lambda function is any Julia anonymous function, i.e. a function which is not bound to an identifier.  Within **GModelFit.jl**, lambda functions are typically defined using the [`@fd`](@ref) macro which returns a [`GModelFit.FunctDesc`](@ref) structure.  The latter allows both to invoke the function itself, as well as providing a string representation used for display purposes.  Such functions are used in two different contexts:
-  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when carrying out [Multi-dataset fitting](@ref);
-  - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components;
-
 - *Multi-model*: a `Vector{Model}` containing two or more models, suitable to be compared to a corresponding `Vector{Measures}` to perform [Multi-dataset fitting](@ref);
 
 - *Minimizer*: the **GModelFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
   Both are automatically installed with **GModelFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) function call).
+
+- *function descriptor*: **GModelFit.jl** uses standard Julia function in two different contexts:
+  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when performing [Multi-dataset fitting](@ref);
+  - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components;
+
+  To use a standard function in this fashion it should be wrapped into a [`GModelFit.FunctDesc`](@ref) object which allows both to invoke the function itself, as well as to provide a string representation for display purposes.  In order to create a function descriptor object it typically is much easier to invoke the [`@fd`](@ref) macro rather than the `FunctDesc` constructor.
 
 
 
@@ -81,6 +83,6 @@ This section deals with **GModelFit.jl** internals.  Feel free to skip if not in
 
 During fitting a number of data structures are created to avoid reallocating heap memory at each minimizer iteration.  The most important of such structures are:
 
-- [`GModelFit.CompEval`](@ref): a container for a component to allow evaluation on a specific domain.  This structure is managed internally by **GModelFit.jl** and is never returned by user.  Its use is, however, necessary to implement the `evaluate!` method when defining [Custom components](@ref) the custom `evaluate!` method shall accept one such structure 
+- [`GModelFit.CompEval`](@ref): a container for a component to allow evaluation on a specific domain.  This structure is managed internally by **GModelFit.jl** and is never returned by user.  Its use is, however, necessary to implement the `evaluate!` method when defining [Custom components](@ref) the custom `evaluate!` method shall accept one such structure
 
 - [`GModelFit.ModelEval`](@ref): a container for a `Model` object to allow evaluation on a specific domain. This structure is managed internally by **GModelFit.jl** and is never returned by user.

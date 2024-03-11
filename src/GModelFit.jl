@@ -70,7 +70,7 @@ julia> f(1, 2)
 3
 ```
 
-Note that it is unpractical to directly create a `FunctDescr` using its constructor, and the above results can be obtained by using the @fd macro:
+Note that it is inconvenient to directly create a `FunctDescr` using its constructor, and the above results can be obtained by using the @fd macro:
 ```
 f = @fd (x, p=0) -> x + p
 ```
@@ -87,7 +87,7 @@ end
 """
     @fd expr
 
-Macro to generate a `FunctDesc` object using the same syntax as in a standard Julia anonymous function.
+Macro to generate a `FunctDesc` object using the same syntax as for a standard Julia anonymous function.
 
 ### Example
 ```
