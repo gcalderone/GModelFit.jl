@@ -70,9 +70,11 @@ model(Domain(0:0.1:10))
 println() # hide
 ```
 
-- *Fitting*: the main functions to fit an empirical dataset (represented by one or more [`Measures`](@ref) objects) to a (multi-)model (represented by one or more [`Model`](@ref) objects) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object will have their parameters set to the best fit values.  An overview of the fit workflow is as follows:
+- *Fitting*: the main functions to fit a model (represented by a [`Model`](@ref) object) to an empirical dataset (represented by a [`Measures`](@ref) object) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object will have their parameters set to the best fit values.  In both cases the `Model` object will be evaluated on the same domain associated with the `Measures` object.  An overview of the fit workflow is as follows:
 
-![](assets/schema.svg)
+  ![](assets/schema.svg)
+
+  To perform a [Multi-dataset fitting](@ref) simply pass a `Vector{Model}` and a `Vector{Measures` to the `fit` or `fit!` function.
 
 - *Mock data*: testing the capabilities of a model to in identifying the best fit parameters may be useful even before actual data are available.  To this purpose, the [`GModelFit.mock()`](@ref) function provides the possibility to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process.  This functionality is used in some of the examples presented in the next sections.
 
