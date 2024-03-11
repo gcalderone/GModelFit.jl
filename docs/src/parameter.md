@@ -14,7 +14,7 @@ A parameter constraint is defined by explicitly modifiying the fields of the cor
 1. to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
 1. to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
 1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`).  In this case the parameter is assumed to be fixed;
-1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@λ`](@ref) macro) which must accept a single argument (which can be used as a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
+1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@fd`](@ref) macro) which must accept a single argument (which can be used as a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
 1. to define a parametrized patch expression: create a a λ-function with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
 1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the `Vector{Model}` object.
 
@@ -51,12 +51,12 @@ println() # hide
 ```
 - the width of `l2` must be twice that of `l1` (patched parameter):
 ```@example abc
-model[:l2].sigma.patch = @λ m -> 2 * m[:l1].sigma
+model[:l2].sigma.patch = @fd m -> 2 * m[:l1].sigma
 println() # hide
 ```
 - the center of `l2` must be at a larger coordinate with respect to the center of `l1`.  In this case we re-interpret the `model[:l2].center` parameter as the distance between the two centers, and create a parametrized patch expression to calculate the actual center value of `l2`:
 ```@example abc
-model[:l2].center.patch = @λ (m, v) -> v + m[:l1].center
+model[:l2].center.patch = @fd (m, v) -> v + m[:l1].center
 model[:l2].center.val = 1   # guess value for the distance between the centers
 model[:l2].center.low = 0   # ensure [l2].center > [l1].center
 println() # hide

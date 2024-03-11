@@ -1,48 +1,86 @@
-# Basic concepts and data types
+```@setup abc
+include("setup.jl")
+```
 
-In order to exploit the **GModelFit.jl** model expressiveness we need to introduce a few concepts, and the associated data types:
+# Data types and functionalities
 
-- *Domain*: an N-dimensional grid of points where the model is to be evaluated, it is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation. It is represented by either:
-  - a [`Domain{N}`](@ref) object for linear domains, i.e. where the coordinates for each of the N dimensions are explicitly specified for all the points;
+## Basic concepts and data types
+In order to exploit the **GModelFit.jl** model expressiveness a few concepts need to be introduced, along with their associated data types:
+
+- *Domain*: an N-dimensional grid of points associated to empirical measures, and used to evaluate a model.  It is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation. It is represented by either:
+  - a [`Domain{N}`](@ref) object for linear domains, where the coordinates for each of the N dimensions are explicitly specified for all the points;
   - or a [`CartesianDomain{N}`](@ref) object where the coordinates are specified for each of the `N` axis and the coordinates for all points are obtained as the cartesian product of all the axes.  A cartesian domain is internally transformed into a linear one when needed;
-  A domain object (either linear or cartesian) is required as first argument for the `Model` and `Measures` constructors (see below).
+  A domain object (either linear or cartesian) is required as first argument for the `Measures` constructor (see below).
 
 - *Measures*: a container for the N-dimensional empirical data and their associated $1\sigma$ Gaussian uncertainties, represented by an object of type [`Measures{N}`](@ref) (further options may be available in the future, such as Poisson counts);
 
-- *Model component*: the atomic building block of a (potentially very complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` representing the component evaluation.  A component is a structure inheriting from `GModelFit.AbstractComponent` and is typically characterized by one or more *parameters* (see below). One component's evaluation can also be used as input for another one's calculation, thus inducing a dependency between the two.  The **GModelFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user (see [Custom components](@ref)).  The memoization mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none of its parameter values has changed since last evaluation;
+- *Model component*: the atomic building block of a (potentially complex) model, it is essentially a function used to map a `Domain` or `CartesianDomain` object into a `Vector{Float64}` representing the component evaluation.  A component is a structure inheriting from `GModelFit.AbstractComponent` and is typically characterized by one or more *parameters* (see below).   The **GModelFit.jl** package provides several [Built-in components](@ref), and new ones can be implemented by the user (see [Custom components](@ref)).  The memoization mechanism operates at the component level and aims to avoid unnecessary re-evaluation of the component if none of its parameter values has changed since last evaluation;
 
 - *Parameter*: a single floating point number characterizing a specific aspect for the evaluation of a component (e.g. the slope of a power law or the width of a Gaussian profile). The parameter values are automatically varied during the fitting process until the residuals between the global model evaluation and the empirical data are minimized.  A parameter can be fixed to a specific value, limited in an interval, and/or be dynamically calculated (patched) according to the values of other parameters.  All parameters are represented by an object of type [`GModelFit.Parameter`](@ref);
 
-- *Model*: is the overall model description, whose evaluation is supposed to be compared to a single `Measures` objects and whose parameters are varied during fitting to reduce the residuals. All models are represented by an object of type [`Model`](@ref) containing a single `Domain` or `CartesianDomain` object representing the domain where the model will be evaluated, and one or more *components* characterizing the model itself.  Each component is identified by a unique name (actually a `Symbol`) within a model.
-  - Component dependencies and *main component*: the evaluation of a component, say `A`, may use the output of another component, say `B`, to calculate its output.  In this case we say that `A` *depends* on `B`, and therefore `B` needs to be evaluated before `A` (circular dependencies are not allowed, and would raise an error if attempted).  The dependencies are automatically identified, and the last component being evaluated is dubbed *main component* since its output represent the overall model evaluation;
+- *Model*: is the overall model description, whose evaluation is supposed to be compared to a single `Measures` object and whose parameters are varied during fitting to reduce the residuals.  Internally, a model is implemented as a dictionary containing one or more *components*, each identified by a unique `Symbol` name (see [`Model`](@ref));
 
-- *Multi-model*: a `Vector{Model}` containing two or more models, suitable to be compared to a corresponding number of `Measures` objects to perform [Multi-dataset fitting](@ref);
+  - Component dependencies and *main component*: the evaluation of a component, say `A`, may use the outcome of another component, say `B`, to calculate its output, thus inducing a dependency between the two. In this case we say that `A` *depends* on `B`, and therefore `B` needs to be evaluated before `A` (circular dependencies are not allowed, and would raise an error if attempted).  The dependencies are automatically identified, and the last component being evaluated is dubbed *main component* since its output represent the overall model evaluation;
 
-- *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit, are returned by the [`fit()`](@ref) function in a [`GModelFit.FitStats`](@ref) structure.
+- *Fit statistics*: the purpose of fitting is to minimize the *distance* between the model and the data, as quantified by a proper fit statistic (typically a reduced $\chi^2$ for the Gaussian uncertainties case). Such statistic, as well as other information concerning the fit, are returned by the [`fit()`](@ref) function in a [`GModelFit.FitStats`](@ref) structure;
 
-- *Model snapshot*: the best fit model, as well as the best fit parameter values and associated uncertainties, are returned by the [`fit()`](@ref) function as a [`GModelFit.ModelSnapshot`](@ref) structure, namely a *frozen snapshot* of a `Model` object.
+- *Model snapshot*: the best fit model, as well as the best fit parameter values and associated uncertainties, are returned by the [`fit()`](@ref) function as a [`GModelFit.ModelSnapshot`](@ref) structure, namely a *frozen snapshot* of the evaluation of a `Model` object on a given `Domain`.  Components, parameters and evaluations outcomes are accessed in exactly the same way on both `Model` and `ModelSnapshot` objects, the only difference being that the latter can't be re-evaluated on different domains or parameter values.
 
-- Standard Julia functions can be used by **GModelFit.jl** in two different contexts:
-  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when performing [Multi-dataset fitting](@ref);
-  - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components.
-  In both cases the Julia function should be properly encapsulated in a [`GModelFit.FunctDesc`](@ref) structure, which is typically generated using the [`@λ`](@ref) convenience macro.
+An overview of the fit workflow is as follows:
+
+![](assets/schema.svg)
+
+Further relevant concepts are:
+
+- *λ-function*: a lambda function is any Julia anonymous function, i.e. a function which is not bound to an identifier.  Within **GModelFit.jl**, lambda functions are typically defined using the [`@fd`](@ref) macro which returns a [`GModelFit.FunctDesc`](@ref) structure.  The latter allows both to invoke the function itself, as well as providing a string representation used for display purposes.  Such functions are used in two different contexts:
+  - to calculate the value of a `Parameter` as a function of other `Parameter`'s values. In this case the parameters are said to be *patched*, or linked, since there is a constraint between their values.  Two (or more) parameters may be patched within the same model, or across models when carrying out [Multi-dataset fitting](@ref);
+  - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components;
+
+- *Multi-model*: a `Vector{Model}` containing two or more models, suitable to be compared to a corresponding `Vector{Measures}` to perform [Multi-dataset fitting](@ref);
 
 - *Minimizer*: the **GModelFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *minimizer* library.  Two minimizers are currently available:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia minimizer;
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C minimizer wrapped in a Julia package.
   Both are automatically installed with **GModelFit.jl**, and `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) function call).
 
-- *Mock data*: evaluating a a model may be useful even before actual data are available, e.g. to test its robustness and capabilities.  To this purpose **GModelFit.jl** provides the [`GModelFit.mock()`](@ref) function which is able to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process. This functionality is used in some of the examples presented in the next sections.
+
+
+## Main functionalities
+
+- *Model definition* and *manipulation*: a [`Model`](@ref) object is essentially a dictionary of components with `Symbol` keys.  The `keys()`, `haskey()` and `iterate()` methods defined for the `Model` object provide the usual functionalities as for any dictionary.  Each entry in the dictionary is a component, namely a structure inheriting `GModelFit.AbstractComponent` and hosting one or more fields with type [`GModelFit.Parameter`](@ref).  A model object can be manipulated as follows:
+```@example abc
+using GModelFit
+
+# Create the object
+model = Model()
+
+# Add a component
+model[:comp1] = GModelFit.Gaussian(1, 0, 1)  # numbers represent the guess parameter
+
+# Modify a parameter value:
+model[:comp1].center.val = 5
+
+# Evaluate the model on a user define domain
+model(Domain(0:0.1:10))
+println() # hide
+```
+
+- *Fitting*: the main functions to fit an empirical dataset (represented by one or more [`Measures`](@ref) objects) to a (multi-)model (represented by one or more [`Model`](@ref) objects) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object(s) will have their parameters set to the best fit values;
+
+- *Mock data*: testing the capabilities of a model to in identifying the best fit parameters may be useful even before actual data are available.  To this purpose, the [`GModelFit.mock()`](@ref) function provides the possibility to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process.  This functionality is used in some of the examples presented in the next sections.
 
 - *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitStats`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.
 
-## How to access the data structures
 
-**GModelFit.jl** interface aims to be easy to use and remember, and the number of exported function is purposely kept to a minimum.  As a consequence, many of the above mentioned data structures are accessible using either indexing (as in dictionary or vectors) or as field of a `struct`-like interface, starting from a single [`Model`](@ref) or a `Vector{Model}` object. In particular:
-- a *Multi-model* is a `Vector{Model}` with the inidividual elements accessible via the usual indexing syntax;
-- a `Model` object can be considered as a dictionary of components, with `Symbol` keys. The `keys()` function will return the name of components in the model;
-- a component is a structure, either built-in (see [Built-in components](@ref)) or implemented by the user ([Custom components](@ref)).  One or more structure fields are supposed to represent the component parameters (with objects of type [`GModelFit.Parameter`](@ref));
-- The fields of a component structure, as well as the fields of the [`GModelFit.Parameter`](@ref)) structures are accessed using the standard dot (`.`) notation.
 
-As an example, the syntax to access the value of a parameter in a single model case is: `model[:Component].param.val`.  In a multi-model case it is: `multi[1][:Component].param.val`.
 
+
+### GModelFit internals
+
+This section deals with **GModelFit.jl** internals.  Feel free to skip if not interested.
+
+During fitting a number of data structures are created to avoid reallocating heap memory at each minimizer iteration.  The most important of such structures are:
+
+- [`GModelFit.CompEval`](@ref): a container for a component to allow evaluation on a specific domain.  This structure is managed internally by **GModelFit.jl** and is never returned by user.  Its use is, however, necessary to implement the `evaluate!` method when defining [Custom components](@ref) the custom `evaluate!` method shall accept one such structure 
+
+- [`GModelFit.ModelEval`](@ref): a container for a `Model` object to allow evaluation on a specific domain. This structure is managed internally by **GModelFit.jl** and is never returned by user.

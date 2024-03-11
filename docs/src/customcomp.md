@@ -7,9 +7,9 @@ include("setup.jl")
 Besides the [Built-in components](@ref), the user may define any number of custom components to be used in a model.
 
 A user-defined component shall satisfy the following constraints:
-- it shall be defined as a structure inheriting `AbstractComponent`;
+- it shall be a structure inheriting from `GModelFit.AbstractComponent`;
 
-- the structure fields shall contain the component parameters as `Parameter` object(s), e.g.:
+- the component values shall be defined as fields with type `Parameter`, e.g.:
 ```julia
 struct MyComponent <: AbstractComponent
 	param1::Parameter
@@ -20,12 +20,12 @@ end
 (see below for a complete example).
 Alternatively, the parameters may be specified as a single field of type `OrderedDict{Symbol, Parameter}` (see the [`Polynomial`](https://github.com/gcalderone/GModelFit.jl/blob/master/src/components/Polynomial.jl) component for an example);
 
-- the `evaluate!` function shall be extended to provide the component-specific code for evaluation.
-Specifically, the `evaluate!` function should replace the content of a `buffer::Vector{Float64}` with the outcome of the new component evaluation, given the numerical values for the parameters, e.g.
+- the `GModelFit.evaluate!` function shall be extended to provide the component-specific code for evaluation.
+Specifically, the `evaluate!` function should replace the content of the `buffer::Vector{Float64}` with the outcome of the new component evaluation, given the numerical values for the parameters, e.g.
 ```julia
-function evaluate!(buffer::Vector{Float64}, comp::MyComponent, x::AbstractDomain,
+function evaluate!(ceval::CompEval{MyComponent},
                    param1::Float64, param2::Float64...)
-	buffer .= (component evaluation using param1 and param2 values)
+	ceval.buffer .= (component evaluation using param1 and param2 values)
 end
 ```
 

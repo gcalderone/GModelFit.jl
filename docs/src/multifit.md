@@ -22,8 +22,8 @@ model2 = Model(GModelFit.Gaussian(1, 0., 1.))
 multi = [model1, model2]
 
 # Patch parameters
-multi[2][:main].norm.mpatch   = @λ m -> m[1][:main].norm
-multi[2][:main].center.mpatch = @λ m -> m[1][:main].center
+multi[2][:main].norm.mpatch   = @fd m -> m[1][:main].norm
+multi[2][:main].center.mpatch = @fd m -> m[1][:main].center
 
 # Create datasets and fit
 data1 = Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04)

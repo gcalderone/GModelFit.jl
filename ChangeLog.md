@@ -1,10 +1,15 @@
 # Version 0.3.0
 - Breaking Changes:
 	* `Model` constructor no longer accepts a `Domain` argument;
+	
+	* `mock` now accepts the `Domain` argument;
 
 	* fix -> fix!
 
+    * getindex(d::Union{Domain, CartesianDomain}, dim::Integer) is no longer available
 
+    * @λ -> @fd
+	
 
 # Version 0.2.1
 

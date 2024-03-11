@@ -1,7 +1,17 @@
 
-# ====================================================================
-# CompEval: a container for a component evaluated on a specific domain
-#
+"""
+    CompEval(comp::AbstractComponent, domain::AbstractDomain)
+
+A container for a component to be evaluated on a specific domain.
+
+# Fields:
+ - `comp::AbstractComponent`: the wrapped component;
+ - `domain::AbstractDomain`: the domain where the component is supposed to be evaluated;
+ - `counter::Int`: the number of times the component has been evaluated since creatio of the `CompEval` object;
+ - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `update!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
+ - `deps::Vector{Vector{Float64}}`: the buffers of all dependencies;
+ - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
+"""
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
@@ -21,6 +31,11 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
 end
 
 
+"""
+    update!(ceval::CompEval, pvalues::Vector{Float64})
+
+Evaluate a `CompEval` structure with a new component evaluation using the provided parameter values.
+"""
 function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
                  pvalues::AbstractVector{Float64})
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
@@ -117,7 +132,7 @@ free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
 """
     update!(meval::ModelEval)
 
-Evaluate a `Model` and update `ModelEval` internal structures.
+Update a `ModelEval` structure by evaluating all components in the model.
 """
 function update!(meval::ModelEval)
     update_init!(meval)

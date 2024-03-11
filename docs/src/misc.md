@@ -14,7 +14,7 @@ In some case it is useful to test a model for robustness before the emprical dat
 using GModelFit
 
 dom = Domain(1:0.1:50)
-model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 
 # Generate a mock dataset
 data = GModelFit.mock(Measures, model, dom, seed=1)
@@ -36,7 +36,7 @@ In the following we will generate a few **GModelFit.jl** objects and serialized 
 using GModelFit
 
 dom = Domain(1:0.1:50)
-model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
 best, fitstats = fit(model, data)
 

@@ -28,7 +28,7 @@ import Base.push!
 import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
-    CompEval, Model, @λ, select_maincomp!, SumReducer, domain, comptype,
+    CompEval, Model, @fd, select_maincomp!, SumReducer, domain, comptype,
     isfreezed, thaw!, freeze!, fit, fit!, compare
 
 include("PV.jl")
@@ -62,17 +62,17 @@ A "Julia function" descriptor containing the reference to the function itself, a
 
 ### Example:
 ```
-julia> f = GModelFit.FunctDesc((x, p=0) -> x + p,    # actual function definition
-                          "(x, p=0) -> x + p",  # string representation
-                          [:x],                 # vector of argument namess
-                          [:(p = 0)])           # vector of `Expr` with arguments default values
+julia> f = GModelFit.FunctDesc( (x, p=0) -> x + p,   # actual function definition
+                               "(x, p=0) -> x + p",  # string representation
+                               [:x],                 # vector of argument namess
+                               [:(p = 0)])           # vector of `Expr` with arguments default values
 julia> f(1, 2)
 3
 ```
 
-Note that it is unpractical to directly create a `FunctDescr` using its constructor, and the above results can be obtained using the @λ macro:
+Note that it is unpractical to directly create a `FunctDescr` using its constructor, and the above results can be obtained by using the @fd macro:
 ```
-f = @λ (x, p=0) -> x + p
+f = @fd (x, p=0) -> x + p
 ```
 
 """
@@ -85,19 +85,19 @@ end
 (f::FunctDesc)(args...; kws...) = f.funct(args...; kws...)
 
 """
-    @λ expr
+    @fd expr
 
 Macro to generate a `FunctDesc` object using the same syntax as in a standard Julia anonymous function.
 
 ### Example
 ```
-julia> f = @λ (x, p=0) -> x + p
+julia> f = @fd (x, p=0) -> x + p
 
 julia> f(1, 2)
 3
 ```
 """
-macro λ(_expr)
+macro fd(_expr)
     @assert isexpr(longdef(_expr), :function)
     expr = prettify(_expr)
     def  = splitdef(expr)
@@ -272,8 +272,8 @@ function find_maincomp(model::Model)
     end
 
     if length(comps) > 1
-        # Ignoring components with no dependencies
         for (cname, comp) in model.comps
+            # Ignoring components with no dependencies
             if length(dependencies(model, cname)) == 0
                 i = findfirst(comps .== cname)
                 if !isnothing(i)  &&  (length(comps) > 1)  # ...but keep at least one

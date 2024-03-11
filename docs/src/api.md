@@ -12,7 +12,7 @@ CartesianDomain{N}
 Domain{N}
 Measures{N}
 Model
-@λ
+@fd
 axis
 compare
 comptype
@@ -37,6 +37,7 @@ The following symbols are not exported by the **GModelFit.jl** package since the
 ```@docs
 GModelFit.evalcounter
 GModelFit.evalcounters
+GModelFit.CompEval
 GModelFit.FitStats
 GModelFit.FunctDesc
 GModelFit.ModelEval

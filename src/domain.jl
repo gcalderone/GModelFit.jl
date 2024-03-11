@@ -139,7 +139,7 @@ end
 """
     Measures{N}
 
-An object representing a set of empirical measurements (with Gaussian uncertainties)
+An object representing a set of empirical measurements (with Gaussian uncertainties) as measured on a specific domain.
 
 Available constructors:
 - `Measures(domain::Domain{N},
@@ -148,8 +148,9 @@ Available constructors:
 - `Measures(domain::CartesianDomain{N},
             values::AbstractArray{T, N},
             uncerts::AbstractArray{T, N}) where {T <: AbstractFloat, N}`
+- `Measures(values::AbstractVector, uncerts)`
 
-In the above constructor methods the last argument may also be a scalar value, to set the same uncertainty for all the measurements. The method accepting a `CartesianDomain` requires arrays with at least 2 dimensions.
+In the above constructor methods the last argument may also be a scalar value, to set the same uncertainty for all the measurements. The method accepting a `CartesianDomain` requires arrays with at least 2 dimensions.  In the last constructor the `Domain` object is automatically built depending on the length of the `values` vector.
 
 The domain, values and uncertainties for a `Measures` object can be retrieved using the `domain`, `values` and `uncerts` functions respectively.
 """

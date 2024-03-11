@@ -83,7 +83,7 @@ Note: The `GModelFit.serialize` function also accepts `Model` and `Vector{Model}
 # Create GModelFit objects
 using GModelFit
 dom  = Domain(1:5)
-model = Model(dom, :linear => @λ (x, b=2, m=0.5) -> (b .+ x .* m))
+model = Model(dom, :linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 best, fitstats = fit(model, data)
 

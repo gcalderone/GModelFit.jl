@@ -17,7 +17,7 @@ There is also a dummy minimizer, `GModelFit.dry()`, whose purpose is to compare 
 ```@example abc
 using GModelFit
 dom = Domain(1:0.1:50)
-model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
 best, fitstats = fit(model, data, minimizer=GModelFit.lsqfit())
 println(); # hide
@@ -40,7 +40,7 @@ The `cmpfit()` minimizer allows to specify several options to fine-tune the mini
 ```@example abc
 using GModelFit
 dom = Domain(1:0.1:50)
-model = Model(:main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, dom, seed=1)
 
 # Set minimizer options
