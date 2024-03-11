@@ -10,7 +10,7 @@ The **GModelFit.jl** provides several built-in components which may be used to b
 
 ## FComp
 
-The `FComp` component is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  It comes in two flavours: `FComp` is used when the function accepts one or more scalar parameters, while `FCompv` (see next section) is used when the function requires a vector of parameters.  The `FComp` constructors are defined as follows:
+The `FComp` component is a wrapper for a standard Julia function whose evaluation is performed using the function itself.  It comes in two flavours: `FComp` is used when the function accepts one or more *scalar* parameters, while `FCompv` (see next section) is used when the function accepts a single *vector* of parameters.  The `FComp` constructors are defined as follows:
 
 ```julia
 FComp(funct::Function, deps=Symbol[]; par1=guess1, par2=guess2, ...)
