@@ -121,7 +121,11 @@ function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::Ab
     update!(multi)
     fp = MultiFitProblem(multi, data)
     status = fit(minimizer, fp)
-    return ModelSnapshot.(fp.multi), FitStats(fp, status)
+
+    bestfit = ModelSnapshot.(fp.multi)
+    stats = FitStats(fp, status)
+    test_serialization(bestfit, stats, data)
+    return (bestfit, stats)
 end
 fit!(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
 fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)

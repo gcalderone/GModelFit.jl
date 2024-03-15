@@ -46,13 +46,11 @@ _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
 _serialize(vv::FitStats) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
-_serialize(vv::MinimizerStatus) = _serialize_struct(MinimizerStatus(vv.code, vv.message, nothing))
-_serialize(vv::MinimizerStatusCode) = Int(vv)
+_serialize(vv::AbstractMinimizerStatus) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
 
-_serialize(model::Model                                                     ) = _serialize(ModelSnapshot(model))
 _serialize(model::ModelSnapshot, fitstats::FitStats                         ) = _serialize([model, fitstats])
 _serialize(model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures ) = _serialize([model, fitstats, data])
 _serialize(multi::Vector{Model        }                                     ) = _serialize(ModelSnapshot.(multi))
@@ -82,9 +80,8 @@ Note: The `GModelFit.serialize` function also accepts `Model` and `Vector{Model}
 ```julia-repl
 # Create GModelFit objects
 using GModelFit
-dom  = Domain(1:5)
-model = Model(dom, :linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
-data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+model = Model(:linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
+data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
 
 # Serialize objects and save in a file
@@ -106,6 +103,7 @@ function serialize(filename::String, args...; compress=false)
     end
     JSON.print(io, data)
     close(io)
+
     return filename
 end
 
@@ -155,17 +153,9 @@ function _deserialize(dd::AbstractDict)
     end
 
     if "_structtype" in keys(dd)
-        if dd["_structtype"] == "GModelFit.PV.PVComp{GModelFit.Parameter}"
-            # tmp = OrderedDict{Symbol, Int}()
-            # for (k, v) in dd["params"]
-            #     tmp[Symbol(k)] = v
-            # end
+        if !isnothing(findfirst("PVComp{GModelFit.Parameter}", dd["_structtype"]))
             return PVComp{Parameter}(_deserialize(dd["pnames"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
-        elseif dd["_structtype"] == "GModelFit.PV.PVModel{GModelFit.Parameter}"
-            # tmp = OrderedDict{Symbol, PV.PVComp{GModelFit.Parameter}}()
-            # for (k, v) in dd["comps"]
-            #     tmp[Symbol(k)] = _deserialize(v)
-            # end
+        elseif !isnothing(findfirst("PVModel{GModelFit.Parameter}", dd["_structtype"]))
             return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
         elseif dd["_structtype"] == "GModelFit.FunctDesc"
             return FunctDesc(deserialized_function,
@@ -198,10 +188,14 @@ function _deserialize(dd::AbstractDict)
                             _deserialize(dd["dof"]),
                             _deserialize(dd["fitstat"]),
                             _deserialize(dd["status"]))
-        elseif dd["_structtype"] == "GModelFit.MinimizerStatus"
-            return MinimizerStatus(MinimizerStatusCode(_deserialize(dd["code"])),
-                                   _deserialize(dd["message"]),
-                                   _deserialize(dd["internal"]))
+        elseif dd["_structtype"] == "GModelFit.MinimizerStatusOK"
+            return MinimizerStatusOK()
+        elseif dd["_structtype"] == "GModelFit.MinimizerStatusDry"
+            return MinimizerStatusDry()
+        elseif dd["_structtype"] == "GModelFit.MinimizerStatusWarn"
+            return MinimizerStatusWarn(_deserialize(dd["message"]))
+        elseif dd["_structtype"] == "GModelFit.MinimizerStatusError"
+            return MinimizerStatusError(_deserialize(dd["message"]))
         elseif !isnothing(findfirst("CartesianDomain", dd["_structtype"]))
             axis = _deserialize(dd["axis"])
             roi =  _deserialize(dd["roi"])
@@ -218,7 +212,7 @@ function _deserialize(dd::AbstractDict)
                 return Measures(dom, tmp[1], tmp[2])
             end
         else
-            error("Unrecognized structure in serialized data")
+            error("Unrecognized structure in serialized data: " * dd["_structtype"])
         end
     else
         out = OrderedDict{Symbol, Any}()
@@ -239,4 +233,26 @@ function deserialize(filename::String)
     j = JSON.parse(io, dicttype=OrderedDict)
     close(io)
     return _deserialize(j)
+end
+
+
+function test_serialization(args...)
+    function comparedata(A::TA, B::TB) where {TA, TB}
+        isa(B, Function)  &&  return
+        @assert TA == TB
+        if (TA <: AbstractVector)  ||  (TA <: Tuple)  ||  (TA <: AbstractDict)
+            @assert length(A) == length(B)
+            for i in eachindex(A)
+                comparedata(getindex(A, i), getindex(B, i))
+            end
+        elseif isstructtype(TA)
+            for i in 1:nfields(A)
+                comparedata(getfield(A, i), getfield(B, i))
+            end
+        else
+            @assert isequal(A, B)
+        end
+    end
+    dd = deserialize(serialize(tempname(), args...))
+    comparedata(dd, [args...])
 end

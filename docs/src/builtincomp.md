@@ -40,7 +40,6 @@ model = Model(:linear => GModelFit.OffsetSlope(2, 0, 0.5))
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
-dumpjson("ex_OffsetSlope", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -66,7 +65,6 @@ data = Measures(dom, [ 3.08403  3.46719  4.07612  4.25611  5.04716
                        4.34554  4.68698  5.51505  5.69245  6.35409
                        4.643    5.91825  6.18011  6.67073  7.01467], 0.25)
 bestfit, stats = fit(model, data)
-dumpjson("ex_OffsetSlope2d", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -93,7 +91,6 @@ model = Model(GModelFit.Polynomial(2, 0.5))
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
-dumpjson("ex_Polynomial", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -101,7 +98,6 @@ Note that the numerical results are identical to the previous example involving 
 ```@example abc
 model[:main] = GModelFit.Polynomial(2, 0.5, 1)
 bestfit, stats = fit(model, data)
-dumpjson("ex_Polynomial2", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -145,7 +141,6 @@ model = Model(GModelFit.Gaussian(1, 3, 0.5))
 # Fit model against data
 data = Measures([0, 0.3, 6.2, 25.4, 37.6, 23., 7.1, 0.4, 0], 0.6)
 bestfit, stats = fit(model, data)
-dumpjson("ex_Gaussian", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -162,7 +157,6 @@ dom = Domain(hist_bins(hh, side=:center, pad=false))
 data = Measures(dom, hist_weights(hh, pad=false), 1.)
 model = Model(GModelFit.Gaussian(1e3, 0, 1))
 bestfit, stats = fit(model, data)
-dumpjson("ex_Gaussian2", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -187,7 +181,6 @@ dom = CartesianDomain(hist_bins(hh, 1), hist_bins(hh, 2))
 data = Measures(dom, hist_weights(hh) .* 1., 1.)
 model = Model(GModelFit.Gaussian(1e3, 0, 0, 1, 1, 0))
 bestfit, stats = fit(model, data)
-dumpjson("ex_Gaussian2D", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -216,7 +209,6 @@ model = Model(:linear => GModelFit.FComp(myfunc, [:x], b=2, m=0.5))
 # Fit model against a data set
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
-dumpjson("ex_FComp", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -240,7 +232,6 @@ model = Model(:linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
-dumpjson("ex_FComp2", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 Note that a `FComp` component can be added to a model without explicitly invoking its constructor when the [`@fd`](@ref) macro is used.
@@ -251,7 +242,6 @@ The evaluation of a `FComp` component may also involve the outcomes from other c
 ```@example abc
 model[:quadratic] = @fd (x, linear, p2=1) -> (linear .+ p2 .* x.^2)
 bestfit, stats = fit(model, data)
-dumpjson("ex_FComp3", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -295,7 +285,6 @@ where `x = [1, 1, 1]` are the initial guess values for the three parameters in t
 ```@example abc
 data = Measures(fill(0., length(b)), 1.)
 bestfit, stats = fit(model, data)
-dumpjson("ex_FCompv", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 
@@ -331,6 +320,5 @@ model[:main] = SumReducer(:linear, :quadratic)
 dom = Domain(1:5)
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
 bestfit, stats = fit(model, data)
-dumpjson("ex_SumReducer", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```

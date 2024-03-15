@@ -10,7 +10,8 @@
 
     * @λ -> @fd
 	
-
+    * Minimizer status
+	
 # Version 0.2.1
 
 - New features:

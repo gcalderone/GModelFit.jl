@@ -66,7 +66,6 @@ We can fit the model against a mock dataset (see [Generate mock datasets](@ref))
 dom = Domain(0:0.1:5)
 data = GModelFit.mock(Measures, model, dom)
 bestfit, stats = fit(model, data)
-dumpjson("ex_Parameter", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
 and plot the results with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):

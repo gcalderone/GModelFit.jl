@@ -63,10 +63,10 @@ struct FitStats
     fitstat::Float64
     # gofstat::Float64
     # log10testprob::Float64
-    status::MinimizerStatus
+    status::AbstractMinimizerStatus
 end
 
-function FitStats(fp::AbstractFitProblem, status::MinimizerStatus)
+function FitStats(fp::AbstractFitProblem, status::AbstractMinimizerStatus)
     # gof_stat = sum(abs2, residuals(fp))
     # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
     FitStats(fp.timestamp, (now() - fp.timestamp).value / 1e3,
@@ -81,7 +81,10 @@ function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsq
     update!(meval)
     fp = FitProblem(meval, data)
     status = fit(minimizer, fp)
-    return ModelSnapshot(fp.meval), FitStats(fp, status)
+    bestfit = ModelSnapshot(fp.meval)
+    stats = FitStats(fp, status)
+    test_serialization(bestfit, stats, data)
+    return (bestfit, stats)
 end
 
 

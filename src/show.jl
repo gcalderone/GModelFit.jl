@@ -321,27 +321,18 @@ function show(io::IO, multi::Union{Vector{Model}, Vector{ModelSnapshot}})
 end
 
 
-function show(io::IO, status::MinimizerStatus)
-    print(io, "Status: ")
-    if status.code == MinOK
-        color, ss = crayon"green", "OK"
-    elseif status.code == MinWARN
-        color, ss = crayon"bold yellow", "WARNING"
-    elseif status.code == MinERROR
-        color, ss = crayon"bold red", "ERROR"
-    elseif status.code == MinDRY
-        color, ss = crayon"bold red", "DRY"
-    else
-        error("Unsupported minimizer status code: $(status.code)")
-    end
+getmessage(status::MinimizerStatusOK) = crayon"green", "OK"
+getmessage(status::MinimizerStatusDry) = crayon"bold yellow", "DRY"
+getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN:\n" * status.message
+getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR:\n" * status.message
 
+function show(io::IO, status::AbstractMinimizerStatus)
+    print(io, "Status: ")
+    color, ss = getmessage(status)
     if showsettings.plain
         print(io, @sprintf("%-8s", ss))
     else
         print(io, color, @sprintf("%-8s", ss), crayon"default")
-    end
-    if status.message != ""
-        println(io, "\n", status.message)
     end
 end
 

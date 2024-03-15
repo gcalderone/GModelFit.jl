@@ -108,6 +108,5 @@ model = Model(:theory => Interpolator(theory_x, theory_y),
 
 data = Measures(Domain(obs_x), obs_y, 0.2)
 bestfit, stats = fit(model, data)
-dumpjson("ex_Customcomp", bestfit, stats, data) # hide
 show((bestfit, stats)) # hide
 ```
