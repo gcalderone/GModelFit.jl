@@ -13,10 +13,10 @@ In some case it is useful to test a model for robustness before the emprical dat
 ```@example abc
 using GModelFit
 
-dom = Domain(1:0.1:50)
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 
-# Generate a mock dataset
+# Generate a mock dataset on a specific domain
+dom = Domain(1:0.1:50)
 data = GModelFit.mock(Measures, model, dom, seed=1)
 
 # Fit model against the mock dataset

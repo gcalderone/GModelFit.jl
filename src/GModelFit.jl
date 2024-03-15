@@ -185,8 +185,22 @@ function setparams!(comp::AbstractComponent, params::PVComp{Parameter})
 end
 
 
-# Fall back methods
+"""
+    prepare!(comp::AbstractComponent, domain::AbstractDomain)
+
+Allocate the buffer for a component evaluation on a specific domain.  Return value must be a `Vector{Float64}`.
+
+This function is invoked only once when the `ModelEval` structure is created (typically within a `fit` of `fit!` call), hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.  Default implementation returns a vector filled with `NaN`s with the same length as the domain.
+"""
 prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
+
+"""
+    dependencies(comp::AbstractComponent)
+
+Return the name of dependecies for a component. Return value must be a `Vector{Symbol}`.
+
+Default implementation returns `Symbol[]` (i.e. no dependencies.
+"""
 dependencies(comp::AbstractComponent) = Symbol[]
 
 

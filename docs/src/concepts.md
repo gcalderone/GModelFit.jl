@@ -81,10 +81,7 @@ println() # hide
 - *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitStats`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.
 
 
-
-
-
-### GModelFit internals
+## GModelFit internals
 
 This section deals with **GModelFit.jl** internals, feel free to skip if not interested.
 

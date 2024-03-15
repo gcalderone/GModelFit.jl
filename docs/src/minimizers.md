@@ -7,7 +7,7 @@ Currently, two [non-linear least squares](https://en.wikipedia.org/wiki/Non-line
 
 More minimizers may be added in the future.
 
-To specify a minimizer simply use the `minimizer=` keyword when invoking the [`fit()`](@ref) function, e.g. `minimizer=GModelFit.lsqfit()` or `minimizer=GModelFit.cmpfit()`. If the keyword is not provided the `lsqfit()` minimizer is used.
+To choose a specific minimizer use the `minimizer=` keyword when invoking the [`fit()`](@ref) function, e.g. `minimizer=GModelFit.lsqfit()` or `minimizer=GModelFit.cmpfit()`.  If the keyword is not provided the `lsqfit()` minimizer is used.
 
 There is also a dummy minimizer, `GModelFit.dry()`, whose purpose is to compare the model and the data, and to generate a `FitStats` object without modifying the model parameters.  The dry minimizer is used by the [`compare()`](@ref) function.
 

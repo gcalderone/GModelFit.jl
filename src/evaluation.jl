@@ -9,7 +9,7 @@ A container for a component to be evaluated on a specific domain.
  - `domain::AbstractDomain`: the domain where the component is supposed to be evaluated;
  - `counter::Int`: the number of times the component has been evaluated since creatio of the `CompEval` object;
  - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `update!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
- - `deps::Vector{Vector{Float64}}`: the buffers of all dependencies;
+ - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
@@ -32,9 +32,25 @@ end
 
 
 """
+    evaluate!(ceval::CompEval, pvalues::Vector{Float64})
+
+Evaluate a component using the provided parameter values.  Outcomes shall be stored in the `CompEval.buffer` vector.
+"""
+evaluate!(ceval::CompEval{T, D}, par_values...) where {T <: AbstractComponent, D <: AbstractDomain} =
+    error("No evaluate! method implemented for CompEval{$(T), $(D)}")
+
+
+"""
     update!(ceval::CompEval, pvalues::Vector{Float64})
 
-Evaluate a `CompEval` structure with a new component evaluation using the provided parameter values.
+Update a `CompEval` structure using the provided parameter values.
+
+The component is actually evaluated if one of the following applies:
+- the component has never been evaluated;
+- the component has at least one dependency (whose evaluation may have changed since its last evaluation);
+- at least one parameter value has changed since last evaluation.
+
+If none of the above applies, no evaluation occurs.
 """
 function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
                  pvalues::AbstractVector{Float64})

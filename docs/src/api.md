@@ -44,7 +44,10 @@ GModelFit.ModelEval
 GModelFit.ModelSnapshot
 GModelFit.Parameter
 GModelFit.comptypes
+GModelFit.dependencies
+GModelFit.evaluate!
 GModelFit.mock
+GModelFit.prepare!
 GModelFit.serialize
 GModelFit.update!
 ```
