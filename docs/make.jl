@@ -2,11 +2,11 @@ using Revise, Documenter, GModelFit, Gnuplot
 
 makedocs(sitename="GModelFit.jl",
          authors = "Giorgio Calderone",
-         # format = Documenter.HTML(prettyurls = false),  # uncomment for local use, comment for deployment
+         format = Documenter.HTML(prettyurls = false),  # uncomment for local use, comment for deployment
          modules=[GModelFit],
          pages = [
              "Home" => "index.md",
-             "Basic concepts and data types" => "concepts.md",
+             "Data types and functionalities" => "concepts.md",
              "Built-in components" => "builtincomp.md",
              "Custom components" => "customcomp.md",
              "Parameter constraints" => "parameter.md",

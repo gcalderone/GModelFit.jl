@@ -13,14 +13,14 @@ In some case it is useful to test a model for robustness before the emprical dat
 ```@example abc
 using GModelFit
 
-dom = Domain(1:0.1:50)
-model = Model(dom, :main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 
-# Generate a mock dataset
-data = GModelFit.mock(Measures, model, seed=1)
+# Generate a mock dataset on a specific domain
+dom = Domain(1:0.1:50)
+data = GModelFit.mock(Measures, model, dom, seed=1)
 
 # Fit model against the mock dataset
-best, fitstats = fit(model, data)
+bestfit, stats = fit(model, data)
 ```
 
 
@@ -36,19 +36,19 @@ In the following we will generate a few **GModelFit.jl** objects and serialized 
 using GModelFit
 
 dom = Domain(1:0.1:50)
-model = Model(dom, :main => @λ (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
-data = GModelFit.mock(Measures, model, seed=1)
-best, fitstats = fit(model, data)
+model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
+data = GModelFit.mock(Measures, model, dom, seed=1)
+bestfit, stats = fit(model, data)
 
 # Serialize objects and save in a file
-GModelFit.serialize("save_for_future_use.json", best, fitstats, data)
+GModelFit.serialize("save_for_future_use.json", bestfit, stats, data)
 println(); # hide
 ```
 
 The same objects can be de-serialized in a different Julia session:
 ```@example abc
 using GModelFit
-best, fitstats, data = GModelFit.deserialize("save_for_future_use.json")
+bestfit, stats, data = GModelFit.deserialize("save_for_future_use.json")
 ```
 
 
@@ -64,19 +64,19 @@ Create a model, a mock dataset and run a fit:
 using GModelFit
 
 dom = Domain(0:0.01:5)
-model = Model(dom, :bkg => GModelFit.OffsetSlope(1, 1, 0.1),
-                   :l1 => GModelFit.Gaussian(1, 2, 0.2),
-                   :l2 => GModelFit.Gaussian(1, 3, 0.4),
-                   :main => SumReducer(:bkg, :l1, :l2))
-data = GModelFit.mock(Measures, model)
-best, res = fit(model, data)
+model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
+              :l1 => GModelFit.Gaussian(1, 2, 0.2),
+              :l2 => GModelFit.Gaussian(1, 3, 0.4),
+              :main => SumReducer(:bkg, :l1, :l2))
+data = GModelFit.mock(Measures, model, dom)
+bestfit, stats = fit(model, data)
 println(); # hide
 ```
 
 A plot of the dataset and of the best fit model can be simply obtained with
 ```@example abc
 using Gnuplot
-@gp data best
+@gp data bestfit
 saveas("gnuplot1") # hide
 ```
 ![](assets/gnuplot1.png)
@@ -85,7 +85,7 @@ You may also specify axis range, labels, title, etc. using the standard [**Gnupl
 
 ```@example abc
 using Gnuplot
-@gp xr=[1, 4.5] xlabel="Wavelength" ylab="Flux" "set key outside" data best
+@gp xr=[1, 4.5] xlabel="Wavelength" ylab="Flux" "set key outside" data bestfit
 saveas("gnuplot2") # hide
 ```
 ![](assets/gnuplot2.png)

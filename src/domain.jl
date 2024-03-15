@@ -91,12 +91,6 @@ coords(d::Domain{1}) = d.axis[1]
 coords(d::Domain, dim::Integer) = d.axis[dim]
 coords(d::CartesianDomain, dim::Integer) = coords(flatten(d), dim)
 
-"""
-    getindex(d::Union{Domain, CartesianDomain}, dim::Integer)
-
-Shortcut for `coords(d, dim)`.
-"""
-getindex(d::Union{Domain, CartesianDomain}, dim::Integer) = coords(d, dim)
 
 # Iterate through domain dimensions returning coordinates
 function iterate(d::Union{Domain, CartesianDomain}, ii=1)
@@ -123,7 +117,13 @@ axis(d::CartesianDomain, dim::Integer) = d.axis[dim]
 
 abstract type AbstractMeasures{N} end
 
+"""
+    domain(d::AbstractMeasures)
+
+Return the domain associated to an AbstractMeasures object.
+"""
 domain(d::AbstractMeasures) = d.domain
+
 ndims(d::AbstractMeasures) = ndims(domain(d))
 length(d::AbstractMeasures) = length(domain(d))
 size(d::AbstractMeasures) = size(domain(d))
@@ -139,7 +139,7 @@ end
 """
     Measures{N}
 
-An object representing a set of empirical measurements (with Gaussian uncertainties)
+An object representing a set of empirical measurements (with Gaussian uncertainties) as measured on a specific domain.
 
 Available constructors:
 - `Measures(domain::Domain{N},
@@ -148,8 +148,9 @@ Available constructors:
 - `Measures(domain::CartesianDomain{N},
             values::AbstractArray{T, N},
             uncerts::AbstractArray{T, N}) where {T <: AbstractFloat, N}`
+- `Measures(values::AbstractVector, uncerts)`
 
-In the above constructor methods the last argument may also be a scalar value, to set the same uncertainty for all the measurements. The method accepting a `CartesianDomain` requires arrays with at least 2 dimensions.
+In the above constructor methods the last argument may also be a scalar value, to set the same uncertainty for all the measurements. The method accepting a `CartesianDomain` requires arrays with at least 2 dimensions.  In the last constructor the `Domain` object is automatically built depending on the length of the `values` vector.
 
 The domain, values and uncertainties for a `Measures` object can be retrieved using the `domain`, `values` and `uncerts` functions respectively.
 """
@@ -157,6 +158,9 @@ struct Measures{N} <: AbstractMeasures{N}
     domain::AbstractDomain{N}
     values::NTuple{2, Vector{Float64}}
     labels::NTuple{2, String}
+
+    # If no domain is provided we generate one
+    Measures(values::AbstractVector, uncerts) = Measures(Domain(length(values)), values, uncerts)
 
     # Measures with linear domain are built using 1D vector(s).
     function Measures(domain::Domain{N}, values::AbstractVector{T}, uncerts::AbstractVector{T}) where {T <: AbstractFloat, N}

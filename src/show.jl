@@ -128,7 +128,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
         push!(fixed, param.fixed)
         if !param.fixed  &&  (isnan(param.unc)  ||  (param.unc <= 0.))
             push!(warns, true)
-            table[end,6] = " ???"
+            table[end,6] = ""
         else
             push!(warns, false)
         end
@@ -236,15 +236,17 @@ function tabledeps(model::Union{Model, ModelSnapshot})
         table[i, 2] = comptype(model, cname)
         table[i, 3] = count(getproperty.(values(getparams(model[cname])), :fixed) .== false)
         (table[i, 3] == 0)  &&  (table[i, 3] = "")
-        table[i, 4] = evalcounter(model, cname)
-        result = model(cname)
-        v = view(result, findall(isfinite.(result)))
-        if length(v) > 0
-            table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
-        else
-            table[i, 5:7] .= ["", "", ""]
+        if !isa(model, Model)
+            table[i, 4] = evalcounter(model, cname)
+            result = model(cname)
+            v = view(result, findall(isfinite.(result)))
+            if length(v) > 0
+                table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+            else
+                table[i, 5:7] .= ["", "", ""]
+            end
+            table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         end
-        table[i, 8] = count(isnan.(result)) + count(isinf.(result))
         push!(fixed, isfreezed(model, cname))
     end
     return table, fixed
@@ -253,16 +255,24 @@ end
 
 function show(io::IO, model::Union{Model, ModelSnapshot})
     section(io, "Components:")
+    (length(keys(model)) == 0)  &&  (return nothing)
     table, fixed = tabledeps(model)
     if showsettings.plain
         highlighters = nothing
     else
         highlighters = Highlighter((data,i,j) -> fixed[i], showsettings.fixed)
     end
-    printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-               hlines=[0,1, size(table)[1]+1],
-               formatters=ft_printf(showsettings.floatformat, 5:7),
-               highlighters=highlighters)
+    if !isa(model, Model)
+        printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+                   hlines=[0,1, size(table)[1]+1],
+                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   highlighters=highlighters)
+    else
+        printtable(io, table[:, 1:3], ["Component", "Type", "#Free"],
+                   hlines=[0,1, size(table)[1]+1],
+                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   highlighters=highlighters)
+    end
     println(io)
 
     section(io, "Parameters:")
@@ -288,8 +298,12 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
-                        Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+        if !isa(model, Model)
+            highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                            Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+        else
+            highlighters = Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)
+        end
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
                hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
@@ -307,27 +321,18 @@ function show(io::IO, multi::Union{Vector{Model}, Vector{ModelSnapshot}})
 end
 
 
-function show(io::IO, status::MinimizerStatus)
-    print(io, "Status: ")
-    if status.code == MinOK
-        color, ss = crayon"green", "OK"
-    elseif status.code == MinWARN
-        color, ss = crayon"bold yellow", "WARNING"
-    elseif status.code == MinERROR
-        color, ss = crayon"bold red", "ERROR"
-    elseif status.code == MinDRY
-        color, ss = crayon"bold red", "DRY"
-    else
-        error("Unsupported minimizer status code: $(status.code)")
-    end
+getmessage(status::MinimizerStatusOK) = crayon"green", "OK"
+getmessage(status::MinimizerStatusDry) = crayon"bold yellow", "DRY"
+getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN:\n" * status.message
+getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR:\n" * status.message
 
+function show(io::IO, status::AbstractMinimizerStatus)
+    print(io, "Status: ")
+    color, ss = getmessage(status)
     if showsettings.plain
         print(io, @sprintf("%-8s", ss))
     else
         print(io, color, @sprintf("%-8s", ss), crayon"default")
-    end
-    if status.message != ""
-        println(io, "\n", status.message)
     end
 end
 

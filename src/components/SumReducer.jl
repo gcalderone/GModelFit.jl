@@ -9,14 +9,9 @@ end
 dependencies(comp::SumReducer) = comp.list
 
 
-function evaluate!(buffer::Vector{Float64}, comp::SumReducer, domain::AbstractDomain)
-    buffer .= 0.
-end
-
-function evaluate!(buffer::Vector{Float64}, comp::SumReducer, domain::AbstractDomain,
-                   args)
-    buffer .= 0.
-    for i in 1:length(args)
-        buffer .+= args[i]
+function evaluate!(ceval::CompEval{SumReducer, <: AbstractDomain})
+    ceval.buffer .= 0.
+    for i in 1:length(ceval.deps)
+        ceval.buffer .+= ceval.deps[i]
     end
 end

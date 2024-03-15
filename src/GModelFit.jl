@@ -28,8 +28,8 @@ import Base.push!
 import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
-    Model, @λ, select_maincomp!, SumReducer, domain, comptype,
-    update!, isfreezed, thaw!, freeze!, fit, compare
+    CompEval, Model, @fd, select_maincomp!, SumReducer, domain, comptype,
+    isfreezed, thaw!, freeze!, fit, fit!, compare
 
 include("PV.jl")
 using .PV
@@ -62,17 +62,17 @@ A "Julia function" descriptor containing the reference to the function itself, a
 
 ### Example:
 ```
-julia> f = GModelFit.FunctDesc((x, p=0) -> x + p,    # actual function definition
-                          "(x, p=0) -> x + p",  # string representation
-                          [:x],                 # vector of argument namess
-                          [:(p = 0)])           # vector of `Expr` with arguments default values
+julia> f = GModelFit.FunctDesc( (x, p=0) -> x + p,   # actual function definition
+                               "(x, p=0) -> x + p",  # string representation
+                               [:x],                 # vector of argument namess
+                               [:(p = 0)])           # vector of `Expr` with arguments default values
 julia> f(1, 2)
 3
 ```
 
-Note that it is unpractical to directly create a `FunctDescr` using its constructor, and the above results can be obtained using the @λ macro:
+Note that it is inconvenient to directly create a `FunctDescr` using its constructor, and the above results can be obtained by using the @fd macro:
 ```
-f = @λ (x, p=0) -> x + p
+f = @fd (x, p=0) -> x + p
 ```
 
 """
@@ -85,19 +85,19 @@ end
 (f::FunctDesc)(args...; kws...) = f.funct(args...; kws...)
 
 """
-    @λ expr
+    @fd expr
 
-Macro to generate a `FunctDesc` object using the same syntax as in a standard Julia anonymous function.
+Macro to generate a `FunctDesc` object using the same syntax as for a standard Julia anonymous function.
 
 ### Example
 ```
-julia> f = @λ (x, p=0) -> x + p
+julia> f = @fd (x, p=0) -> x + p
 
 julia> f(1, 2)
 3
 ```
 """
-macro λ(_expr)
+macro fd(_expr)
     @assert isexpr(longdef(_expr), :function)
     expr = prettify(_expr)
     def  = splitdef(expr)
@@ -138,28 +138,6 @@ end
 Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
 
 
-struct ParameterVectors
-    params::PVModel{Parameter}
-    values::PVModel{Float64}
-    actual::PVModel{Float64}
-    ifree::Vector{Int}
-    ParameterVectors() = new(PVModel{Parameter}(), PVModel{Float64}(),
-                             PVModel{Float64}(), Vector{Int}())
-end
-function empty!(pv::ParameterVectors)
-    empty!(pv.params)
-    empty!(pv.values)
-    empty!(pv.actual)
-    empty!(pv.ifree)
-end
-function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
-    push!(pv.params, cname, pname, par)
-    push!(pv.values, cname, pname, par.val)
-    push!(pv.actual, cname, pname, par.actual)
-    if !par.fixed
-        push!(pv.ifree, length(items(pv.params)))
-    end
-end
 
 # ====================================================================
 # Components:
@@ -170,6 +148,7 @@ end
 # of type Parameter, or have all parameters collected in a single
 # field of type OrderedDict{Symbol, Parameter}()
 abstract type AbstractComponent end
+abstract type AbstractCompWDeps end
 
 # Note: this function must mirror setparams!()
 function getparams(comp::AbstractComponent)
@@ -206,83 +185,23 @@ function setparams!(comp::AbstractComponent, params::PVComp{Parameter})
 end
 
 
-# Fall back methods
+"""
+    prepare!(comp::AbstractComponent, domain::AbstractDomain)
+
+Allocate the buffer for a component evaluation on a specific domain.  Return value must be a `Vector{Float64}`.
+
+This function is invoked only once when the `ModelEval` structure is created (typically within a `fit` of `fit!` call), hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.  Default implementation returns a vector filled with `NaN`s with the same length as the domain.
+"""
+prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
+
+"""
+    dependencies(comp::AbstractComponent)
+
+Return the name of dependecies for a component. Return value must be a `Vector{Symbol}`.
+
+Default implementation returns `Symbol[]` (i.e. no dependencies.
+"""
 dependencies(comp::AbstractComponent) = Symbol[]
-
-prepare!(comp::AbstractComponent, domain::AbstractDomain) =
-    fill(NaN, length(domain))
-
-evaluate!(buffer::Vector{Float64}, comp::T, domain::AbstractDomain, pars...) where T <: AbstractComponent=
-    error("No evaluate!() method implemented for $T")
-
-# Evaluate component on the given domain.  Parmeter values are the
-# ones stored in the component unless a custom value is provided via a
-# keyword.
-function (comp::AbstractComponent)(domain::AbstractDomain, args...; kws...)
-    buffer = prepare!(comp, domain)
-    par_values = Float64[]
-    params = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
-    for (pname, pval) in kws
-        if pname in keys(params)
-            params[pname] = pval
-        else
-            @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(params)), ", ")
-        end
-    end
-    evaluate!(buffer, comp, domain, values(params)..., args...)
-end
-
-
-# Built-in components
-include("components/FComp.jl")
-include("components/OffsetSlope.jl")
-include("components/Polynomial.jl")
-include("components/Gaussian.jl")
-include("components/Lorentzian.jl")
-include("components/SumReducer.jl")
-
-
-# ====================================================================
-# CompEval: a wrapper for a component evaluated on a specific domain
-#
-mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
-    comp::TComp
-    counter::Int
-    deps::Vector{Vector{Float64}}
-    lastvalues::Vector{Float64}
-    buffer::Vector{Float64}
-    cfixed::Bool
-    updated::Bool
-
-    function CompEval(_comp::AbstractComponent, domain::AbstractDomain)
-        # Components internal state may be affected by `prepare!`
-        # call.  Avoid overwriting input state with a deep copy.
-        comp = deepcopy(_comp)
-        buffer = prepare!(comp, domain)
-        return new{typeof(comp), typeof(domain)}(
-            comp, 0,
-            Vector{Vector{Float64}}(),
-            fill(NaN, length(getparams(comp))),
-            buffer, false, false)
-    end
-end
-
-
-function update!(c::CompEval, domain::AbstractDomain, pvalues::Vector{Float64})
-    c.updated  &&  return
-
-    # Do we actually need a new evaluation?
-    if (any(c.lastvalues .!= pvalues)  ||  (c.counter == 0)  ||  (length(c.deps) > 0))
-        if length(c.deps) > 0
-            evaluate!(c.buffer, c.comp, domain, c.deps, pvalues...)
-        else
-            evaluate!(c.buffer, c.comp, domain, pvalues...)
-        end
-        c.lastvalues .= pvalues
-        c.counter += 1
-    end
-    c.updated = true
-end
 
 
 # ====================================================================
@@ -307,285 +226,112 @@ Individual components may be *freezed* (i.e. have all its parameters fixed durin
 
 The main component, i.e. the one whose evaluation corresponds to the overall model evaluation, is typically automatically identified by analyzing the component dependencies.  However a specific component may be forced to be the main one by invoking `select_maincomp!`.
 
-The model is automatically evaluated whenever needed, however there are a few cases where it is not possible to trigger an automatic evaluation, e.g. immediately after the user modifies a `Parameter` value. In this case an evaluation can be forced by invoking `update!()`.
-
 The most important function for a `Model` object is `fit()`, which allows to fit the model against an empirical dataset. The `!` in the name reminds us that, after fitting, the parameter values will be set to the best fit ones (rather than retaining their original values).
 
 The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
 """
-struct Model  # performances are slightly better if this structure is mutable
-    domain::AbstractDomain
-    cevals::OrderedDict{Symbol, CompEval}
-    pv::ParameterVectors
-    pvmulti::Vector{PVModel{Float64}}
-    buffers::OrderedDict{Symbol, Vector{Float64}}
-    maincomp::Vector{Symbol}
+mutable struct Model
+    comps::OrderedDict{Symbol, AbstractComponent}
+    fixed::OrderedDict{Symbol, Bool}
+    maincomp::Union{Nothing, Symbol}
 
-    function Model(domain::AbstractDomain, args...)
-        function parse_args(args::AbstractDict)
-            out = OrderedDict{Symbol, AbstractComponent}()
-            for (name, item) in args
-                # isa(item, Number)  &&  (item = SimplePar(item))
-                @assert isa(name, Symbol)
-                @assert isa(item, AbstractComponent)
-                out[name] = item
-            end
-            return out
-        end
+    Model() = new(OrderedDict{Symbol, AbstractComponent}(), OrderedDict{Symbol, Bool}(), nothing)
 
-        function parse_args(args::Vararg{Pair})
-            out = OrderedDict{Symbol, AbstractComponent}()
-            for arg in args
-                if isa(arg[2], AbstractComponent)
-                    out[arg[1]] = arg[2]
-                elseif isa(arg[2], FunctDesc)
-                    out[arg[1]] = FComp(arg[2])
-                # elseif isa(arg[2], Number)
-                #     out[arg[1]] = SimplePar(arg[2])
-                else
-                    error("Unsupported data type: " * string(typeof(arg[2])) *
-                          ".  Must be an AbstractComponent, a FunctDesc or a real number.")
-                end
-            end
-            return parse_args(out)
-        end
-
-        parse_args(arg::AbstractComponent) = parse_args(:main => arg)
-        parse_args(arg::FunctDesc) = parse_args(:main => FComp(arg))
-        # parse_args(arg::Real) = parse_args(:main => SimplePar(arg))
-
-        model = new(domain, OrderedDict{Symbol, CompEval}(),
-                    ParameterVectors(), Vector{PVModel{Float64}}(),
-                    OrderedDict{Symbol, Vector{Float64}}(),
-                    Vector{Symbol}())
-
-        for (name, item) in parse_args(args...)
+    function Model(dict::AbstractDict)
+        model = Model()
+        for (name, item) in dict
+            # isa(item, Number)  &&  (item = SimplePar(item))
+            @assert isa(name, Symbol)
+            @assert isa(item, AbstractComponent)
             model[name] = item
         end
         return model
     end
+
+    function Model(args::Vararg{Pair})
+        model = Model()
+        for arg in args
+            @assert isa(arg[1], Symbol)
+            if isa(arg[2], AbstractComponent)
+                model[arg[1]] = arg[2]
+            elseif isa(arg[2], FunctDesc)
+                model[arg[1]] = FComp(arg[2])
+                # elseif isa(arg[2], Number)
+                #     out[arg[1]] = SimplePar(arg[2])
+            else
+                error("Unsupported data type: " * string(typeof(arg[2])) *
+                    ".  (accepted types ar T <: AbstractComponent or FunctDesc.")
+            end
+        end
+        return model
+    end
+    Model(arg::AbstractComponent) = Model(:main => arg)
+    Model(arg::FunctDesc) = Model(:main => FComp(arg))
 end
 
 
 function find_maincomp(model::Model)
-    if length(model.maincomp) > 0
-        return model.maincomp[end]
+    isnothing(model.maincomp)  ||  (return model.maincomp)
+
+    if length(model.comps) == 1
+        return collect(keys(model.comps))[1]
     end
 
-    if length(model.cevals) == 1
-        return collect(keys(model.cevals))[1]
-    end
-
-    maincomps = collect(keys(model.cevals))
-    for (cname, ceval) in model.cevals
+    comps = collect(keys(model.comps))
+    for (cname, comp) in model.comps
         for d in dependencies(model, cname)
-            i = findfirst(maincomps .== d)
-            deleteat!(maincomps, i)
+            i = findfirst(comps .== d)
+            deleteat!(comps, i)
         end
     end
 
-    if length(maincomps) > 1
-        # Ignoring components with no dependencies
-        for (cname, ceval) in model.cevals
+    if length(comps) > 1
+        for (cname, comp) in model.comps
+            # Ignoring components with no dependencies
             if length(dependencies(model, cname)) == 0
-                i = findfirst(maincomps .== cname)
-                if !isnothing(i)
-                    deleteat!(maincomps, i)
-
-                    # ...but keep the last
-                    if length(maincomps) == 1
-                        return maincomps[1]
-                    end
+                i = findfirst(comps .== cname)
+                if !isnothing(i)  &&  (length(comps) > 1)  # ...but keep at least one
+                    deleteat!(comps, i)
                 end
             end
         end
     end
 
-    return maincomps[end]
+    return comps[end]
 end
 
 
 function dependencies(model::Model, cname::Symbol; select_domain=false)
     domdeps = Vector{Symbol}()
     compdeps = Vector{Symbol}()
-    nd = ndims(domain(model))
-    for d in dependencies(model.cevals[cname].comp)
-        if haskey(model.cevals, d)
-            # Dependency with known name
+    # nd = ndims(domain(model))
+    for d in dependencies(model.comps[cname])
+        if haskey(model.comps, d)  # dependency with known name
             push!(compdeps, d)
-        else
-            # Dependency with unknown name is intended as a domain dimension
+        else # dependency with unknown name is intended as a domain dimension
             @assert length(compdeps) == 0 "Domain dependencies must be listed first"
-            @assert length(domdeps) < nd "Component $cname depends on $d, but the latter is not a component in the model."
+            # @assert length(domdeps) < nd "Component $cname depends on $d, but the latter is not a component in the model."
             push!(domdeps, d)
         end
     end
-    @assert (length(domdeps) == 0)  ||  (length(domdeps) == nd) "Domain has $nd dimensions but only $(length(domdeps)) are listed as dependencies"
-    return (select_domain ? domdeps : compdeps)
-end
-
-
-
-"""
-    update!(model::Model)
-
-Evaluate a `Model` and update internal structures.
-"""
-function update!(model::Model)
-    update_step_init(model)
-    update_step_evaluation(model)
-    update_step_finalize(model)
-    return model
-end
-
-
-# Evaluation step init:
-# - update internal structures before fitting
-function update_step_init(model::Model)
-    empty!(model.pv)
-
-    for (cname, ceval) in model.cevals
-        for (pname, _par) in getparams(ceval.comp)
-            # Parameter may be changed here, hence we take a copy of the original one
-            par = deepcopy(_par)
-            if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-            if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
-                s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-
-            if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
-                if isa(par.patch, Symbol)  # use same param. value from a different component
-                    par.fixed = true
-                else                       # invoke a patch function
-                    @assert length(par.patch.args) in [1,2]
-                    if length(par.patch.args) == 1
-                        par.fixed = true
-                    else
-                        par.fixed = false
-                    end
-                end
-            elseif !isnothing(par.mpatch)
-                @assert length(model.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
-                @assert length(par.mpatch.args) in [1,2]
-                if length(par.mpatch.args) == 1
-                    par.fixed = true
-                else
-                    par.fixed = false
-                end
-            end
-            if ceval.cfixed != 0
-                par.fixed = true
-            end
-            push!(model.pv, cname, pname, par)
-        end
-
-        empty!(ceval.deps)
-        i = 1
-        for d in dependencies(model, cname, select_domain=true)
-            push!(ceval.deps, coords(domain(model), i))
-        end
-        for d in dependencies(model, cname, select_domain=false)
-            push!(ceval.deps, model.buffers[d])
-        end
-    end
-end
-
-
-# Set new model parameters
-function update_step_newpvalues(model::Model, pvalues::Vector{Float64})
-    items(model.pv.values)[model.pv.ifree] .= pvalues
-end
-
-
-# Evaluation step fit:
-# - copy all parameter values into actual;
-# - update actual by invoking the patch functions;
-# - evaluation of all components
-function update_step_evaluation(model::Model)
-    # Reset `updated` flag
-    for (cname, ceval) in model.cevals
-        ceval.updated = false
-    end
-    # Copy pvalues into actual
-    items(model.pv.actual) .= items(model.pv.values)
-    # Patch parameter values
-    for (cname, comp) in model.pv.params
-        for (pname, par) in comp
-            if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
-                if isa(par.patch, Symbol)  # use same param. value from a different component
-                    model.pv.actual[cname][pname] = model.pv.values[par.patch][pname]
-                else                       # invoke a patch function
-                    if length(par.patch.args) == 1
-                        model.pv.actual[cname][pname] = par.patch(model.pv.values)
-                    else
-                        model.pv.actual[cname][pname] = par.patch(model.pv.values, model.pv.values[cname][pname])
-                    end
-                end
-            elseif !isnothing(par.mpatch)
-                @assert length(model.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
-                if length(par.mpatch.args) == 1
-                    model.pv.actual[cname][pname] = par.mpatch(model.pvmulti)
-                else
-                    model.pv.actual[cname][pname] = par.mpatch(model.pvmulti, model.pv.values[cname][pname])
-                end
-            end
-        end
-    end
-
-    # Evaluation of all components, starting from the main one and
-    # following dependencies
-    function update_compeval_recursive(model::Model, cname::Symbol)
-        @batch_when_threaded per=core for d in dependencies(model, cname)
-            update_compeval_recursive(model, d)
-        end
-        update!(model.cevals[cname], model.domain,
-                collect(items(model.pv.actual[cname])))
-    end
-    update_compeval_recursive(model, find_maincomp(model))
-end
-
-
-# Evaluation step finalize:
-# - copy back bestfit, actual values and uncertainties into their original Parameter structures.
-function update_step_finalize(model::Model, uncerts=Vector{Float64}[])
-    i = 1
-    for (cname, comp) in model.pv.params
-        for (pname, par) in comp
-            par.val    = model.pv.values[cname][pname]
-            par.actual = model.pv.actual[ cname][pname]
-            if (length(uncerts) > 0)  &&  (!par.fixed)
-                par.unc = uncerts[i]
-                i += 1
-            else
-                par.unc = NaN
-            end
-        end
-    end
-
-    # Also update Model's parameters
-    for (cname, ceval) in model.cevals
-        setparams!(ceval.comp, model.pv.params[cname])
-    end
+    # @assert (length(domdeps) == 0)  ||  (length(domdeps) == nd) "Domain has $nd dimensions but only $(length(domdeps)) are listed as dependencies"
+    return (select_domain  ?  domdeps  :  compdeps)
 end
 
 
 # User interface
-# setindex!(model::Model, v::Real, cname::Symbol) = setindex!(model, SimplePar(v), cname)
-setindex!(model::Model, f::FunctDesc, cname::Symbol) = setindex!(model, FComp(f), cname)
+setindex!(model::Model, f::FunctDesc, cname::Symbol) = model[cname] = FComp(f)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
-    ceval = CompEval(comp, model.domain)
-    model.cevals[cname] = ceval
-    model.buffers[cname] = ceval.buffer
-    update!(model)
+    model.comps[cname] = deepcopy(comp)
+    model.fixed[cname] = false
 end
 
-free_params(model::Model) = collect(items(model.pv.params)[model.pv.ifree])
+function iterate(model::Model, i=1)
+    k = collect(keys(model))
+    (i > length(k))  &&  return nothing
+    return (k[i] => model[k[i]], i+1)
+end
+
 
 """
     isfreezed(model::Model, cname::Symbol)
@@ -593,8 +339,8 @@ free_params(model::Model) = collect(items(model.pv.params)[model.pv.ifree])
 Check whether a component is *freezed* in the model.
 """
 function isfreezed(model::Model, cname::Symbol)
-    @assert cname in keys(model.cevals) "Component $cname is not defined"
-    return model.cevals[cname].cfixed
+    @assert cname in keys(model.fixed) "Component $cname is not defined"
+    return model.fixed[cname]
 end
 
 """
@@ -603,9 +349,8 @@ end
 Freeze a component in the model (i.e. treat all component parameters as fixed for fitting).
 """
 function freeze!(model::Model, cname::Symbol)
-    @assert cname in keys(model.cevals) "Component $cname is not defined"
-    model.cevals[cname].cfixed = true
-    update!(model)
+    @assert cname in keys(model.fixed) "Component $cname is not defined"
+    model.fixed[cname] = true
     nothing
 end
 
@@ -615,35 +360,32 @@ end
 Thaw a freezed component in the model (i.e. treat component parameters as fixed only if explicitly set in the corresponding `Parameter` structure).
 """
 function thaw!(model::Model, cname::Symbol)
-    @assert cname in keys(model.cevals) "Component $cname is not defined"
-    model.cevals[cname].cfixed = false
-    update!(model)
+    @assert cname in keys(model.fixed) "Component $cname is not defined"
+    model.fixed[cname] = false
     nothing
 end
 
 
-Base.keys(p::Model) = collect(keys(p.cevals))
+Base.keys(model::Model) = collect(keys(model.comps))
+
 
 """
     haskey(m::Model, name::Symbol)
 
 Check whether a component exists in model.
 """
-Base.haskey(m::Model, name::Symbol) = haskey(m.cevals, name)
-function Base.getindex(model::Model, name::Symbol)
-    if name in keys(model.cevals)
-        return model.cevals[name].comp
-    end
-    error("Name $name not defined")
+Base.haskey(model::Model, cname::Symbol) = haskey(model.comps, cname)
+
+
+"""
+    getindex(model::Model, cname::Symbol)
+
+Return the model component with name `cname`.
+"""
+function Base.getindex(model::Model, cname::Symbol)
+    @assert cname in keys(model.comps) "Component $cname is not defined"
+    return model.comps[cname]
 end
-
-"""
-    domain(model::Model)
-
-Return the domain where the model is evaluated.
-"""
-domain(model::Model) = model.domain
-
 
 """
     comptype(model::Model, cname::Symbol)
@@ -662,104 +404,28 @@ comptypes(model::Model) = OrderedDict([cname => comptype(model, cname) for cname
 
 
 """
-    evalcounter(model::Model, cname::Symbol)
-
-Return the number of times a component has been evaluated.
-"""
-evalcounter(model::Model, cname::Symbol) = model.cevals[cname].counter
-
-
-"""
-    evalcounters(model::Model)
-
-Return a `OrderedDict{Symbol, Int}` with the number of times each model component has been evaluated.
-"""
-evalcounters(model::Model) = OrderedDict([cname => evalcounter(model, cname) for cname in keys(model)])
-
-
-# Return model evaluations
-(model::Model)() = reshape(domain(model), model.cevals[find_maincomp(model)].buffer)
-(model::Model)(name::Symbol) = reshape(domain(model), model.cevals[name].buffer)
-
-"""
     select_maincomp!(model::Model, cname::Symbol)
 
 Force a component to be the final one for model evaluation.
 """
 function select_maincomp!(model::Model, cname::Symbol)
-    @assert haskey(model, cname)
-    empty!(model.maincomp)
-    push!(model.maincomp, cname)
+    @assert haskey(model, cname) "Component $cname is not defined"
+    model.maincomp = cname
 end
 
 
-"""
-    ModelSnapshot
-
-A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A snapshot contains the same parameters and component evaluations of the original model, and provide the same user interface.  Moreover, a `ModelSnapshot` can be serialized to a file and de-serialized in another Julia session (see `GModelFit.serialize()`).
-
-The best fit model and best fit parameter values returned as a `ModelSnapshot` object by the `fit()` function.
-"""
-struct ModelSnapshot
-    domain::AbstractDomain
-    params::PVModel{Parameter}
-    buffers::OrderedDict{Symbol, Vector{Float64}}
-    maincomp::Symbol
-    comptypes::OrderedDict{Symbol, String}
-    isfreezed::OrderedDict{Symbol, Bool}
-    deps::OrderedDict{Symbol, Vector{Symbol}}
-    evalcounters::OrderedDict{Symbol, Int}
-end
-function ModelSnapshot(model::Model)
-    deps = OrderedDict{Symbol, Vector{Symbol}}()
-    for cname in keys(model)
-        deps[cname] = dependencies(model, cname)
-    end
-    ModelSnapshot(deepcopy(domain(model)), deepcopy(model.pv.params),
-                  deepcopy(model.buffers), find_maincomp(model),
-                  comptypes(model),
-                  OrderedDict([Pair(cname, isfreezed(model, cname)) for cname in keys(model)]),
-                  deps, evalcounters(model))
-end
-
-domain(model::ModelSnapshot) = model.domain
-Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
-(model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
-(model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
-find_maincomp(model::ModelSnapshot) = model.maincomp
-isfreezed(model::ModelSnapshot, cname::Symbol) = model.isfreezed[cname]
-dependencies(model::ModelSnapshot, cname::Symbol) = model.deps[cname]
-evalcounter(model::ModelSnapshot, cname::Symbol) = model.evalcounters[cname]
-comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
-comptypes(model::ModelSnapshot) = model.comptypes
-Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.params, name)
-function Base.getindex(model::ModelSnapshot, name::Symbol)
-    if name in keys(model.params)
-        return model.params[name]
-    end
-    error("Name $name not defined")
-end
-
-function getparams(comp::GModelFit.PV.PVComp{GModelFit.Parameter})
-    out = OrderedDict{Symbol, Parameter}()
-    for pname in propertynames(comp)
-        out[pname] = getproperty(comp, pname)
-    end
-    return out
-end
-
+include("evaluation.jl")
+include("snapshot.jl")
 
 
 abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
 include("multimodel.jl")
-
 include("serialize.jl")
 include("show.jl")
 include("utils.jl")
 include("gnuplot_recipe.jl")
-
 include("precompile.jl")
 
 end
