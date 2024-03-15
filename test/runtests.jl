@@ -44,26 +44,26 @@ unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
 
 domain = Domain(x)
 data = Measures(domain, meas, unc)
-model = Model(@λ (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
+model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 res = fit(model, data)
 # @gp data model
 
 
 # ====================================================================
 x = 0:0.1:5
-model = Model(:parabola => @λ (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
+model = Model(:parabola => @fd (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 # @gp x y "w l t 'True model'" x values(data) uncerts(data) "w yerr t 'Data'" x model() "w l t 'Best fit'"
 
 
 # ====================================================================
 x = 0:0.1:5
-model = Model(@λ (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
+model = Model(@fd (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 
 # ====================================================================
-f = @λ (x, p1=1, p2=1.e-3, p3=1e-6, p4=4, p5=5) ->
+f = @fd (x, p1=1, p2=1.e-3, p3=1e-6, p4=4, p5=5) ->
 @. (p1 + p2 * x + p3 * x^2 + p4 * sin(p5 * x))  *  cos(x)
 x = 1.:50:10000
 model = Model(f)
@@ -71,22 +71,22 @@ res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 
 # ====================================================================
-f1 = @λ (x, p1=1, p2=1e-3, p3=1e-6) -> @.  p1  +  p2 * x  +  p3 * x^2
-f2 = @λ (x, p4=4, p5=5) -> @. p4 * sin(p5 * x)
-f3 = @λ (x) -> cos.(x)
+f1 = @fd (x, p1=1, p2=1e-3, p3=1e-6) -> @.  p1  +  p2 * x  +  p3 * x^2
+f2 = @fd (x, p4=4, p5=5) -> @. p4 * sin(p5 * x)
+f3 = @fd (x) -> cos.(x)
 
 x = 1.:50:10000
 model = Model(:f1 => f1,
               :f2 => f2,
               :f3 => f3,
-              :main => @λ (x, f1, f2, f3) -> (f1 .+ f2) .* f3)
+              :main => @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3)
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 # Same results with
 model = Model(:f1 => f1)
 model[:f2] = f2
 model[:f3] = f3
-model[:main] = @λ (x, f1, f2, f3) -> (f1 .+ f2) .* f3
+model[:main] = @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 
@@ -104,7 +104,7 @@ model[:l2].norm.patch = :l1
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 # Patch one parameter to another via a λ function
-model[:l2].norm.patch = @λ (m, v) -> v + m[:l1].norm
+model[:l2].norm.patch = @fd (m, v) -> v + m[:l1].norm
 res = fit(model, GModelFit.mock(Measures, model, Domain(x), seed=1))
 
 
@@ -133,11 +133,11 @@ res = fit(models, data, minimizer=GModelFit.cmpfit())
 thaw!(models[1], :bkg);
 thaw!(models[2], :bkg);
 
-models[2][:bkg].offset.mpatch = @λ m -> m[1][:bkg].offset
-models[2][:bkg].slope.mpatch  = @λ m -> m[1][:bkg].slope
+models[2][:bkg].offset.mpatch = @fd m -> m[1][:bkg].offset
+models[2][:bkg].slope.mpatch  = @fd m -> m[1][:bkg].slope
 
 
-models[1][:l2].center.mpatch = @λ m -> m[2][:l2].center
+models[1][:l2].center.mpatch = @fd m -> m[2][:l2].center
 
 @time res = fit(models, data)
 
