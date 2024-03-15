@@ -8,14 +8,14 @@ Models are characterized by *parameters* (see [Basic concepts and data types](@r
 
 An important concept to bear in mind is that the [`GModelFit.Parameter`](@ref) structure provides two field for the associated numerical value:
 - `val`: is the parameter value which is being varied by the minimizer during fitting.  The value set before the fitting is the *guess* value.  The value after fitting is the *best fit* one;
-- `actual`: is the result of the patch expression evaluation, and the actual value used when evaluating a component.  Note that this value will be overwitten at each model evaluation, hence setting this field has no effect. The `val` and `actual` values are identical if no patch constraint has been defined.
+- `actual`: is the result of the patch expression evaluation, and the actual value used when evaluating a component via its `evaluate!` method.  Note that this value will be overwitten at each model evaluation, hence setting this field has no effect. The `val` and `actual` values are identical if no patch constraint has been defined.
 
 A parameter constraint is defined by explicitly modifiying the fields of the corresponding [`GModelFit.Parameter`](@ref) structure. More specifically:
 1. to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
 1. to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
-1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`).  In this case the parameter is assumed to be fixed;
-1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to a λ-function (generated with the [`@fd`](@ref) macro) which must accept a single argument (which can be used as a dictionary of components) and return a scalar number.  In this case the parameter is assumed to be fixed;
-1. to define a parametrized patch expression: create a a λ-function with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
+1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`);
+1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to an anonymous function generated with the [`@fd`](@ref) macro.  The function must accept a single argument (actually a dictionary of components) and return a scalar numberl;
+1. to define a parametrized patch expression: create an anonymous function with the [`@fd`](@ref) macro with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
 1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the `Vector{Model}` object.
 
 The following examples show how to define constraints for each of the afore-mentioned cases.
@@ -26,7 +26,6 @@ We will consider a model for a 1D domain consisting of the sum of a linear backg
 ```@example abc
 using GModelFit
 
-dom = Domain(0:0.1:5)
 model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
               :l1 => GModelFit.Gaussian(1, 2, 0.2),
               :l2 => GModelFit.Gaussian(1, 3, 0.4),
@@ -64,6 +63,7 @@ println() # hide
 
 We can fit the model against a mock dataset (see [Generate mock datasets](@ref)):
 ```@example abc
+dom = Domain(0:0.1:5)
 data = GModelFit.mock(Measures, model, dom)
 bestfit, stats = fit(model, data)
 dumpjson("ex_Parameter", bestfit, stats, data) # hide
