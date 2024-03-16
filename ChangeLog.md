@@ -1,16 +1,17 @@
 # Version 0.3.0
 - Breaking Changes:
-	* `Model` constructor no longer accepts a `Domain` argument;
+	* The `Model` constructor no longer accepts a `Domain` argument;
 	
-	* `mock` now accepts the `Domain` argument;
+	* The `mock()` function now requires a `Domain` argument;
 
-	* fix -> fix!
+	* The `fit()` function no longer modifies the provided `Model` argument. The old behaviour is available with the newly added `fit!()` function;
 
-    * getindex(d::Union{Domain, CartesianDomain}, dim::Integer) is no longer available
+    * The `@λ` macro has been renamed to `@fd` to remind that the resulting value is a `FunctDesc` structure;
 
-    * @λ -> @fd
+    * Domain objects can no longer be indexed as if they were vectors.  The same functionality is available via the `coords()` or `axis()` functions;
 	
-    * Minimizer status
+    * The minimizer status is no longer an `Enum`, the same information is now indicated by the corresponding subtypes of `AbstractMinimizerStatus`;
+
 	
 # Version 0.2.1
 
