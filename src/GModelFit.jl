@@ -211,24 +211,23 @@ dependencies(comp::AbstractComponent) = Symbol[]
 """
     Model
 
-A structure containing a model description, whose evaluation is suitable to be compared to a single empirical dataset.
+A structure containing a model description.
 
-Constructor is: `Model(domain::AbstractDomain, components...)`
-where the first argument is either a `Domain` or `CartesianDomain` object, and the remaining one(s) is (are) the model component(s), which may be given as:
+Constructor is: `Model(components...)`.  Components may be specified as:
 - a single `Dict{Symbol, AbstractComponent}`, where the keys are the names and the values the component objects;
-- a single component, which will have a default name is assigned (`:main`);
-- a single `FunctDesc`, which will be wrapped into an `LComp` component and a default name will be assigned (`:main`);
+- a single component (the default `:main` is automatically assigned);
+- a single `FunctDesc` which will be wrapped into an `FComp` component and a default name will be assigned (`:main`);
 - one or more `Pair{Symbol, AbstractComponent}`, where the first element is the name and the second is the component.
 
-You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same synatx.  Finally, you may use the `keys()` and `haskey()` functions with their usual meanings.
+You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same syntax.  Finally, you may use the `keys()` and `haskey()` functions with their usual meanings.
 
 Individual components may be *freezed* (i.e. have all its parameters fixed during fitting, despite the individual `Parameter` settings) or *thawed* using the `freeze!()` and `thaw!()` functions.  Use the `isfreezed()` function to check if a component is freezed.
 
-The main component, i.e. the one whose evaluation corresponds to the overall model evaluation, is typically automatically identified by analyzing the component dependencies.  However a specific component may be forced to be the main one by invoking `select_maincomp!`.
+The main component, i.e. the one whose evaluation corresponds to the overall model evaluation, is automatically identified by analyzing the component dependencies.  However a specific component may be forced to be the main one by invoking `select_maincomp!`.
 
-The most important function for a `Model` object is `fit()`, which allows to fit the model against an empirical dataset. The `!` in the name reminds us that, after fitting, the parameter values will be set to the best fit ones (rather than retaining their original values).
+The most important function for a `Model` object is `fit()` which allows to fit the model against an empirical dataset.  The `fit!()` function has the same purpose, with the only difference that it stores the best fit parameter values into the original `Model` object.
 
-The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
+The model and all component evaluation can be evaluated has if they were a function by simply passing a `Domain` object.
 """
 mutable struct Model
     comps::OrderedDict{Symbol, AbstractComponent}
@@ -271,33 +270,50 @@ end
 
 
 function find_maincomp(model::Model)
-    isnothing(model.maincomp)  ||  (return model.maincomp)
-
-    if length(model.comps) == 1
-        return collect(keys(model.comps))[1]
-    end
-
-    comps = collect(keys(model.comps))
+    # Identify parent for all comps
+    parent = OrderedDict{Symbol, Symbol}()
     for (cname, comp) in model.comps
-        for d in dependencies(model, cname)
-            i = findfirst(comps .== d)
-            deleteat!(comps, i)
+        for d in GModelFit.dependencies(model, cname)
+            @assert !haskey(parent, d) "Component $d has two parent nodes: $(parent[d]) and $cname"
+            parent[d] = cname
         end
     end
 
-    if length(comps) > 1
-        for (cname, comp) in model.comps
-            # Ignoring components with no dependencies
-            if length(dependencies(model, cname)) == 0
-                i = findfirst(comps .== cname)
-                if !isnothing(i)  &&  (length(comps) > 1)  # ...but keep at least one
-                    deleteat!(comps, i)
+    # Ensure no circular dependency is present by checking all parent
+    # nodes of a given component to be different from the component
+    # itself.  Also collect components with no parent.
+    comps_with_no_parent = Vector{Symbol}()
+    for cname in keys(model.comps)
+        if haskey(parent, cname)
+            p = parent[cname]
+            @assert p != cname "Component $cname depends on itself"
+            while haskey(parent, p)
+                p = parent[p]
+                if cname == p
+                    display(parent)
+                    error("Circular dependency detected for component $cname")
                 end
             end
+        else
+            push!(comps_with_no_parent, cname)
         end
     end
 
-    return comps[end]
+    # If multiple possibilities are stll available neglect components
+    # with no dependencies
+    while length(comps_with_no_parent) > 1
+        if length(dependencies(model, comps_with_no_parent[1])) == 0
+            deleteat!(comps_with_no_parent, 1)
+        end
+    end
+
+    # The above check is always performed even if an explicit maincomp
+    # has been set
+    if isnothing(model.maincomp)
+        return comps_with_no_parent[end]
+    else
+        return model.maincomp
+    end
 end
 
 
