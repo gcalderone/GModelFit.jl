@@ -323,8 +323,8 @@ end
 
 getmessage(status::MinimizerStatusOK) = crayon"green", "OK"
 getmessage(status::MinimizerStatusDry) = crayon"bold yellow", "DRY"
-getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN:\n" * status.message
-getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR:\n" * status.message
+getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN\n" * status.message
+getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR\n" * status.message
 
 function show(io::IO, status::AbstractMinimizerStatus)
     print(io, "Status: ")
