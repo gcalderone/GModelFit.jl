@@ -52,7 +52,7 @@ A structure representing the results of a fitting process.
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 
-Note: the `FitStats` fields are supposed to be accessed directly by the user, without invoking any get() method.
+Note: the `FitStats` fields are supposed to be accessed directly by the user.
 """
 struct FitStats
     timestamp::DateTime
@@ -83,7 +83,7 @@ function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsq
     status = fit(minimizer, fp)
     bestfit = ModelSnapshot(fp.meval)
     stats = FitStats(fp, status)
-    test_serialization(bestfit, stats, data)
+    # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
 

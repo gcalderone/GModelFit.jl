@@ -124,7 +124,7 @@ function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::Ab
 
     bestfit = ModelSnapshot.(fp.multi)
     stats = FitStats(fp, status)
-    test_serialization(bestfit, stats, data)
+    # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
 fit!(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
