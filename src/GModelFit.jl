@@ -1,7 +1,7 @@
 module GModelFit
 
 using Printf, PrettyTables
-using Statistics, Distributions
+using Statistics
 using DataStructures
 using LsqFit
 using MacroTools
@@ -9,7 +9,6 @@ using Dates
 using ProgressMeter
 using Random
 using JSON, GZip
-using Polyester
 
 import Base.show
 import Base.ndims
@@ -33,24 +32,6 @@ export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
 
 include("PV.jl")
 using .PV
-
-
-macro batch_when_threaded(args...)
-    if Threads.nthreads() > 1
-        out = Expr(:macrocall, Symbol("@batch"), LineNumberNode(1, nothing))
-        append!(out.args, args)
-        return esc(out)
-    else
-        for arg in args
-            if isa(arg, Expr)
-                if arg.head == :for
-                    return esc(arg)
-                end
-            end
-        end
-    end
-end
-
 
 include("domain.jl")
 

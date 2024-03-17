@@ -261,7 +261,7 @@ function update_evaluation!(meval::ModelEval)
     # Evaluation of all components, starting from the main one and
     # following dependencies
     function update_compeval_recursive(meval::ModelEval, cname::Symbol)
-        @batch_when_threaded per=core for d in dependencies(meval.model, cname)
+        for d in dependencies(meval.model, cname)
             update_compeval_recursive(meval, d)
         end
         update!(meval.cevals[cname], items(meval.pv.actual[cname]))
