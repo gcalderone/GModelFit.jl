@@ -1,5 +1,3 @@
-abstract type AbstractResiduals end
-
 # ====================================================================
 # Minimizers
 #
@@ -24,11 +22,12 @@ end
 
 # --------------------------------------------------------------------
 abstract type AbstractMinimizer end
+abstract type AbstractResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} end
 
 
 # --------------------------------------------------------------------
 struct dry <: AbstractMinimizer; end
-function fit(minimizer::dry, resid::AbstractResiduals)
+function minimize!(resid::AbstractResiduals{Measures{N}, dry}) where N
     params = free_params(resid)
     residuals(resid, getfield.(params, :val))
     finalize!(resid,
@@ -41,29 +40,29 @@ end
 # --------------------------------------------------------------------
 import LsqFit
 
-mutable struct lsqfit <: AbstractMinimizer;
+mutable struct lsqfit <: AbstractMinimizer
     result
     lsqfit() = new(nothing)
 end
 
-function fit(mzer::lsqfit, resid::AbstractResiduals)
+function minimize!(resid::AbstractResiduals{Measures{N}, lsqfit}) where N
     params = free_params(resid)
     ndata = length(residuals(resid))
     prog = ProgressUnknown(desc="Model (dof=$(resid.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
-    mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
-                                       ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])
-                                       residuals(resid, pvalues)
-                                   end,
-                                   1.:ndata, fill(0., ndata),
-                                   getfield.(params, :val),
-                                   lower=getfield.(params, :low),
-                                   upper=getfield.(params, :high))
+    resid.mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
+                                             ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])
+                                             residuals(resid, pvalues)
+                                         end,
+                                         1.:ndata, fill(0., ndata),
+                                         getfield.(params, :val),
+                                         lower=getfield.(params, :low),
+                                         upper=getfield.(params, :high))
     ProgressMeter.finish!(prog)
-    if !mzer.result.converged
+    if !resid.mzer.result.converged
         return MnimizerStatusError("Not converged")
     end
 
-    finalize!(resid, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
+    finalize!(resid, getfield.(Ref(resid.mzer.result), :param), LsqFit.stderror(resid.mzer.result))
     return MinimizerStatusOK()
 end
 
@@ -95,7 +94,7 @@ mutable struct cmpfit <: AbstractMinimizer
     end
 end
 
-function fit(mzer::cmpfit, resid::AbstractResiduals)
+function minimize!(resid::AbstractResiduals{Measures{N}, cmpfit}) where N
     params = free_params(resid)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
@@ -112,33 +111,33 @@ function fit(mzer::cmpfit, resid::AbstractResiduals)
     last_fitstat = sum(abs2, residuals(resid))
     prog = ProgressUnknown(desc="Model (dof=$(resid.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
-        mzer.result = CMPFit.cmpfit((pvalues) -> begin
-                                        ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])
-                                        residuals(resid, pvalues)
-                                    end,
-                                    guess, parinfo=parinfo, config=mzer.config)
-        if mzer.result.status <= 0
-            return MinimizerStatusError("CMPFit status = $(mzer.result.status)")
+        resid.mzer.result = CMPFit.cmpfit((pvalues) -> begin
+                                              ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])
+                                              residuals(resid, pvalues)
+                                          end,
+                                          guess, parinfo=parinfo, config=resid.mzer.config)
+        if resid.mzer.result.status <= 0
+            return MinimizerStatusError("CMPFit status = $(resid.mzer.result.status)")
         end
 
-        if (mzer.result.status == 5)
-            Δfitstat = (last_fitstat - mzer.result.bestnorm) / last_fitstat
-            if Δfitstat > mzer.ftol_after_maxiter
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(mzer.ftol_after_maxiter), continue minimization...\n")
-                last_fitstat = mzer.result.bestnorm
-                guess = getfield.(Ref(mzer.result), :param)
+        if (resid.mzer.result.status == 5)
+            Δfitstat = (last_fitstat - resid.mzer.result.bestnorm) / last_fitstat
+            if Δfitstat > resid.mzer.ftol_after_maxiter
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(resid.mzer.ftol_after_maxiter), continue minimization...\n")
+                last_fitstat = resid.mzer.result.bestnorm
+                guess = getfield.(Ref(resid.mzer.result), :param)
                 continue
             end
         end
 
         ProgressMeter.finish!(prog)
         finalize!(resid,
-                  getfield.(Ref(mzer.result), :param),
-                  getfield.(Ref(mzer.result), :perror))
+                  getfield.(Ref(resid.mzer.result), :param),
+                  getfield.(Ref(resid.mzer.result), :perror))
 
-        if mzer.result.status == 2
+        if resid.mzer.result.status == 2
             return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
-        elseif mzer.result.status == 5
+        elseif resid.mzer.result.status == 5
             return MinimizerStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
         end
         return MinimizerStatusOK()

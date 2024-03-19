@@ -62,21 +62,22 @@ end
 
 
 # ====================================================================
-struct MultiResiduals{T <: AbstractMeasures} <: AbstractResiduals
+struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     multi::Vector{ModelEval}
     resid::Vector{Residuals{T}}
     buffer::Vector{Float64}
     nfree::Int
     dof::Int
+    mzer::M
 
-    function MultiResiduals(multi::Vector{ModelEval}, datasets::Vector{T}) where T <: AbstractMeasures
+    function MultiResiduals(multi::Vector{ModelEval}, datasets::Vector{T}, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         @assert length(multi) == length(datasets)
         update!(multi)
         mresid = [Residuals(multi[id], datasets[id]) for id in 1:length(multi)]
         buffer = fill(NaN, sum(length.(getfield.(mresid, :buffer))))
         nfree = sum(getfield.(mresid, :nfree))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T}(multi, mresid, buffer, nfree, length(mresid) - nfree)
+        return new{T,M}(multi, mresid, buffer, nfree, length(mresid) - nfree, mzer)
     end
 end
 
@@ -119,9 +120,8 @@ Fit a multi-model to a set of empirical data sets using the specified minimizer 
 function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     timestamp = now()
     update!(multi)
-    mresid = MultiResiduals(multi, data)
-    status = fit(minimizer, mresid)
-
+    mresid = MultiResiduals(multi, data, minimizer)
+    status = minimize!(mresid)
     bestfit = ModelSnapshot.(mresid.multi)
     stats = FitStats(mresid, status, (now() - timestamp).value / 1e3)
     # test_serialization(bestfit, stats, data)

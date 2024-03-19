@@ -1,18 +1,19 @@
 
 # ====================================================================
-struct Residuals{T <: AbstractMeasures} <: AbstractResiduals
+struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     meval::ModelEval
     measures::T
     buffer::Vector{Float64}
     nfree::Int
     dof::Int
+    mzer::M
 
-    function Residuals(meval::ModelEval, data::T) where T <: AbstractMeasures
+    function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         update!(meval)
         resid = fill(NaN, length(data))
         nfree = length(free_params(meval))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T}(meval, data, resid, nfree, length(resid) - nfree)
+        return new{T,M}(meval, data, resid, nfree, length(resid) - nfree, mzer)
     end
 end
 
@@ -78,8 +79,8 @@ end
 function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
     timestamp = now()
     update!(meval)
-    resid = Residuals(meval, data)
-    status = fit(minimizer, resid)
+    resid = Residuals(meval, data, minimizer)
+    status = minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, (now() - timestamp).value / 1e3)
     # test_serialization(bestfit, stats, data)
