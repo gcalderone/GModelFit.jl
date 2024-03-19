@@ -8,7 +8,7 @@ struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResid
 
     function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         update!(meval)
-        buffer = fill(NaN, length(last_evaluation(meval)))
+        buffer = fill(NaN, length(data))
         return new{T,M}(meval, data, buffer, mzer)
     end
 end

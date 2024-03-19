@@ -71,7 +71,7 @@ struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: Abstract
     function MultiResiduals(mevals::Vector{ModelEval}, datasets::Vector{T}, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         @assert length(mevals) == length(datasets)
         update!(mevals)
-        buffer = fill(NaN, sum(length.(last_evaluation.(mevals))))
+        buffer = fill(NaN, sum(length.(datasets)))
         return new{T,M}(mevals, datasets, buffer, mzer)
     end
 end

@@ -13,7 +13,7 @@ using PrecompileTools
         domain = Domain(x)
         model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
         data = GModelFit.mock(Measures, model, domain, seed=1)
-        bestfit, status = fit(model, data)
+        bestfit, stats = fit(model, data)
 
         
         x = 0:0.05:6
@@ -24,7 +24,7 @@ using PrecompileTools
         model[:l2].norm.patch = :l1
         model[:l2].norm.patch = @fd (m, v) -> v + m[:l1].norm
         data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-        bestfit, status = fit(model, data, minimizer=GModelFit.cmpfit())
+        bestfit, stats = fit(model, data, minimizer=GModelFit.cmpfit())
 
 
         x = 0:0.05:6
@@ -49,7 +49,7 @@ using PrecompileTools
         model[1][:l2].center.mpatch = @fd m -> m[2][:l2].center
 
         data = GModelFit.mock(Measures, model, [Domain(x), Domain(x)], seed=1)
-        bestfit, status = fit(model, data)
+        bestfit, stats = fit(model, data)
 
         # mevals = [GModelFit.ModelEval(model[i], data[i].domain) for i in 1:length(model)]
         # GModelFit.update!(mevals);
