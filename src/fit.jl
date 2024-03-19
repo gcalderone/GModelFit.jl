@@ -10,10 +10,10 @@ struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResid
 
     function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         update!(meval)
-        resid = fill(NaN, length(data))
+        buffer = fill(NaN, length(data))
         nfree = length(free_params(meval))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T,M}(meval, data, resid, nfree, length(resid) - nfree, mzer)
+        return new{T,M}(meval, data, buffer, nfree, length(buffer) - nfree, mzer)
     end
 end
 

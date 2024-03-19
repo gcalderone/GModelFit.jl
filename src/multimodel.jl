@@ -77,7 +77,7 @@ struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: Abstract
         buffer = fill(NaN, sum(length.(getfield.(mresid, :buffer))))
         nfree = sum(getfield.(mresid, :nfree))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T,M}(multi, mresid, buffer, nfree, length(mresid) - nfree, mzer)
+        return new{T,M}(multi, mresid, buffer, nfree, length(buffer) - nfree, mzer)
     end
 end
 
