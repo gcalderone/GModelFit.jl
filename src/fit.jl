@@ -2,7 +2,7 @@
 # ====================================================================
 struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     meval::ModelEval
-    measures::T
+    data::T
     buffer::Vector{Float64}
     nfree::Int
     dof::Int
@@ -12,7 +12,6 @@ struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResid
         update!(meval)
         buffer = fill(NaN, length(data))
         nfree = length(free_params(meval))
-        @assert nfree > 0 "No free parameter in the model"
         return new{T,M}(meval, data, buffer, nfree, length(buffer) - nfree, mzer)
     end
 end
@@ -23,7 +22,7 @@ residuals(resid::Residuals) = resid.buffer
 function residuals(resid::Residuals, pvalues::Vector{Float64})
     update_setparvals(resid.meval, pvalues)
     update_evaluation!(resid.meval)
-    resid.buffer .= reshape((last_evaluation(resid.meval) .- values(resid.measures)) ./ uncerts(resid.measures), :)
+    resid.buffer .= reshape((last_evaluation(resid.meval) .- values(resid.data)) ./ uncerts(resid.data), :)
     return resid.buffer
 end
 
@@ -77,7 +76,9 @@ end
 
 # ====================================================================
 function fit!(resid::Residuals)
+    @assert resid.nfree > 0 "No free parameter in the model"
     starttime = time()
+    update!(resid.meval)
     status = minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, time() - starttime)
