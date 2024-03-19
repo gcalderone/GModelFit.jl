@@ -112,23 +112,36 @@ function finalize!(mresid::MultiResiduals, best::Vector{Float64}, uncerts::Vecto
 end
 
 
-"""
-    fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
-
-Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
-"""
-function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+# ====================================================================
+function fit!(mresid::MultiResiduals)
     starttime = time()
-    update!(multi)
-    mresid = MultiResiduals(multi, data, minimizer)
     status = minimize!(mresid)
     bestfit = ModelSnapshot.(mresid.multi)
     stats = FitStats(mresid, status, time() - starttime)
     # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
-fit!(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data; kws...)
-fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)
+
+
+"""
+    fit!(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
+
+Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
+"""
+function fit!(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+    mevals = [ModelEval(multi[i], data[i].domain) for i in 1:length(multi)]
+    update!(mevals)
+    mresid = MultiResiduals(mevals, data, minimizer)
+    return fit!(mresid)
+end
+
+
+"""
+    fit(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit())
+
+Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
+"""
+fit(multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(deepcopy(multi), data; kws...)
 
 
 """
@@ -136,9 +149,4 @@ fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(dee
 
 Compare a multi-model to a multi-dataset and return a `FitStats` object.
 """
-function compare(multi::Vector{ModelEval}, data::Vector{Measures{N}}) where N
-    mresid = MultiResiduals(multi, data, dry())
-    status = minimize!(mresid)
-    return FitStats(mresid, status)
-end
-compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N = compare([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data)
+compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N = fit!(multi, data, dry())

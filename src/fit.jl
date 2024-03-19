@@ -76,10 +76,8 @@ end
 
 
 # ====================================================================
-function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+function fit!(resid::Residuals)
     starttime = time()
-    update!(meval)
-    resid = Residuals(meval, data, minimizer)
     status = minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, time() - starttime)
@@ -93,26 +91,25 @@ end
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.
 """
-fit!(model::Model, data::Measures; kws...) = fit!(ModelEval(model, data.domain), data; kws...)
+function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+    meval = ModelEval(model, data.domain)
+    update!(meval)
+    resid = Residuals(meval, data, minimizer)
+    return fit!(resid)
+end
 
 
 """
     fit(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit())
 
-Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).
+Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
 """
 fit(model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
 
-
-function compare(meval::ModelEval, data::Measures)
-    resid = Residuals(meval, data, dry())
-    status = minimize!(resid)
-    return FitStats(resid, status)
-end
 
 """
     compare(model::Model, data::Measures)
 
 Compare a model to a dataset and return a `FitStats` object.
 """
-compare(model::Model, data::Measures) = compare(ModelEval(model, data.domain), data)
+compare(model::Model, data::Measures) = fit!(model, data, minimizer=dry())
