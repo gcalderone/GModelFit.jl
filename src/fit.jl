@@ -4,19 +4,18 @@ struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResid
     meval::ModelEval
     data::T
     buffer::Vector{Float64}
-    nfree::Int
-    dof::Int
     mzer::M
 
     function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         update!(meval)
-        buffer = fill(NaN, length(data))
-        nfree = length(free_params(meval))
-        return new{T,M}(meval, data, buffer, nfree, length(buffer) - nfree, mzer)
+        buffer = fill(NaN, length(last_evaluation(meval)))
+        return new{T,M}(meval, data, buffer, mzer)
     end
 end
 
 free_params(resid::Residuals) = free_params(resid.meval)
+nfree(resid::Residuals) = nfree(resid.meval)
+dof(resid::Residuals) = length(resid.data) - nfree(resid)
 
 residuals(resid::Residuals) = resid.buffer
 function residuals(resid::Residuals, pvalues::Vector{Float64})
@@ -27,10 +26,10 @@ function residuals(resid::Residuals, pvalues::Vector{Float64})
 end
 
 fit_stat(resid::Residuals{Measures{N}}) where N =
-    sum(abs2, resid.buffer) / resid.dof
+    sum(abs2, resid.buffer) / dof(resid)
 
 function finalize!(resid::Residuals, best::Vector{Float64}, uncerts::Vector{Float64})
-    @assert resid.nfree == length(best) == length(uncerts)
+    @assert nfree(resid) == length(best) == length(uncerts)
     residuals(resid, best)
     update_finalize!(resid.meval, uncerts)
 end
@@ -67,8 +66,10 @@ end
 function FitStats(resid::AbstractResiduals, status::AbstractMinimizerStatus, elapsed=NaN)
     # gof_stat = sum(abs2, residuals(resid))
     # tp = logccdf(Chisq(resid.dof), gof_stat) * log10(exp(1))
+    ndata = length(residuals(resid))
+    nf = nfree(resid)
     FitStats(elapsed,
-             length(residuals(resid)), resid.nfree, resid.dof, fit_stat(resid), # tp,
+             ndata, nf, ndata - nf, fit_stat(resid), # tp,
              status)
 end
 
@@ -76,9 +77,9 @@ end
 
 # ====================================================================
 function fit!(resid::Residuals)
-    @assert resid.nfree > 0 "No free parameter in the model"
     starttime = time()
     update!(resid.meval)
+    @assert nfree(resid) > 0 "No free parameter in the model"
     status = minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, time() - starttime)

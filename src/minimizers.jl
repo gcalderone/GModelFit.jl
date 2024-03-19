@@ -48,7 +48,8 @@ end
 function minimize!(resid::AbstractResiduals{Measures{N}, lsqfit}) where N
     params = free_params(resid)
     ndata = length(residuals(resid))
-    prog = ProgressUnknown(desc="Model (dof=$(resid.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    dof = ndata - length(params)
+    prog = ProgressUnknown(desc="Model (dof=$(dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     resid.mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
                                              ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])
                                              residuals(resid, pvalues)
@@ -107,9 +108,10 @@ function minimize!(resid::AbstractResiduals{Measures{N}, cmpfit}) where N
         parinfo[i].limits  = (low[i], high[i])
     end
 
+    dof = length(residuals(resid)) - length(params)
     residuals(resid, guess)
     last_fitstat = sum(abs2, residuals(resid))
-    prog = ProgressUnknown(desc="Model (dof=$(resid.dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    prog = ProgressUnknown(desc="Model (dof=$(dof)) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
         resid.mzer.result = CMPFit.cmpfit((pvalues) -> begin
                                               ProgressMeter.next!(prog; showvalues=() -> [(:fit_stat, fit_stat(resid))])

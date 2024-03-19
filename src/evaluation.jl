@@ -143,6 +143,7 @@ end
 
 
 free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
+nfree(meval::ModelEval) = length(meval.pv.ifree)
 
 
 """

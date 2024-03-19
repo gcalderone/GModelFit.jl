@@ -12,7 +12,6 @@ function free_params_indices(mevals::Vector{ModelEval})
     return out
 end
 
-
 function update!(mevals::Vector{ModelEval})
     update_init!(mevals)
     update_evaluation!(mevals)
@@ -59,29 +58,27 @@ function free_params(mevals::Vector{ModelEval})
     end
     return out
 end
+nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
 
 # ====================================================================
 struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     mevals::Vector{ModelEval}
-    resid::Vector{Residuals{T}}
+    data::Vector{T}
     buffer::Vector{Float64}
-    nfree::Int
-    dof::Int
     mzer::M
 
     function MultiResiduals(mevals::Vector{ModelEval}, datasets::Vector{T}, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
         @assert length(mevals) == length(datasets)
         update!(mevals)
-        mresid = [Residuals(mevals[id], datasets[id]) for id in 1:length(mevals)]
-        buffer = fill(NaN, sum(length.(getfield.(mresid, :buffer))))
-        nfree = sum(getfield.(mresid, :nfree))
-        @assert nfree > 0 "No free parameter in the model"
-        return new{T,M}(mevals, mresid, buffer, nfree, length(buffer) - nfree, mzer)
+        buffer = fill(NaN, sum(length.(last_evaluation.(mevals))))
+        return new{T,M}(mevals, datasets, buffer, mzer)
     end
 end
 
 free_params(mresid::MultiResiduals) = free_params(mresid.mevals)
+nfree(mresid::MultiResiduals) = nfree(mresid.mevals)
+dof(mresid::MultiResiduals) = sum(length.(mresid.data)) - nfree(mresid)
 
 residuals(mresid::MultiResiduals) = mresid.buffer
 function residuals(mresid::MultiResiduals, pvalues::Vector{Float64})
@@ -89,34 +86,37 @@ function residuals(mresid::MultiResiduals, pvalues::Vector{Float64})
     update_setparvals(mresid.mevals, pvalues)
 
     # Populate residuals
-    j1 = 1
-    for (id, i1, i2) in free_params_indices(mresid.mevals)
-        residuals(mresid.resid[id], pvalues[i1:i2])
-        nn = length(mresid.resid[id].buffer)
+    i1 = 1
+    for i in 1:length(mresid.mevals)
+        meval = mresid.mevals[i]
+        update_evaluation!(meval)
+        nn = length(last_evaluation(meval))
         if nn > 0
-            j2 = j1 + nn - 1
-            mresid.buffer[j1:j2] .= mresid.resid[id].buffer
-            j1 += nn
+            i2 = i1 + nn - 1
+            mresid.buffer[i1:i2] .= (last_evaluation(meval) .- values(mresid.data[i])) ./ uncerts(mresid.data[i])
+            i1 += nn
         end
     end
     return mresid.buffer
 end
 
 fit_stat(mresid::MultiResiduals) =
-    sum(abs2, mresid.buffer) / mresid.dof
+    sum(abs2, mresid.buffer) / dof(mresid)
 
 function finalize!(mresid::MultiResiduals, best::Vector{Float64}, uncerts::Vector{Float64})
+    @assert nfree(mresid) == length(best) == length(uncerts)
+    residuals(mresid, best)
     for (id, i1, i2) in free_params_indices(mresid.mevals)
-        finalize!(mresid.resid[id], best[i1:i2], uncerts[i1:i2])
+        update_finalize!(mresid.mevals[id], uncerts[i1:i2])
     end
 end
 
 
 # ====================================================================
 function fit!(mresid::MultiResiduals)
-    @assert mresid.nfree > 0 "No free parameter in the model"
     starttime = time()
     update!(mresid.mevals)
+    @assert nfree(mresid) > 0 "No free parameter in the model"
     status = minimize!(mresid)
     bestfit = ModelSnapshot.(mresid.mevals)
     stats = FitStats(mresid, status, time() - starttime)
