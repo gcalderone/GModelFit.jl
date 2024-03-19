@@ -62,6 +62,19 @@ nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
 
 # ====================================================================
+"""
+    MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer}
+
+A structure representing the distance between a `Vector{ModelEval}` and a corresponding number of datasets. The "distance" is expressed in terms of weighted residuals.
+
+A minimizer can be invoked via the `minimize!` function  to reduce such distance by varying the parameter valuesfor each model.
+
+# Fields:
+- `mevals::Vector{ModelEval}`: Vector of model evaluations;
+- `data::Vector{<: AbstractMeasures}`: Empirical datasets to be compared to the models;
+- `buffer::Vector{Float64}`: Weighted residuals for each point in the domain of each dataset;
+- `mzer::AbstractMinimizer`: Minimizer used to reduce the residuals.
+"""
 struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     mevals::Vector{ModelEval}
     data::Vector{T}
@@ -113,11 +126,16 @@ end
 
 
 # ====================================================================
-function fit!(mresid::MultiResiduals)
+"""
+    minimize!(mresid::MultiResiduals)
+
+Invoke a minimizer to reduce the residuals between a set of models and a corresponding number of datasets.
+"""
+function minimize!(mresid::MultiResiduals)
     starttime = time()
     update!(mresid.mevals)
     @assert nfree(mresid) > 0 "No free parameter in the model"
-    status = minimize!(mresid)
+    status = _minimize!(mresid)
     bestfit = ModelSnapshot.(mresid.mevals)
     stats = FitStats(mresid, status, time() - starttime)
     # test_serialization(bestfit, stats, data)
@@ -134,7 +152,7 @@ function fit!(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::Abstra
     mevals = [ModelEval(multi[i], data[i].domain) for i in 1:length(multi)]
     update!(mevals)
     mresid = MultiResiduals(mevals, data, minimizer)
-    return fit!(mresid)
+    return minimize!(mresid)
 end
 
 

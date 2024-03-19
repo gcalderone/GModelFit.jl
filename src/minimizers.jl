@@ -27,7 +27,7 @@ abstract type AbstractResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} e
 
 # --------------------------------------------------------------------
 struct dry <: AbstractMinimizer; end
-function minimize!(resid::AbstractResiduals{Measures{N}, dry}) where N
+function _minimize!(resid::AbstractResiduals{Measures{N}, dry}) where N
     params = free_params(resid)
     residuals(resid, getfield.(params, :val))
     finalize!(resid,
@@ -45,7 +45,7 @@ mutable struct lsqfit <: AbstractMinimizer
     lsqfit() = new(nothing)
 end
 
-function minimize!(resid::AbstractResiduals{Measures{N}, lsqfit}) where N
+function _minimize!(resid::AbstractResiduals{Measures{N}, lsqfit}) where N
     params = free_params(resid)
     ndata = length(residuals(resid))
     dof = ndata - length(params)
@@ -95,7 +95,7 @@ mutable struct cmpfit <: AbstractMinimizer
     end
 end
 
-function minimize!(resid::AbstractResiduals{Measures{N}, cmpfit}) where N
+function _minimize!(resid::AbstractResiduals{Measures{N}, cmpfit}) where N
     params = free_params(resid)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)

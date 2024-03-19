@@ -91,4 +91,4 @@ During fitting a number of data structures are created to avoid reallocating hea
 
 - [`GModelFit.ModelEval`](@ref): a container for a `Model` evaluation on a specific domain. This structure contains a `CompEval` structure for each component in a model and is updated at each iteration of the minimizer to reflect the current state;
 
-- `GModelFit.FitProblem`: container for a `ModelEval` object, a `Measures` object, and a `Vector{Float64}` to store the normalized residuals of the comparison between the model and the data.  The `GModelFit.MultiFitProblem` has the same purpose in a [Multi-dataset fitting](@ref) case.
+- [`GModelFit.Residuals`](@ref): container for a `ModelEval` object, a `Measures` object, and a `Vector{Float64}` to store the weighted residuals of the comparison between the model and the data.  The [`GModelFit.MultiResiduals`](@ref) has the same purpose in the [Multi-dataset fitting](@ref) case.

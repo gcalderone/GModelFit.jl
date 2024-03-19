@@ -5,7 +5,6 @@
 A structure representing the results of a fitting process.
 
 # Fields:
-- `timestamp::DateTime`: time at which the fitting process has started;
 - `elapsed::Float64`: elapsed time (in seconds);
 - `ndata::Int`: number of data empirical points;
 - `nfree::Int`: number of free parameters;
@@ -27,17 +26,29 @@ struct FitStats
 end
 
 function FitStats(resid::AbstractResiduals, status::AbstractMinimizerStatus, elapsed=NaN)
-    # gof_stat = sum(abs2, residuals(resid))
     # tp = logccdf(Chisq(resid.dof), gof_stat) * log10(exp(1))
     ndata = length(residuals(resid))
     nf = nfree(resid)
     FitStats(elapsed,
-             ndata, nf, ndata - nf, fit_stat(resid), # tp,
+             ndata, nf, ndata - nf, fit_stat(resid),
              status)
 end
 
 
 # ====================================================================
+"""
+    Residuals{T <: AbstractMeasures, M <: AbstractMinimizer}
+
+A structure representing the distance between a `ModelEval` and a dataset. The "distance" is expressed in terms of weighted residuals.
+
+A minimizer can be invoked via the `minimize!` function  to reduce such distance by varying the model parameter values.
+
+# Fields:
+- `meval::ModelEval`: Model evaluation on a given domain;
+- `data::AbstractMeasures`: Empirical dataset to be compared to the model;
+- `buffer::Vector{Float64}`: Weighted residuals for each point in the domain;
+- `mzer::AbstractMinimizer`: Minimizer used to reduce the residuals.
+"""
 struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
     meval::ModelEval
     data::T
@@ -74,11 +85,16 @@ end
 
 
 # ====================================================================
-function fit!(resid::Residuals)
+"""
+    minimize!(resid::Residuals)
+
+Invoke a minimizer to reduce the residuals between a model and a dataset.
+    """
+function minimize!(resid::Residuals)
     starttime = time()
     update!(resid.meval)
     @assert nfree(resid) > 0 "No free parameter in the model"
-    status = minimize!(resid)
+    status = _minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, time() - starttime)
     # test_serialization(bestfit, stats, data)
@@ -95,7 +111,7 @@ function fit!(model::Model, data::Measures; minimizer::AbstractMinimizer=lsqfit(
     meval = ModelEval(model, data.domain)
     update!(meval)
     resid = Residuals(meval, data, minimizer)
-    return fit!(resid)
+    return minimize!(resid)
 end
 
 

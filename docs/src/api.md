@@ -43,11 +43,14 @@ GModelFit.FitStats
 GModelFit.FunctDesc
 GModelFit.ModelEval
 GModelFit.ModelSnapshot
+GModelFit.MultiResiduals
 GModelFit.Parameter
+GModelFit.Residuals
 GModelFit.comptypes
 GModelFit.dependencies
 GModelFit.evaluate!
 GModelFit.last_evaluation
+GModelFit.minimize!
 GModelFit.mock
 GModelFit.prepare!
 GModelFit.serialize
