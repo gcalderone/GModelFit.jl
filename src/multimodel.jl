@@ -137,8 +137,8 @@ fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(dee
 Compare a multi-model to a multi-dataset and return a `FitStats` object.
 """
 function compare(multi::Vector{ModelEval}, data::Vector{Measures{N}}) where N
-    mresid = MultiResiduals(multi, data)
-    status = fit(dry(), mresid)
-    return FitStats(mresid, MinimizerStatus(MinDRY))
+    mresid = MultiResiduals(multi, data, dry())
+    status = minimize!(mresid)
+    return FitStats(mresid, status)
 end
 compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N = compare([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data)

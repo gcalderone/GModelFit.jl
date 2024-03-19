@@ -105,9 +105,9 @@ fit(model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
 
 
 function compare(meval::ModelEval, data::Measures)
-    resid = Residuals(meval, data)
-    status = fit(dry(), resid)
-    return FitStats(resid, MinimizerStatus(MinDRY))
+    resid = Residuals(meval, data, dry())
+    status = minimize!(resid)
+    return FitStats(resid, status)
 end
 
 """

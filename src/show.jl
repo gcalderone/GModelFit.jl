@@ -322,7 +322,7 @@ end
 
 
 getmessage(status::MinimizerStatusOK) = crayon"green", "OK"
-getmessage(status::MinimizerStatusDry) = crayon"bold yellow", "DRY"
+getmessage(status::MinimizerStatusDry) = crayon"dark_gray", "Residuals not minimized"
 getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN\n" * status.message
 getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR\n" * status.message
 

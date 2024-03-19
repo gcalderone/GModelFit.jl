@@ -33,7 +33,7 @@ function minimize!(resid::AbstractResiduals{Measures{N}, dry}) where N
     finalize!(resid,
               getfield.(params, :val),
               fill(NaN, length(params)))
-    return MinimizerStatusDry
+    return MinimizerStatusDry()
 end
 
 
