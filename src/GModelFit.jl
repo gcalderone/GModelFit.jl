@@ -421,9 +421,6 @@ end
 
 include("evaluation.jl")
 include("snapshot.jl")
-
-
-abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
 include("multimodel.jl")

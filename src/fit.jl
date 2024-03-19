@@ -1,39 +1,38 @@
 
 # ====================================================================
-struct FitProblem{T <: AbstractMeasures} <: AbstractFitProblem
-    timestamp::DateTime
+struct Residuals{T <: AbstractMeasures} <: AbstractResiduals
     meval::ModelEval
-    measures::AbstractMeasures
-    resid::Vector{Float64}
+    measures::T
+    buffer::Vector{Float64}
     nfree::Int
     dof::Int
 
-    function FitProblem(meval::ModelEval, data::T) where T <: AbstractMeasures
+    function Residuals(meval::ModelEval, data::T) where T <: AbstractMeasures
         update!(meval)
         resid = fill(NaN, length(data))
         nfree = length(free_params(meval))
         @assert nfree > 0 "No free parameter in the model"
-        return new{T}(now(), meval, data, resid, nfree, length(resid) - nfree)
+        return new{T}(meval, data, resid, nfree, length(resid) - nfree)
     end
 end
 
-free_params(fp::FitProblem) = free_params(fp.meval)
+free_params(resid::Residuals) = free_params(resid.meval)
 
-residuals(fp::FitProblem) = fp.resid
-function residuals(fp::FitProblem, pvalues::Vector{Float64})
-    update_setparvals(fp.meval, pvalues)
-    update_evaluation!(fp.meval)
-    fp.resid .= reshape((last_evaluation(fp.meval) .- values(fp.measures)) ./ uncerts(fp.measures), :)
-    return fp.resid
+residuals(resid::Residuals) = resid.buffer
+function residuals(resid::Residuals, pvalues::Vector{Float64})
+    update_setparvals(resid.meval, pvalues)
+    update_evaluation!(resid.meval)
+    resid.buffer .= reshape((last_evaluation(resid.meval) .- values(resid.measures)) ./ uncerts(resid.measures), :)
+    return resid.buffer
 end
 
-fit_stat(fp::FitProblem{Measures{N}}) where N =
-    sum(abs2, fp.resid) / fp.dof
+fit_stat(resid::Residuals{Measures{N}}) where N =
+    sum(abs2, resid.buffer) / resid.dof
 
-function finalize!(fp::FitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
-    @assert fp.nfree == length(best) == length(uncerts)
-    residuals(fp, best)
-    update_finalize!(fp.meval, uncerts)
+function finalize!(resid::Residuals, best::Vector{Float64}, uncerts::Vector{Float64})
+    @assert resid.nfree == length(best) == length(uncerts)
+    residuals(resid, best)
+    update_finalize!(resid.meval, uncerts)
 end
 
 
@@ -55,7 +54,6 @@ A structure representing the results of a fitting process.
 Note: the `FitStats` fields are supposed to be accessed directly by the user.
 """
 struct FitStats
-    timestamp::DateTime
     elapsed::Float64
     ndata::Int
     nfree::Int
@@ -66,11 +64,11 @@ struct FitStats
     status::AbstractMinimizerStatus
 end
 
-function FitStats(fp::AbstractFitProblem, status::AbstractMinimizerStatus)
-    # gof_stat = sum(abs2, residuals(fp))
-    # tp = logccdf(Chisq(fp.dof), gof_stat) * log10(exp(1))
-    FitStats(fp.timestamp, (now() - fp.timestamp).value / 1e3,
-             length(residuals(fp)), fp.nfree, fp.dof, fit_stat(fp), # tp,
+function FitStats(resid::AbstractResiduals, status::AbstractMinimizerStatus, elapsed=NaN)
+    # gof_stat = sum(abs2, residuals(resid))
+    # tp = logccdf(Chisq(resid.dof), gof_stat) * log10(exp(1))
+    FitStats(elapsed,
+             length(residuals(resid)), resid.nfree, resid.dof, fit_stat(resid), # tp,
              status)
 end
 
@@ -78,11 +76,12 @@ end
 
 # ====================================================================
 function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
+    timestamp = now()
     update!(meval)
-    fp = FitProblem(meval, data)
-    status = fit(minimizer, fp)
-    bestfit = ModelSnapshot(fp.meval)
-    stats = FitStats(fp, status)
+    resid = Residuals(meval, data)
+    status = fit(minimizer, resid)
+    bestfit = ModelSnapshot(resid.meval)
+    stats = FitStats(resid, status, (now() - timestamp).value / 1e3)
     # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
@@ -105,9 +104,9 @@ fit(model::Model, data::Measures; kws...) = fit!(deepcopy(model), data; kws...)
 
 
 function compare(meval::ModelEval, data::Measures)
-    fp = FitProblem(meval, data)
-    status = fit(dry(), fp)
-    return FitStats(fp, MinimizerStatus(MinDRY))
+    resid = Residuals(meval, data)
+    status = fit(dry(), resid)
+    return FitStats(resid, MinimizerStatus(MinDRY))
 end
 
 """

@@ -62,52 +62,51 @@ end
 
 
 # ====================================================================
-struct MultiFitProblem <: AbstractFitProblem
-    timestamp::DateTime
+struct MultiResiduals{T <: AbstractMeasures} <: AbstractResiduals
     multi::Vector{ModelEval}
-    fp::Vector{FitProblem}
-    resid::Vector{Float64}
+    resid::Vector{Residuals{T}}
+    buffer::Vector{Float64}
     nfree::Int
     dof::Int
 
-    function MultiFitProblem(multi::Vector{ModelEval}, datasets::Vector{T}) where T <: AbstractMeasures
+    function MultiResiduals(multi::Vector{ModelEval}, datasets::Vector{T}) where T <: AbstractMeasures
         @assert length(multi) == length(datasets)
         update!(multi)
-        fp = [FitProblem(multi[id], datasets[id]) for id in 1:length(multi)]
-        resid = fill(NaN, sum(length.(getfield.(fp, :resid))))
-        nfree = sum(getfield.(fp, :nfree))
+        mresid = [Residuals(multi[id], datasets[id]) for id in 1:length(multi)]
+        buffer = fill(NaN, sum(length.(getfield.(mresid, :buffer))))
+        nfree = sum(getfield.(mresid, :nfree))
         @assert nfree > 0 "No free parameter in the model"
-        return new(now(), multi, fp, resid, nfree, length(resid) - nfree)
+        return new{T}(multi, mresid, buffer, nfree, length(mresid) - nfree)
     end
 end
 
-free_params(fp::MultiFitProblem) = free_params(fp.multi)
+free_params(mresid::MultiResiduals) = free_params(mresid.multi)
 
-residuals(fp::MultiFitProblem) = fp.resid
-function residuals(fp::MultiFitProblem, pvalues::Vector{Float64})
+residuals(mresid::MultiResiduals) = mresid.buffer
+function residuals(mresid::MultiResiduals, pvalues::Vector{Float64})
     # Must set pvalues on all models before any evaluation
-    update_setparvals(fp.multi, pvalues)
+    update_setparvals(mresid.multi, pvalues)
 
     # Populate residuals
     j1 = 1
-    for (id, i1, i2) in free_params_indices(fp.multi)
-        residuals(fp.fp[id], pvalues[i1:i2])
-        nn = length(fp.fp[id].resid)
+    for (id, i1, i2) in free_params_indices(mresid.multi)
+        residuals(mresid.resid[id], pvalues[i1:i2])
+        nn = length(mresid.resid[id].buffer)
         if nn > 0
             j2 = j1 + nn - 1
-            fp.resid[j1:j2] .= fp.fp[id].resid
+            mresid.buffer[j1:j2] .= mresid.resid[id].buffer
             j1 += nn
         end
     end
-    return fp.resid
+    return mresid.buffer
 end
 
-fit_stat(fp::MultiFitProblem) =
-    sum(abs2, fp.resid) / fp.dof
+fit_stat(mresid::MultiResiduals) =
+    sum(abs2, mresid.buffer) / mresid.dof
 
-function finalize!(fp::MultiFitProblem, best::Vector{Float64}, uncerts::Vector{Float64})
-    for (id, i1, i2) in free_params_indices(fp.multi)
-        finalize!(fp.fp[id], best[i1:i2], uncerts[i1:i2])
+function finalize!(mresid::MultiResiduals, best::Vector{Float64}, uncerts::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(mresid.multi)
+        finalize!(mresid.resid[id], best[i1:i2], uncerts[i1:i2])
     end
 end
 
@@ -118,12 +117,13 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
+    timestamp = now()
     update!(multi)
-    fp = MultiFitProblem(multi, data)
-    status = fit(minimizer, fp)
+    mresid = MultiResiduals(multi, data)
+    status = fit(minimizer, mresid)
 
-    bestfit = ModelSnapshot.(fp.multi)
-    stats = FitStats(fp, status)
+    bestfit = ModelSnapshot.(mresid.multi)
+    stats = FitStats(mresid, status, (now() - timestamp).value / 1e3)
     # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
@@ -137,8 +137,8 @@ fit( multi::Vector{Model}, data::Vector{Measures{N}}; kws...) where N = fit!(dee
 Compare a multi-model to a multi-dataset and return a `FitStats` object.
 """
 function compare(multi::Vector{ModelEval}, data::Vector{Measures{N}}) where N
-    fp = MultiFitProblem(multi, data)
-    status = fit(dry(), fp)
-    return FitStats(fp, MinimizerStatus(MinDRY))
+    mresid = MultiResiduals(multi, data)
+    status = fit(dry(), mresid)
+    return FitStats(mresid, MinimizerStatus(MinDRY))
 end
 compare(multi::Vector{Model}, data::Vector{Measures{N}}) where N = compare([ModelEval(multi[i], data[i].domain) for i in 1:length(multi)], data)

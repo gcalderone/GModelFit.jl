@@ -181,8 +181,7 @@ function _deserialize(dd::AbstractDict)
                                  _deserialize(dd["deps"]),
                                  _deserialize(dd["evalcounters"]))
         elseif dd["_structtype"] == "GModelFit.FitStats"
-            return FitStats(_deserialize(dd["timestamp"]),
-                            _deserialize(dd["elapsed"]),
+            return FitStats(_deserialize(dd["elapsed"]),
                             _deserialize(dd["ndata"]),
                             _deserialize(dd["nfree"]),
                             _deserialize(dd["dof"]),
