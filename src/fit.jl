@@ -1,40 +1,3 @@
-
-# ====================================================================
-struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
-    meval::ModelEval
-    data::T
-    buffer::Vector{Float64}
-    mzer::M
-
-    function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
-        update!(meval)
-        buffer = fill(NaN, length(data))
-        return new{T,M}(meval, data, buffer, mzer)
-    end
-end
-
-free_params(resid::Residuals) = free_params(resid.meval)
-nfree(resid::Residuals) = nfree(resid.meval)
-dof(resid::Residuals) = length(resid.data) - nfree(resid)
-
-residuals(resid::Residuals) = resid.buffer
-function residuals(resid::Residuals, pvalues::Vector{Float64})
-    update_setparvals(resid.meval, pvalues)
-    update_evaluation!(resid.meval)
-    resid.buffer .= reshape((last_evaluation(resid.meval) .- values(resid.data)) ./ uncerts(resid.data), :)
-    return resid.buffer
-end
-
-fit_stat(resid::Residuals{Measures{N}}) where N =
-    sum(abs2, resid.buffer) / dof(resid)
-
-function finalize!(resid::Residuals, best::Vector{Float64}, uncerts::Vector{Float64})
-    @assert nfree(resid) == length(best) == length(uncerts)
-    residuals(resid, best)
-    update_finalize!(resid.meval, uncerts)
-end
-
-
 # ====================================================================
 """
     FitStats
@@ -73,6 +36,41 @@ function FitStats(resid::AbstractResiduals, status::AbstractMinimizerStatus, ela
              status)
 end
 
+
+# ====================================================================
+struct Residuals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
+    meval::ModelEval
+    data::T
+    buffer::Vector{Float64}
+    mzer::M
+
+    function Residuals(meval::ModelEval, data::T, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
+        update!(meval)
+        buffer = fill(NaN, length(data))
+        return new{T,M}(meval, data, buffer, mzer)
+    end
+end
+
+free_params(resid::Residuals) = free_params(resid.meval)
+nfree(resid::Residuals) = nfree(resid.meval)
+dof(resid::Residuals) = length(resid.data) - nfree(resid)
+
+residuals(resid::Residuals) = resid.buffer
+function residuals(resid::Residuals, pvalues::Vector{Float64})
+    update_setparvals(resid.meval, pvalues)
+    update_evaluation!(resid.meval)
+    resid.buffer .= reshape((last_evaluation(resid.meval) .- values(resid.data)) ./ uncerts(resid.data), :)
+    return resid.buffer
+end
+
+fit_stat(resid::Residuals{Measures{N}}) where N =
+    sum(abs2, resid.buffer) / dof(resid)
+
+function finalize!(resid::Residuals, best::Vector{Float64}, uncerts::Vector{Float64})
+    @assert nfree(resid) == length(best) == length(uncerts)
+    residuals(resid, best)
+    update_finalize!(resid.meval, uncerts)
+end
 
 
 # ====================================================================
