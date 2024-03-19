@@ -24,6 +24,7 @@ freeze!
 getindex
 haskey
 isfreezed
+length
 select_maincomp!
 thaw!
 uncerts
@@ -46,6 +47,7 @@ GModelFit.Parameter
 GModelFit.comptypes
 GModelFit.dependencies
 GModelFit.evaluate!
+GModelFit.last_evaluation
 GModelFit.mock
 GModelFit.prepare!
 GModelFit.serialize

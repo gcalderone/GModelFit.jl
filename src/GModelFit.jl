@@ -385,6 +385,14 @@ function Base.getindex(model::Model, cname::Symbol)
 end
 
 """
+    length(model::Model)
+
+Return number of components in a model.
+"""
+Base.length(model::Model) = length(model.comps)
+
+
+"""
     comptype(model::Model, cname::Symbol)
 
 Return a component type as a string.

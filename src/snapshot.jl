@@ -22,7 +22,7 @@ function ModelSnapshot(meval::ModelEval)
     end
     ModelSnapshot(deepcopy(meval.domain), deepcopy(meval.pv.params),
                   OrderedDict([Pair(cname, ceval.buffer) for (cname, ceval) in meval.cevals]),
-                  meval.maincomp,
+                  meval.maincomp[1],
                   comptypes(meval.model),
                   OrderedDict([Pair(cname, isfreezed(meval.model, cname)) for cname in keys(meval.cevals)]),
                   deps, evalcounters(meval))
@@ -45,6 +45,8 @@ function Base.getindex(model::ModelSnapshot, name::Symbol)
     end
     error("Name $name not defined")
 end
+
+Base.length(model::ModelSnapshot) = length(model.buffers)
 
 function iterate(model::ModelSnapshot, i=1)
     k = collect(keys(model))

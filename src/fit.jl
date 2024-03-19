@@ -23,7 +23,7 @@ residuals(fp::FitProblem) = fp.resid
 function residuals(fp::FitProblem, pvalues::Vector{Float64})
     update_setparvals(fp.meval, pvalues)
     update_evaluation!(fp.meval)
-    fp.resid .= reshape((fp.meval() .- values(fp.measures)) ./ uncerts(fp.measures), :)
+    fp.resid .= reshape((last_evaluation(fp.meval) .- values(fp.measures)) ./ uncerts(fp.measures), :)
     return fp.resid
 end
 

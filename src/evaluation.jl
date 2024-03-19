@@ -130,12 +130,12 @@ struct ModelEval
     cevals::OrderedDict{Symbol, CompEval}
     pv::ParameterVectors
     pvmulti::Vector{PVModel{Float64}}
-    maincomp::Symbol
+    maincomp::Vector{Symbol}
 
     function ModelEval(model::Model, domain::AbstractDomain)
         out = new(model, domain, OrderedDict{Symbol, CompEval}(),
                   ParameterVectors(), Vector{PVModel{Float64}}(),
-                  find_maincomp(model))
+                  Vector{Symbol}())
         # update!(out)  This would cause error in the multimodel case
         return out
     end
@@ -151,6 +151,7 @@ free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
 Update a `ModelEval` structure by evaluating all components in the model.
 """
 function update!(meval::ModelEval)
+    (length(meval.model) == 0)  &&  (return meval)  # to handle empty Model object
     update_init!(meval)
     update_evaluation!(meval)
     update_finalize!(meval)
@@ -161,6 +162,9 @@ end
 # Evaluation step init:
 # - update internal structures before fitting
 function update_init!(meval::ModelEval)
+    empty!(meval.maincomp)
+    push!(meval.maincomp, find_maincomp(meval.model))
+
     for (cname, comp) in meval.model.comps
         (cname in keys(meval.cevals))  &&  continue
         meval.cevals[cname] = CompEval(comp, meval.domain)
@@ -266,7 +270,7 @@ function update_evaluation!(meval::ModelEval)
         end
         update!(meval.cevals[cname], items(meval.pv.actual[cname]))
     end
-    update_compeval_recursive(meval, meval.maincomp)
+    update_compeval_recursive(meval, meval.maincomp[1])
 end
 
 
@@ -311,9 +315,14 @@ Return a `OrderedDict{Symbol, Int}` with the number of times each model componen
 evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
 
 
-# Return model evaluations
-(meval::ModelEval)() = meval(meval.maincomp)
-(meval::ModelEval)(name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
+"""
+    last_evaluation(meval::ModelEval)
+    last_evaluation(meval::ModelEval, name::Symbol)
+
+Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
+"""
+last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.maincomp[1])
+last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
 
 
 # ====================================================================
@@ -322,8 +331,8 @@ function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=no
     meval = ModelEval(model, domain)
     update!(meval)
     if isnothing(cname)
-        return meval()
+        return last_evaluation(meval)
     else
-        return meval(cname)
+        return last_evaluation(meval, cname)
     end
 end
