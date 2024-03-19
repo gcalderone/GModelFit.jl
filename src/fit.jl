@@ -77,12 +77,12 @@ end
 
 # ====================================================================
 function fit!(meval::ModelEval, data::Measures; minimizer::AbstractMinimizer=lsqfit())
-    timestamp = now()
+    starttime = time()
     update!(meval)
     resid = Residuals(meval, data, minimizer)
     status = minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
-    stats = FitStats(resid, status, (now() - timestamp).value / 1e3)
+    stats = FitStats(resid, status, time() - starttime)
     # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end

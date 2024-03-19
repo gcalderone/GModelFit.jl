@@ -118,12 +118,12 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).
 """
 function fit!(multi::Vector{ModelEval}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
-    timestamp = now()
+    starttime = time()
     update!(multi)
     mresid = MultiResiduals(multi, data, minimizer)
     status = minimize!(mresid)
     bestfit = ModelSnapshot.(mresid.multi)
-    stats = FitStats(mresid, status, (now() - timestamp).value / 1e3)
+    stats = FitStats(mresid, status, time() - starttime)
     # test_serialization(bestfit, stats, data)
     return (bestfit, stats)
 end
