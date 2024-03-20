@@ -65,9 +65,9 @@ end
 # Evaluate component on the given domain.  Parameter values are the
 # ones stored in the component unless a custom value is provided via a
 # keyword.
-function (comp::AbstractComponent)(domain::AbstractDomain, deps=Vector{Vector{Float64}}(); kws...)
+function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
+    @assert length(dependencies(comp)) == 0 "Can't evaluate a stand-alone component with dependencies."
     ceval = CompEval(comp, domain)
-    append!(ceval.deps, deps)
     pvalues = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
     for (pname, pval) in kws
         if pname in keys(pvalues)
