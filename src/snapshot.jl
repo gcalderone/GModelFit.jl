@@ -3,7 +3,7 @@
 
 A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A snapshot contains the same parameters and component evaluations of the original model, and provide the same user interface.  Moreover, a `ModelSnapshot` can be serialized to a file and de-serialized in another Julia session (see `GModelFit.serialize()`).
 
-The best fit model and best fit parameter values returned as a `ModelSnapshot` object by the `fit()` function.
+The best fit model and parameter values returned by the `fit()` function are provided as a `ModelSnapshot` object .
 """
 struct ModelSnapshot
     domain::AbstractDomain

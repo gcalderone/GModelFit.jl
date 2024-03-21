@@ -89,3 +89,47 @@ using Gnuplot
 saveas("gnuplot2") # hide
 ```
 ![](assets/gnuplot2.png)
+
+
+## GModelFit internals
+
+(This section deals with **GModelFit.jl** internals, feel free to skip if not interested.)
+
+During minimization a number of internal data structures are created to avoid reallocating heap memory at each iteration.  The most important of such structures are:
+
+- [`GModelFit.CompEval`](@ref): a container to perform component evaluation on a specific domain.  This structure is relevant when defining [Custom components](@ref) as it is used to dispatch component evaluation to the proper `evaluate!` method;
+
+- [`GModelFit.ModelEval`](@ref): a container for a [`Model`](@ref) evaluation on a specific domain.  This structure contains a dictionary of `CompEval` structures for all components in a model, as well as the values of *patched* parameters (see [Parameter constraints](@ref)), and is updated at each iteration of the minimizer to reflect the current model evaluaion.
+
+  An important functionality of the `ModelEval` structure is that it detects the changes in the original `Model` even after it has been created, e.g.:
+  ```@example abc
+  # Create a Model
+  model = Model(:comp1 => @fd (x, p1=1) -> p1 .* x)
+
+  # Wrap the model into a ModelEval to perform evaluation on a specific domain
+  dom = Domain(1:5)
+  meval = GModelFit.ModelEval(model, dom)
+  
+  # Evaluate and print the maximum value
+  GModelFit.update!(meval)
+  println(maximum(GModelFit.last_evaluation(meval)))
+  
+  # Add a second component to the original model
+  model[:comp2] = @fd (x, comp1, p2=1) -> comp1 .+ p2 .* x.^2
+  
+  # Re-evaluate the ModelEval (it will automatically detect the addition of :comp2)
+  GModelFit.update!(meval)
+  println(maximum(GModelFit.last_evaluation(meval)))
+  ```
+
+- [`GModelFit.Residuals`](@ref): container for a `ModelEval` object, a `Measures` object, a `Vector{Float64}` to store the normalized residuals, and a minimizer instance.  A `Residuals` object contains all the relevant informations to perform minimization, and is therefore the only argument required for the [`GModelFit.minimize!`](@ref) function.  Since `Residuals` wraps a `ModelEval` object it is also able to detect changes in the original model. 
+
+  An example of its usage is as follows:
+  ```@example abc
+  data = GModelFit.mock(Measures, model, dom)
+  resid = GModelFit.Residuals(meval, data, GModelFit.lsqfit())
+  GModelFit.minimize!(resid)
+  println() # hide
+  ```
+
+  The [`GModelFit.MultiResiduals`](@ref) has the same purpose in the [Multi-dataset fitting](@ref) case. 

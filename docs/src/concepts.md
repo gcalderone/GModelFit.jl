@@ -2,9 +2,7 @@
 include("setup.jl")
 ```
 
-# Data types and functionalities
-
-## Basic concepts and data types
+# Basic concepts and data types
 In order to exploit the **GModelFit.jl** model expressiveness a few concepts need to be introduced, along with their associated data types:
 
 - *Domain*: an N-dimensional grid of points associated to empirical measures, and used to evaluate a model.  It is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation. It is represented by either:
@@ -38,57 +36,3 @@ In order to exploit the **GModelFit.jl** model expressiveness a few concepts nee
   - to define a model component using a standard Julia mathematical expression involving `Parameter`s values or other components;
 
   To use a standard function in this fashion it should be wrapped into a [`GModelFit.FunctDesc`](@ref) object which allows both to invoke the function itself, as well as to provide a string representation for display purposes.  In order to create a function descriptor object it typically is much easier to invoke the [`@fd`](@ref) macro rather than the `FunctDesc` constructor.
-
-
-
-## Main functions
-
-- *Preparation of empirical data*: both the data domain and empirical values (with associated uncertainties) should be wrapped into `Domain` (or `CartesianDomain`) and `Measures` objects respectively.  Such objects are created by simply passing `AbstractVector{<: Real}` to their respective constructors, e.g.:
-```@example abc
-using GModelFit
-dom  = Domain([0.1, 1.1, 2.1, 3.1, 4.1])
-data = Measures(dom, [6.29, 7.27, 10.41, 18.67, 25.3],
-                      [1.1,  1.1,   1.1,   1.2, 1.2])
-println() # hide
-```
-
-- *Model definition* and *manipulation*: a [`Model`](@ref) object is essentially a dictionary of components with `Symbol` keys.  The `keys()`, `haskey()` and `iterate()` methods defined for the `Model` object provide the usual functionalities as for any dictionary.  Each entry in the dictionary is a component, namely a structure inheriting `GModelFit.AbstractComponent` and hosting one or more fields with type [`GModelFit.Parameter`](@ref).  A model object can be manipulated as follows:
-```@example abc
-using GModelFit
-
-# Create an empty model
-model = Model()
-
-# Add a component
-model[:comp1] = GModelFit.Gaussian(1, 0, 1)  # numbers represent the guess values
-
-# Modify a parameter value:
-model[:comp1].center.val = 5
-
-# Evaluate the model on a user define domain
-model(Domain(0:0.1:10))
-println() # hide
-```
-
-- *Fitting*: the main functions to fit a model (represented by a [`Model`](@ref) object) to an empirical dataset (represented by a [`Measures`](@ref) object) are [`fit`](@ref) and [`fit!`](@ref).  The latter provide the same functionality as the former with the only difference that upon return the `Model` object will have their parameters set to the best fit values.  In both cases the `Model` object will be evaluated on the same domain associated with the `Measures` object.  An overview of the fit workflow is as follows:
-
-  ![](assets/schema.svg)
-
-  To perform a [Multi-dataset fitting](@ref) simply pass a `Vector{Model}` and a `Vector{Measures` to the `fit` or `fit!` function.
-
-- *Mock data*: testing the capabilities of a model to in identifying the best fit parameters may be useful even before actual data are available.  To this purpose, the [`GModelFit.mock()`](@ref) function provides the possibility to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process.  This functionality is used in some of the examples presented in the next sections.
-
-- *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitStats`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.
-
-
-## GModelFit internals
-
-This section deals with **GModelFit.jl** internals, feel free to skip if not interested.
-
-During fitting a number of data structures are created to avoid reallocating heap memory at each minimizer iteration.  The most important of such structures are:
-
-- [`GModelFit.CompEval`](@ref): a container for a component evaluation on a specific domain.  This structure is relevant when defining [Custom components](@ref) as it is used to dispatch component evaluation to the proper `evaluate!` method;
-
-- [`GModelFit.ModelEval`](@ref): a container for a `Model` evaluation on a specific domain. This structure contains a `CompEval` structure for each component in a model and is updated at each iteration of the minimizer to reflect the current state;
-
-- [`GModelFit.Residuals`](@ref): container for a `ModelEval` object, a `Measures` object, and a `Vector{Float64}` to store the weighted residuals of the comparison between the model and the data.  The [`GModelFit.MultiResiduals`](@ref) has the same purpose in the [Multi-dataset fitting](@ref) case.

@@ -11,7 +11,7 @@ include("setup.jl")
 
 It provides the basic tools to define, interactively manipulate and efficiently evaluate a (possibly very complex) model, and to fit the latter to empirical data. The main functionalities are:
 - it handles datasets of any dimensionality;
-- the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit()` and the object constructors (see [Main functions](@ref));
+- the syntax is very simple and concise as it resembles the indexing for dictionaries and the field access for structs.  The most relevant functions are the self-explanatory `fit()` and the object constructors (see [Main functionalities](@ref));
 - the fitting model is evaluated on a user defined domain, and is the result of a combination of *model components* or mathematical expressions (in the form of [lambda functions](https://en.wikipedia.org/wiki/Anonymous_function)), or any arbitrary mixture of the two;
 - it provides several ready-to-use [Built-in components](@ref), and it also allows to define new components to suit specific needs ([Custom components](@ref));
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
