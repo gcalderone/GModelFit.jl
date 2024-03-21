@@ -97,7 +97,7 @@ function minimize!(resid::Residuals)
     status = _minimize!(resid)
     bestfit = ModelSnapshot(resid.meval)
     stats = FitStats(resid, status, time() - starttime)
-    # test_serialization(bestfit, stats, data)
+    # test_serialization(bestfit, stats, resid.data)
     return (bestfit, stats)
 end
 
