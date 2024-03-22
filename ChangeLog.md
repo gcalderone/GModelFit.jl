@@ -1,3 +1,9 @@
+# Version 0.3.2
+    * Updated docstrings and documentation;
+
+	* Internals: ModelEval is now able to track the changes in the original Model after it has been created;
+
+
 # Version 0.3.1
     * Updated docstrings
 
