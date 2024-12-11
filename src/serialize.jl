@@ -22,7 +22,8 @@ end
 
 function _serialize_struct(vv; add_show=false)
     out = OrderedDict{String, Any}()
-    out["_structtype"] = string(typeof(vv))
+    out["_structtype"] = string(parentmodule(typeof(vv))) * "." * string(nameof(typeof(vv)))
+    out["_structtype_str"] = string(typeof(vv))
     for field in fieldnames(typeof(vv))
         ff = getfield(vv, field)
         out[String(field)] = _serialize(ff)
@@ -146,73 +147,97 @@ function _deserialize(v::String)
     return v
 end
 
-function _deserialize(dd::AbstractDict)
-    function deserialized_function(args...)
-        @warn "Can't evaluate a deserialized function"
-        nothing
-    end
 
+
+function _deserialize(::Val{Symbol("GModelFit.PV.PVComp")}, dd::AbstractDict)
+    @assert !isnothing(findfirst("{GModelFit.Parameter}", dd["_structtype_str"]))
+    PVComp{Parameter}(_deserialize(dd["pnames"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
+end
+
+function _deserialize(::Val{Symbol("GModelFit.PV.PVModel")}, dd::AbstractDict)
+    @assert !isnothing(findfirst("{GModelFit.Parameter}", dd["_structtype_str"]))
+    PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
+end
+
+
+function deserialized_function(args...)
+    @warn "Can't evaluate a deserialized function"
+    nothing
+end
+
+_deserialize(::Val{Symbol("GModelFit.FunctDesc")},
+             dd::AbstractDict) =
+                 FunctDesc(deserialized_function,
+                           _deserialize(dd["display"]),
+                           _deserialize(dd["args"]),
+                           _deserialize(dd["optargs"]))
+
+_deserialize(::Val{Symbol("GModelFit.Parameter")},
+             dd::AbstractDict) =
+                 Parameter(_deserialize(dd["val"]),
+                           _deserialize(dd["low"]),
+                           _deserialize(dd["high"]),
+                           _deserialize(dd["fixed"]),
+                           _deserialize(dd["patch"]),
+                           _deserialize(dd["mpatch"]),
+                           _deserialize(dd["actual"]),
+                           _deserialize(dd["unc"]))
+
+_deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
+             dd::AbstractDict) = ModelSnapshot(_deserialize(dd["domain"]),
+                                               _deserialize(dd["params"]),
+                                               _deserialize(dd["buffers"]),
+                                               _deserialize(dd["maincomp"]),
+                                               _deserialize(dd["comptypes"]),
+                                               _deserialize(dd["isfreezed"]),
+                                               _deserialize(dd["deps"]),
+                                               _deserialize(dd["evalcounters"]))
+
+_deserialize(::Val{Symbol("GModelFit.FitStats")},
+             dd::AbstractDict) =
+                 FitStats(_deserialize(dd["elapsed"]),
+                          _deserialize(dd["ndata"]),
+                          _deserialize(dd["nfree"]),
+                          _deserialize(dd["dof"]),
+                          _deserialize(dd["fitstat"]),
+                          _deserialize(dd["status"]))
+
+_deserialize(::Val{Symbol("GModelFit.MinimizerStatusOK")},
+             dd::AbstractDict) = MinimizerStatusOK()
+
+_deserialize(::Val{Symbol("GModelFit.MinimizerStatusDry")},
+             dd::AbstractDict) = MinimizerStatusDry()
+
+_deserialize(::Val{Symbol("GModelFit.MinimizerStatusWarn")},
+             dd::AbstractDict) = MinimizerStatusWarn(dd["message"])
+
+_deserialize(::Val{Symbol("GModelFit.MinimizerStatusError")},
+             dd::AbstractDict) = MinimizerStatusError(dd["message"])
+
+function _deserialize(::Val{Symbol("GModelFit.CartesianDomain")},
+                      dd::AbstractDict)
+    axis = _deserialize(dd["axis"])
+    roi =  _deserialize(dd["roi"])
+    return CartesianDomain(axis..., roi=roi)
+end
+
+_deserialize(::Val{Symbol("GModelFit.Domain")},
+             dd::AbstractDict) =  Domain(_deserialize(dd["axis"])...)
+
+function _deserialize(::Val{Symbol("GModelFit.Measures")},
+                      dd::AbstractDict)
+    dom = _deserialize(dd["domain"])
+    tmp = _deserialize(dd["values"])
+    if isa(dom, CartesianDomain)
+        return Measures(dom, reshape(tmp[1], size(dom)), reshape(tmp[2], size(dom)))
+    else
+        return Measures(dom, tmp[1], tmp[2])
+    end
+end
+
+function _deserialize(dd::AbstractDict)
     if "_structtype" in keys(dd)
-        if !isnothing(findfirst("PVComp{GModelFit.Parameter}", dd["_structtype"]))
-            return PVComp{Parameter}(_deserialize(dd["pnames"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
-        elseif !isnothing(findfirst("PVModel{GModelFit.Parameter}", dd["_structtype"]))
-            return PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
-        elseif dd["_structtype"] == "GModelFit.FunctDesc"
-            return FunctDesc(deserialized_function,
-                             _deserialize(dd["display"]),
-                             _deserialize(dd["args"]),
-                             _deserialize(dd["optargs"]))
-        elseif dd["_structtype"] == "GModelFit.Parameter"
-            return Parameter(_deserialize(dd["val"]),
-                             _deserialize(dd["low"]),
-                             _deserialize(dd["high"]),
-                             _deserialize(dd["fixed"]),
-                             _deserialize(dd["patch"]),
-                             _deserialize(dd["mpatch"]),
-                             _deserialize(dd["actual"]),
-                             _deserialize(dd["unc"]))
-        elseif dd["_structtype"] == "GModelFit.ModelSnapshot"
-            return ModelSnapshot(_deserialize(dd["domain"]),
-                                 _deserialize(dd["params"]),
-                                 _deserialize(dd["buffers"]),
-                                 _deserialize(dd["maincomp"]),
-                                 _deserialize(dd["comptypes"]),
-                                 _deserialize(dd["isfreezed"]),
-                                 _deserialize(dd["deps"]),
-                                 _deserialize(dd["evalcounters"]))
-        elseif dd["_structtype"] == "GModelFit.FitStats"
-            return FitStats(_deserialize(dd["elapsed"]),
-                            _deserialize(dd["ndata"]),
-                            _deserialize(dd["nfree"]),
-                            _deserialize(dd["dof"]),
-                            _deserialize(dd["fitstat"]),
-                            _deserialize(dd["status"]))
-        elseif dd["_structtype"] == "GModelFit.MinimizerStatusOK"
-            return MinimizerStatusOK()
-        elseif dd["_structtype"] == "GModelFit.MinimizerStatusDry"
-            return MinimizerStatusDry()
-        elseif dd["_structtype"] == "GModelFit.MinimizerStatusWarn"
-            return MinimizerStatusWarn(_deserialize(dd["message"]))
-        elseif dd["_structtype"] == "GModelFit.MinimizerStatusError"
-            return MinimizerStatusError(_deserialize(dd["message"]))
-        elseif !isnothing(findfirst("CartesianDomain", dd["_structtype"]))
-            axis = _deserialize(dd["axis"])
-            roi =  _deserialize(dd["roi"])
-            return CartesianDomain(axis..., roi=roi)
-        elseif !isnothing(findfirst("Domain", dd["_structtype"]))
-            axis = _deserialize(dd["axis"])
-            return Domain(axis...)
-        elseif !isnothing(findfirst("Measures", dd["_structtype"]))
-            dom = _deserialize(dd["domain"])
-            tmp = _deserialize(dd["values"])
-            if isa(dom, CartesianDomain)
-                return Measures(dom, reshape(tmp[1], size(dom)), reshape(tmp[2], size(dom)))
-            else
-                return Measures(dom, tmp[1], tmp[2])
-            end
-        else
-            error("Unrecognized structure in serialized data: " * dd["_structtype"])
-        end
+        return _deserialize(Val(Symbol(dd["_structtype"])), dd)
     else
         out = OrderedDict{Symbol, Any}()
         for (kk, vv) in dd
