@@ -191,12 +191,15 @@ nfree(meval::ModelEval) = length(meval.ifree)
 
 
 # Set new model parameters
-set_pvalues!(meval::ModelEval) = set_pvalues!(meval, getfield.(free_params(meval), :val))
 function set_pvalues!(meval::ModelEval, pvalues::Vector{Float64})
     items(meval.pvalues)[meval.ifree] .= pvalues
     items(meval.pactual)[meval.ifree] .= pvalues
 end
 
+function update_from_model!(meval::ModelEval)
+    set_pvalues!(meval, getfield.(free_params(meval), :val))
+    update!(meval)
+end
 
 """
     update!(meval::ModelEval)
