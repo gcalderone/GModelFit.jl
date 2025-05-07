@@ -34,6 +34,7 @@ end
 # ====================================================================
 function fit(fitprob::FitProblem, mzer::AbstractMinimizer=lsqfit())
     starttime = time()
+    @assert nfree(fitprob) > 0 "No free parameter in the model"
     status = minimize!(fitprob, mzer)
     bestfit = [ModelSnapshot(meval) for meval in fitprob.mevals]
     stats = FitSummary(fitprob, status, time() - starttime)

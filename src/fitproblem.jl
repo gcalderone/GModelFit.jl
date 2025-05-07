@@ -76,11 +76,11 @@ struct FitProblem{T <: AbstractFitStat}
     data::Vector{<: AbstractMeasures}
     buffer::Vector{Float64}
 
+    FitProblem(model::Model, data::Measures{N}) where N = FitProblem([model], [data])
     function FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N
         @assert length(models) == length(datasets)
         mevals = ModelEval.(models, getfield.(datasets, :domain))
         update!(mevals)
-        @assert nfree(mevals) > 0 "No free parameter in the model"
         buffer = fill(NaN, sum(length.(datasets)))
         return new{ChiSquared}(mevals, datasets, buffer)
     end
