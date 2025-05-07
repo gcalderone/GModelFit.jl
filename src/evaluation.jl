@@ -111,69 +111,73 @@ struct ModelEval
     bestfit::PVModel{Parameter}
 
     function ModelEval(model::Model, domain::AbstractDomain)
-        function isParamFixed(par::Parameter)
-            if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
-                if isa(par.patch, Symbol)  # use same param. value from a different component
-                    return true
-                else                       # invoke a patch function
-                    @assert length(par.patch.args) in [1,2]
-                    if length(par.patch.args) == 1
-                        return true
-                    else
-                        return false
-                    end
-                end
-            elseif !isnothing(par.mpatch)
-                @assert length(par.mpatch.args) in [1,2]
-                if length(par.mpatch.args) == 1
-                    return true
-                else
-                    return false
-                end
+        meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
+                    PVModel{Float64}(), PVModel{Float64}(), Vector{Int}(),
+                    Vector{PVModel{Float64}}(), PVModel{Parameter}())
+        update_from_model!(meval)
+        return meval
+    end
+end
+
+
+function update_from_model!(meval::ModelEval)
+    function isParamFixed(par::Parameter)
+        if !isnothing(par.patch)
+            @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
+            if isa(par.patch, Symbol)  # use same param. value from a different component
+                return true
+            else                       # invoke a patch function
+                @assert length(par.patch.args) in [1,2]
+                return  length(par.patch.args) == 1
             end
-            return par.fixed
+        elseif !isnothing(par.mpatch)
+            @assert length(par.mpatch.args) in [1,2]
+            return  length(par.mpatch.args) == 1
         end
+        return par.fixed
+    end
 
-        cevals = OrderedDict{Symbol, CompEval}()
-        pvalues = PVModel{Float64}()
-        pactual = PVModel{Float64}()
-        isfixed = Vector{Bool}()
+    @assert meval.maincomp == find_maincomp(meval.model) "Main component is not allowed to change after ModelEval creation"
+    empty!(meval.pvalues)
+    empty!(meval.pactual)
+    empty!(meval.ifree)
+    empty!(meval.pvmulti)
+    empty!(meval.bestfit)
 
-        for (cname, comp) in model.comps
-            ceval = CompEval(comp, domain)
-            cevals[cname] = ceval
-
-            for (pname, par) in getparams(comp)
-                if !(par.low <= par.val <= par.high)
-                    s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
-                    error(s)
-                end
-                if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
-                    s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
-                    error(s)
-                end
-
-                push!(pvalues, cname, pname, par.val)
-                push!(pactual, cname, pname, par.val)
-                push!(isfixed, isParamFixed(par)  ||  model.fixed[cname])
+    isfixed = Vector{Bool}()
+    for (cname, comp) in meval.model.comps
+        for (pname, par) in getparams(comp)
+            if !(par.low <= par.val <= par.high)
+                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
+                error(s)
             end
-        end
+            if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
+                s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
+                error(s)
+            end
 
-        for (cname, ceval) in cevals
+            push!(meval.pvalues, cname, pname, par.val)
+            push!(meval.pactual, cname, pname, par.val)
+            push!(isfixed, isParamFixed(par)  ||  meval.model.fixed[cname])
+        end
+        if !(cname in keys(meval.cevals))
+            ceval = CompEval(comp, meval.domain)
+            meval.cevals[cname] = ceval
+        end
+    end
+    append!(meval.ifree, findall(.! isfixed))
+
+    for (cname, ceval) in meval.cevals
+        if length(ceval.deps) == 0
             i = 1
-            for d in dependencies(model, cname, select_domain=true)
-                push!(ceval.deps, coords(domain, i))
+            for d in dependencies(meval.model, cname, select_domain=true)
+                push!(ceval.deps, coords(meval.domain, i))
                 i += 1
             end
-            for d in dependencies(model, cname, select_domain=false)
-                push!(ceval.deps, cevals[d].buffer)
+            for d in dependencies(meval.model, cname, select_domain=false)
+                push!(ceval.deps, meval.cevals[d].buffer)
             end
         end
-
-        return new(model, domain, cevals, find_maincomp(model),
-                   pvalues, pactual, findall(.! isfixed),
-                   Vector{PVModel{Float64}}(), PVModel{Parameter}())
     end
 end
 
@@ -196,10 +200,6 @@ function set_pvalues!(meval::ModelEval, pvalues::Vector{Float64})
     items(meval.pactual)[meval.ifree] .= pvalues
 end
 
-function update_from_model!(meval::ModelEval)
-    set_pvalues!(meval, getfield.(free_params(meval), :val))
-    update!(meval)
-end
 
 """
     update!(meval::ModelEval)

@@ -16,6 +16,9 @@ function free_params_indices(mevals::Vector{ModelEval})
 end
 
 
+update_from_model!(mevals::Vector{ModelEval}) = update_from_model!.(mevals)
+
+
 function free_params(mevals::Vector{ModelEval})
     out = Vector{Parameter}()
     for id in 1:length(mevals)
@@ -32,12 +35,6 @@ function set_pvalues!(mevals::Vector{ModelEval}, pvalues::Vector{Float64})
     end
 end
 
-function update_from_model!(mevals::Vector{ModelEval})
-    for meval in mevals
-        set_pvalues!(meval, getfield.(free_params(meval), :val))
-    end
-    update!(mevals)
-end
 
 function update!(mevals::Vector{ModelEval})
     if length(mevals[1].pvmulti) == 0
