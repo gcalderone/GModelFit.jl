@@ -16,7 +16,7 @@ function free_params_indices(mevals::Vector{ModelEval})
 end
 
 
-update_from_model!(mevals::Vector{ModelEval}) = update_from_model!.(mevals)
+scan_model!(mevals::Vector{ModelEval}) = scan_model!.(mevals)
 
 
 function free_params(mevals::Vector{ModelEval})
@@ -77,9 +77,12 @@ struct FitProblem{T <: AbstractFitStat}
     buffer::Vector{Float64}
 
     FitProblem(model::Model, data::Measures{N}) where N = FitProblem([model], [data])
-    function FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N
-        @assert length(models) == length(datasets)
-        mevals = ModelEval.(models, getfield.(datasets, :domain))
+    FitProblem(meval::ModelEval, data::Measures{N}) where N = FitProblem([meval], [data])
+    FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N =
+        FitProblem(ModelEval.(models, getfield.(datasets, :domain)), datasets)
+
+    function FitProblem(mevals::Vector{ModelEval}, datasets::Vector{Measures{N}}) where N
+        @assert length(mevals) == length(datasets)
         update!(mevals)
         buffer = fill(NaN, sum(length.(datasets)))
         return new{ChiSquared}(mevals, datasets, buffer)

@@ -116,13 +116,13 @@ struct ModelEval
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
                     PVModel{Float64}(), PVModel{Float64}(), Vector{NTuple{2, Symbol}}(),
                     Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}(), PVModel{Parameter}())
-        update_from_model!(meval)
+        scan_model!(meval)
         return meval
     end
 end
 
 
-function update_from_model!(meval::ModelEval)
+function scan_model!(meval::ModelEval)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
