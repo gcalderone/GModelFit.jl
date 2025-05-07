@@ -92,8 +92,16 @@ end
 
 
 # ====================================================================
+function fit(fitprob::AbstractFitProblem, mzer::AbstractMinimizer=lsqfit())
+    starttime = time()
+    status = minimize!(fitprob, mzer)
+    bestfit = [ModelSnapshot(meval) for meval in fitprob.mevals]
+    stats = FitStats(fitprob, status, time() - starttime)
+    return bestfit, stats
+end
+
 function fit!(fitprob::AbstractFitProblem, args...; kws...)
-    bestfit, stats = fit(fitprob, args...; kws...)
+    bestfit, stats = fit(fitprob, args...; kws...) # invoke non-modifying fit() function
     for i in 1:length(fitprob.mevals)
         for (cname, comp) in fitprob.mevals[i].model
             for (pname, par) in getparams(comp)
@@ -102,14 +110,6 @@ function fit!(fitprob::AbstractFitProblem, args...; kws...)
             end
         end
     end
-    return bestfit, stats
-end
-
-function fit(fitprob::AbstractFitProblem, mzer::AbstractMinimizer=lsqfit())
-    starttime = time()
-    status = minimize!(fitprob, mzer)
-    bestfit = [ModelSnapshot(meval) for meval in fitprob.mevals]
-    stats = FitStats(fitprob, status, time() - starttime)
     return bestfit, stats
 end
 
@@ -130,17 +130,6 @@ compare(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fit(models, 
 
 
 """
-    fit!(model::Model, data::Measures, minimizer::AbstractMinimizer=lsqfit())
-
-Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
-"""
-function fit!(model::Model, data::AbstractMeasures, args...; kws...)
-    bestfit, stats = fit!([model], [data], args...; kws...)
-    return bestfit[1], stats
-end
-
-
-"""
     fit(model::Model, data::Measures, minimizer::AbstractMinimizer=lsqfit())
 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
@@ -152,12 +141,14 @@ end
 
 
 """
-    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, minimizer::AbstractMinimizer=lsqfit())
+    fit!(model::Model, data::Measures, minimizer::AbstractMinimizer=lsqfit())
 
-Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
+Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
-fit!(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
-    fit!(FitProblemChiSq(models, datasets)               , args...; kws...)
+function fit!(model::Model, data::AbstractMeasures, args...; kws...)
+    bestfit, stats = fit!([model], [data], args...; kws...)
+    return bestfit[1], stats
+end
 
 
 """
@@ -169,3 +160,10 @@ fit(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where
     fit(FitProblemChiSq(models, datasets)               , args...; kws...)
 
 
+"""
+    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, minimizer::AbstractMinimizer=lsqfit())
+
+Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
+"""
+fit!(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
+    fit!(FitProblemChiSq(models, datasets)               , args...; kws...)
