@@ -39,7 +39,7 @@ dependencies(model::ModelSnapshot, cname::Symbol) = model.deps[cname]
 evalcounter(model::ModelSnapshot, cname::Symbol) = model.evalcounters[cname]
 comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
 comptypes(model::ModelSnapshot) = model.comptypes
-Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.params, name)
+Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.buffers, name)
 function Base.getindex(model::ModelSnapshot, name::Symbol)
     @assert name in keys(model.buffers)
     if name in keys(model.params)
