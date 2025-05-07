@@ -26,7 +26,7 @@ abstract type AbstractMinimizer end
 
 # --------------------------------------------------------------------
 struct dry <: AbstractMinimizer; end
-function minimize!(fitprob::AbstractFitProblem, mzer::dry)
+function minimize!(fitprob::FitProblem, mzer::dry)
     params = free_params(fitprob)
     update!(fitprob,
             getfield.(params, :val),
@@ -43,7 +43,7 @@ mutable struct lsqfit <: AbstractMinimizer
     lsqfit() = new(nothing)
 end
 
-function minimize!(fitprob::AbstractFitProblem, mzer::lsqfit)
+function minimize!(fitprob::FitProblem, mzer::lsqfit)
     params = free_params(fitprob)
     ndata = length(residuals(fitprob))
     prog = ProgressUnknown(desc="Model (dof=$(dof(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
@@ -93,7 +93,7 @@ mutable struct cmpfit <: AbstractMinimizer
     end
 end
 
-function minimize!(fitprob::AbstractFitProblem, mzer::cmpfit)
+function minimize!(fitprob::FitProblem, mzer::cmpfit)
     params = free_params(fitprob)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)

@@ -421,8 +421,7 @@ end
 
 include("evaluation.jl")
 include("snapshot.jl")
-
-abstract type AbstractFitProblem end
+include("fitproblem.jl")
 include("minimizers.jl")
 include("fit.jl")
 include("serialize.jl")

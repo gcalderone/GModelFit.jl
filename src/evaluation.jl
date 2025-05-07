@@ -300,8 +300,6 @@ function set_bestfit!(meval::ModelEval, pvalues::Vector{Float64}, uncerts::Vecto
     nothing
 end
 
-include("evaluation_multi.jl")
-
 
 # ====================================================================
 # Evaluate Model on the given domain
