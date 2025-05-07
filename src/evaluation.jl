@@ -158,7 +158,9 @@ struct ModelEval
                 push!(pactual, cname, pname, par.val)
                 push!(isfixed, isParamFixed(par)  ||  model.fixed[cname])
             end
+        end
 
+        for (cname, ceval) in cevals
             i = 1
             for d in dependencies(model, cname, select_domain=true)
                 push!(ceval.deps, coords(domain, i))
