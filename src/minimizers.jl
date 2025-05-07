@@ -28,9 +28,9 @@ abstract type AbstractMinimizer end
 struct dry <: AbstractMinimizer; end
 function minimize!(fitprob::FitProblem, mzer::dry)
     params = free_params(fitprob)
-    update!(fitprob,
-            getfield.(params, :val),
-            fill(NaN, length(params)))
+    evaluate!(fitprob,
+              getfield.(params, :val),
+              fill(NaN, length(params)))
     return MinimizerStatusDry()
 end
 
@@ -49,7 +49,7 @@ function minimize!(fitprob::FitProblem, mzer::lsqfit)
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
                                        ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                       update!(fitprob, pvalues)
+                                       evaluate!(fitprob, pvalues)
                                        return residuals(fitprob)
                                    end,
                                    1.:ndata, fill(0., ndata),
@@ -61,7 +61,7 @@ function minimize!(fitprob::FitProblem, mzer::lsqfit)
         return MinimizerStatusError("Not converged")
     end
 
-    update!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
+    evaluate!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
     return MinimizerStatusOK()
 end
 
@@ -106,13 +106,13 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
         parinfo[i].limits  = (low[i], high[i])
     end
 
-    update!(fitprob, guess)
+    evaluate!(fitprob, guess)
     last_fitstat = fitstat(fitprob)
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
         mzer.result = CMPFit.cmpfit((pvalues) -> begin
                                         ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                        update!(fitprob, pvalues)
+                                        evaluate!(fitprob, pvalues)
                                         return residuals(fitprob)
                                     end,
                                     guess, parinfo=parinfo, config=mzer.config)
@@ -131,9 +131,9 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
         end
 
         ProgressMeter.finish!(prog)
-        update!(fitprob,
-                getfield.(Ref(mzer.result), :param),
-                getfield.(Ref(mzer.result), :perror))
+        evaluate!(fitprob,
+                  getfield.(Ref(mzer.result), :param),
+                  getfield.(Ref(mzer.result), :perror))
 
         if mzer.result.status == 2
             return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")

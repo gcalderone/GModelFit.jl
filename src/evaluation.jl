@@ -8,7 +8,7 @@ A container for a component to be evaluated on a specific domain.
  - `comp::AbstractComponent`: the wrapped component;
  - `domain::AbstractDomain`: the domain where the component is supposed to be evaluated;
  - `counter::Int`: the number of times the component has been evaluated since creatio of the `CompEval` object;
- - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `update!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
+ - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `evaluate!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
  - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
@@ -41,7 +41,7 @@ evaluate!(ceval::CompEval{T, D}, par_values...) where {T <: AbstractComponent, D
 
 
 """
-    update!(ceval::CompEval, pvalues::Vector{Float64})
+    evaluate_comp!(ceval::CompEval, pvalues::Vector{Float64})
 
 Update a `CompEval` structure using the provided parameter values.
 
@@ -52,8 +52,9 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function update!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
-                 pvalues::AbstractVector{Float64})
+function evaluate_comp!(ceval::CompEval{<: AbstractComponent, <: AbstractDomain},
+                        pvalues::AbstractVector{Float64})
+    # This is named evaluate_comp! rather than evaluate! to distinguish it from evaluate!(ceval::GModelFit.CompEval{GModelFit.FComp}, params...)
     if any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)  ||  (length(ceval.deps) > 0)
         evaluate!(ceval, pvalues...)
         ceval.lastparvalues .= pvalues
@@ -76,7 +77,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
         end
     end
-    update!(ceval, collect(values(pvalues)))
+    evaluate_comp!(ceval, collect(values(pvalues)))
     return ceval.buffer
 end
 
@@ -116,13 +117,13 @@ struct ModelEval
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
                     PVModel{Float64}(), PVModel{Float64}(), Vector{NTuple{2, Symbol}}(),
                     Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}(), PVModel{Parameter}())
-        scan_model!(meval)
+        update!(meval, evaluate=false)
         return meval
     end
 end
 
 
-function scan_model!(meval::ModelEval)
+function update!(meval::ModelEval; evaluate=true)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -197,6 +198,8 @@ function scan_model!(meval::ModelEval)
         compeval_sequence!(meval.seq, meval, meval.maincomp)
     end
     compeval_sequence!(meval)
+
+    evaluate  &&  evaluate!(meval)
 end
 
 
@@ -220,11 +223,11 @@ end
 
 
 """
-    update!(meval::ModelEval)
+    evaluate!(meval::ModelEval)
 
 Update a `ModelEval` structure by evaluating all components in the model.
 """
-function update!(meval::ModelEval)
+function evaluate!(meval::ModelEval)
     # Patch parameter values
     for (cname, pname) in meval.patched
         par = getfield(meval.model[cname], pname)
@@ -251,7 +254,7 @@ function update!(meval::ModelEval)
 
     # Evaluation of all components
     for cname in meval.seq
-        update!(meval.cevals[cname], items(meval.pactual[cname]))
+        evaluate_comp!(meval.cevals[cname], items(meval.pactual[cname]))
     end
     return meval
 end
@@ -286,7 +289,7 @@ last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.ce
 
 function set_bestfit!(meval::ModelEval, pvalues::Vector{Float64}, uncerts::Vector{Float64})
     set_pvalues!(meval, pvalues)
-    update!(meval)
+    evaluate!(meval)
 
     empty!(meval.bestfit)
     i = 1
@@ -313,7 +316,7 @@ end
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     meval = ModelEval(model, domain)
-    update!(meval)
+    evaluate!(meval)
     if isnothing(cname)
         return last_evaluation(meval)
     else

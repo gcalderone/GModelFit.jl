@@ -16,7 +16,7 @@ function free_params_indices(mevals::Vector{ModelEval})
 end
 
 
-scan_model!(mevals::Vector{ModelEval}) = scan_model!.(mevals)
+update!(mevals::Vector{ModelEval}) = update!.(mevals)
 
 
 function free_params(mevals::Vector{ModelEval})
@@ -36,14 +36,14 @@ function set_pvalues!(mevals::Vector{ModelEval}, pvalues::Vector{Float64})
 end
 
 
-function update!(mevals::Vector{ModelEval})
+function evaluate!(mevals::Vector{ModelEval})
     if length(mevals[1].pvmulti) == 0
         pvmulti = [mevals[i].pvalues for i in 1:length(mevals)]
         for i in 1:length(mevals)
             append!(mevals[i].pvmulti, pvmulti)
         end
     end
-    return update!.(mevals)
+    return evaluate!.(mevals)
 end
 
 function set_bestfit!(mevals::Vector{ModelEval}, pvalues::Vector{Float64}, uncerts::Vector{Float64})
@@ -83,7 +83,7 @@ struct FitProblem{T <: AbstractFitStat}
 
     function FitProblem(mevals::Vector{ModelEval}, datasets::Vector{Measures{N}}) where N
         @assert length(mevals) == length(datasets)
-        update!(mevals)
+        evaluate!(mevals)
         buffer = fill(NaN, sum(length.(datasets)))
         return new{ChiSquared}(mevals, datasets, buffer)
     end
@@ -96,9 +96,9 @@ residuals(fitprob::FitProblem) = return fitprob.buffer
 # FitProblem{ChiSquared} specific methods
 dof(fitprob::FitProblem{ChiSquared}) = sum(length.(fitprob.data)) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
-function update!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64}, puncerts=Float64[])
+function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64}, puncerts=Float64[])
     set_pvalues!(fitprob.mevals, pvalues)
-    update!(fitprob.mevals)
+    evaluate!(fitprob.mevals)
 
     # Populate residuals
     i1 = 1

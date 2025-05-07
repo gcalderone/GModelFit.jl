@@ -52,7 +52,7 @@ using PrecompileTools
         bestfit, stats = fit(model, data)
 
         # mevals = [GModelFit.ModelEval(model[i], data[i].domain) for i in 1:length(model)]
-        # GModelFit.update!(mevals);
+        # GModelFit.evaluate!(mevals);
         # GModelFit.update_setparvals(mevals[1], rand(GModelFit.nfree(mevals[1])))
         # GModelFit.update_evaluation!(mevals[1])
         # @gp GModelFit.last_evaluation(mevals[1])
