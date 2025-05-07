@@ -421,13 +421,15 @@ end
 
 include("evaluation.jl")
 include("snapshot.jl")
+
+abstract type AbstractFitProblem end
 include("minimizers.jl")
 include("fit.jl")
-include("multimodel.jl")
+# TODO include("multimodel.jl")
 include("serialize.jl")
 include("show.jl")
 include("utils.jl")
 include("gnuplot_recipe.jl")
-include("precompile.jl")
+# TODO include("precompile.jl")
 
 end

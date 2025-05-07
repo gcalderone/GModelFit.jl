@@ -92,31 +92,6 @@ include("components/SumReducer.jl")
 
 
 # ====================================================================
-struct ParameterVectors
-    params::PVModel{Parameter}
-    values::PVModel{Float64}
-    actual::PVModel{Float64}
-    ifree::Vector{Int}
-    ParameterVectors() = new(PVModel{Parameter}(), PVModel{Float64}(),
-                             PVModel{Float64}(), Vector{Int}())
-end
-function empty!(pv::ParameterVectors)
-    empty!(pv.params)
-    empty!(pv.values)
-    empty!(pv.actual)
-    empty!(pv.ifree)
-end
-function push!(pv::ParameterVectors, cname::Symbol, pname::Symbol, par::Parameter)
-    push!(pv.params, cname, pname, par)
-    push!(pv.values, cname, pname, par.val)
-    push!(pv.actual, cname, pname, par.actual)
-    if !par.fixed
-        push!(pv.ifree, length(items(pv.params)))
-    end
-end
-
-
-# ====================================================================
 """
     ModelEval(model::Model, domain::AbstractDomain)
 
@@ -128,22 +103,106 @@ struct ModelEval
     model::Model
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    pv::ParameterVectors
+    maincomp::Symbol
+    pvalues::PVModel
+    pactual::PVModel
+    ifree::Vector{Int}
     pvmulti::Vector{PVModel{Float64}}
-    maincomp::Vector{Symbol}
+    bestfit::PVModel{Parameter}
 
     function ModelEval(model::Model, domain::AbstractDomain)
-        out = new(model, domain, OrderedDict{Symbol, CompEval}(),
-                  ParameterVectors(), Vector{PVModel{Float64}}(),
-                  Vector{Symbol}())
-        # update!(out)  This would cause error in the multimodel case
-        return out
+        function isParamFixed(par::Parameter)
+            if !isnothing(par.patch)
+                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
+                if isa(par.patch, Symbol)  # use same param. value from a different component
+                    return true
+                else                       # invoke a patch function
+                    @assert length(par.patch.args) in [1,2]
+                    if length(par.patch.args) == 1
+                        return true
+                    else
+                        return false
+                    end
+                end
+            elseif !isnothing(par.mpatch)
+                @assert length(par.mpatch.args) in [1,2]
+                if length(par.mpatch.args) == 1
+                    return true
+                else
+                    return false
+                end
+            end
+            return par.fixed
+        end
+
+        cevals = OrderedDict{Symbol, CompEval}()
+        pvalues = PVModel{Float64}()
+        pactual = PVModel{Float64}()
+        isfixed = Vector{Bool}()
+
+        for (cname, comp) in model.comps
+            ceval = CompEval(comp, domain)
+            cevals[cname] = ceval
+
+            for (pname, par) in getparams(comp)
+                if !(par.low <= par.val <= par.high)
+                    s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
+                    error(s)
+                end
+                if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
+                    s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
+                    error(s)
+                end
+
+                push!(pvalues, cname, pname, par.val)
+                push!(pactual, cname, pname, par.val)
+                push!(isfixed, isParamFixed(par)  ||  model.fixed[cname])
+            end
+
+            i = 1
+            for d in dependencies(model, cname, select_domain=true)
+                push!(ceval.deps, coords(domain, i))
+                i += 1
+            end
+            for d in dependencies(model, cname, select_domain=false)
+                push!(ceval.deps, cevals[d].buffer)
+            end
+        end
+
+        return new(model, domain, cevals, find_maincomp(model),
+                   pvalues, pactual, findall(.! isfixed),
+                   Vector{PVModel{Float64}}(), PVModel{Parameter}())
     end
 end
 
 
-free_params(meval::ModelEval) = collect(items(meval.pv.params)[meval.pv.ifree])
-nfree(meval::ModelEval) = length(meval.pv.ifree)
+function free_params(meval::ModelEval)
+    out = Vector{Parameter}()
+    for (cname, comp) in meval.model.comps
+        for (pname, par) in getparams(comp)
+            push!(out, par)
+        end
+    end
+    return out[meval.ifree]
+end
+nfree(meval::ModelEval) = length(meval.ifree)
+
+
+# Set new model parameters
+function set_pvalues!(meval::ModelEval, pvalues::Vector{Float64})
+    if !isa(meval.pvalues, PVModel{Float64})
+        meval.pvalues = PVModel{Float64}()
+        meval.pactual = PVModel{Float64}()
+        for (cname, comp) in meval.model.comps
+            for (pname, par) in getparams(comp)
+                push!(meval.pvalues, cname, pname, par.val)
+                push!(meval.pactual, cname, pname, par.val)
+            end
+        end
+    end
+    items(meval.pvalues)[meval.ifree] .= pvalues
+    items(meval.pactual)[meval.ifree] .= pvalues
+end
 
 
 """
@@ -152,112 +211,26 @@ nfree(meval::ModelEval) = length(meval.pv.ifree)
 Update a `ModelEval` structure by evaluating all components in the model.
 """
 function update!(meval::ModelEval)
-    (length(meval.model) == 0)  &&  (return meval)  # to handle empty Model object
-    update_init!(meval)
-    update_evaluation!(meval)
-    update_finalize!(meval)
-    return meval
-end
-
-
-# Evaluation step init:
-# - update internal structures before fitting
-function update_init!(meval::ModelEval)
-    empty!(meval.maincomp)
-    push!(meval.maincomp, find_maincomp(meval.model))
-
-    for (cname, comp) in meval.model.comps
-        (cname in keys(meval.cevals))  &&  continue
-        meval.cevals[cname] = CompEval(comp, meval.domain)
-    end
-
-    empty!(meval.pv)
-    for (cname, ceval) in meval.cevals
-        for (pname, _par) in getparams(ceval.comp)
-            # Parameter may be changed here, hence we take a copy of the original one
-            par = deepcopy(_par)
-            if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-            if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
-                s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-
-            if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
-                if isa(par.patch, Symbol)  # use same param. value from a different component
-                    par.fixed = true
-                else                       # invoke a patch function
-                    @assert length(par.patch.args) in [1,2]
-                    if length(par.patch.args) == 1
-                        par.fixed = true
-                    else
-                        par.fixed = false
-                    end
-                end
-            elseif !isnothing(par.mpatch)
-                @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
-                @assert length(par.mpatch.args) in [1,2]
-                if length(par.mpatch.args) == 1
-                    par.fixed = true
-                else
-                    par.fixed = false
-                end
-            end
-            if meval.model.fixed[cname]
-                par.fixed = true
-            end
-            push!(meval.pv, cname, pname, par)
-        end
-
-        empty!(ceval.deps)
-        i = 1
-        for d in dependencies(meval.model, cname, select_domain=true)
-            push!(ceval.deps, coords(meval.domain, i))
-            i += 1
-        end
-        for d in dependencies(meval.model, cname, select_domain=false)
-            push!(ceval.deps, meval.cevals[d].buffer)
-        end
-    end
-end
-
-
-# Set new model parameters
-function update_setparvals(meval::ModelEval, pvalues::Vector{Float64})
-    items(meval.pv.values)[meval.pv.ifree] .= pvalues
-end
-
-
-# Evaluation step fit:
-# - copy all parameter values into actual;
-# - update actual by invoking the patch functions;
-# - evaluation of all components
-function update_evaluation!(meval::ModelEval)
-    # Copy pvalues into actual
-    items(meval.pv.actual) .= items(meval.pv.values)
     # Patch parameter values
-    for (cname, comp) in meval.pv.params
-        for (pname, par) in comp
+    for (cname, comp) in meval.model.comps
+        for (pname, par) in getparams(comp)
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
-                    meval.pv.actual[cname][pname] = meval.pv.values[par.patch][pname]
+                    meval.pactual[cname][pname] = meval.values[par.patch][pname]
                 else                       # invoke a patch function
                     if length(par.patch.args) == 1
-                        meval.pv.actual[cname][pname] = par.patch(meval.pv.values)
+                        meval.pactual[cname][pname] = par.patch(meval.pvalues)
                     else
-                        meval.pv.actual[cname][pname] = par.patch(meval.pv.values, meval.pv.values[cname][pname])
+                        meval.pactual[cname][pname] = par.patch(meval.pvalues, meval.pvalues[cname][pname])
                     end
                 end
             elseif !isnothing(par.mpatch)
                 @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
                 if length(par.mpatch.args) == 1
-                    meval.pv.actual[cname][pname] = par.mpatch(meval.pvmulti)
+                    meval.pactual[cname][pname] = par.mpatch(meval.pvmulti)
                 else
-                    meval.pv.actual[cname][pname] = par.mpatch(meval.pvmulti, meval.pv.values[cname][pname])
+                    meval.pactual[cname][pname] = par.mpatch(meval.pvmulti, meval.pvalues[cname][pname])
                 end
             end
         end
@@ -269,33 +242,10 @@ function update_evaluation!(meval::ModelEval)
         for d in dependencies(meval.model, cname)
             update_compeval_recursive(meval, d)
         end
-        update!(meval.cevals[cname], items(meval.pv.actual[cname]))
+        update!(meval.cevals[cname], items(meval.pactual[cname]))
     end
-    update_compeval_recursive(meval, meval.maincomp[1])
-end
-
-
-# Evaluation step finalize:
-# - copy back bestfit, actual values and uncertainties into their original Parameter structures.
-function update_finalize!(meval::ModelEval, uncerts=Vector{Float64}[])
-    i = 1
-    for (cname, comp) in meval.pv.params
-        for (pname, par) in comp
-            par.val    = meval.pv.values[cname][pname]
-            par.actual = meval.pv.actual[ cname][pname]
-            if (length(uncerts) > 0)  &&  (!par.fixed)
-                par.unc = uncerts[i]
-                i += 1
-            else
-                par.unc = NaN
-            end
-        end
-    end
-
-    # Also update Model's parameters
-    for (cname, ceval) in meval.cevals
-        setparams!(meval.model[cname], meval.pv.params[cname])
-    end
+    update_compeval_recursive(meval, meval.maincomp)
+    return meval
 end
 
 
@@ -322,8 +272,33 @@ evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname)
 
 Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
 """
-last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.maincomp[1])
+last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.maincomp)
 last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
+
+
+function set_bestfit!(meval::ModelEval, pvalues::Vector{Float64}, uncerts::Vector{Float64})
+    set_pvalues!(meval, pvalues)
+    update!(meval)
+
+    empty!(meval.bestfit)
+    i = 1
+    for (cname, comp) in meval.model.comps
+        for (pname, _par) in getparams(comp)
+            par = deepcopy(_par)
+            par.val    = meval.pvalues[cname][pname]
+            par.actual = meval.pactual[cname][pname]
+            push!(meval.bestfit, cname, pname, par)
+            if length(meval.bestfit.data) in meval.ifree
+                par.unc = uncerts[i]
+                par.fixed = false
+                i += 1
+            else
+                par.fixed = true
+            end
+        end
+    end
+    nothing
+end
 
 
 # ====================================================================

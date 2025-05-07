@@ -2,7 +2,7 @@ function free_params_indices(mevals::Vector{ModelEval})
     out = Vector{NTuple{3, Int}}()
     i1 = 1
     for id in 1:length(mevals)
-        nn = length(mevals[id].pv.ifree)
+        nn = length(mevals[id].ifree)
         if nn > 0
             i2 = i1 + nn - 1
             push!(out, (id, i1, i2))
@@ -12,44 +12,6 @@ function free_params_indices(mevals::Vector{ModelEval})
     return out
 end
 
-function update!(mevals::Vector{ModelEval})
-    update_init!(mevals)
-    update_evaluation!(mevals)
-    update_finalize!(mevals)
-    return mevals
-end
-
-function update_init!(mevals::Vector{ModelEval})
-    # Populate pvmulti fields in all Model structures to notify we are
-    # going to perform a multi-model fitting
-    for i in 1:length(mevals)
-        empty!(mevals[i].pvmulti)
-        for j in 1:length(mevals)
-            push!(mevals[i].pvmulti, mevals[j].pv.values)
-        end
-    end
-    update_init!.(mevals)
-end
-
-function update_setparvals(mevals::Vector{ModelEval}, pvalues::Vector{Float64})
-    for (id, i1, i2) in free_params_indices(mevals)
-        update_setparvals(mevals[id], pvalues[i1:i2])
-    end
-end
-
-function update_evaluation!(mevals::Vector{ModelEval})
-    update_evaluation!.(mevals)
-end
-
-function update_finalize!(mevals::Vector{ModelEval}, uncerts=Vector{Float64}[])
-    if length(uncerts) > 0
-        for (id, i1, i2) in free_params_indices(mevals)
-            update_finalize!(mevals[id], pvalues[i1:i2])
-        end
-    else
-        update_finalize!.(mevals)
-    end
-end
 
 function free_params(mevals::Vector{ModelEval})
     out = Vector{Parameter}()
@@ -61,9 +23,28 @@ end
 nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
 
+function set_pvalues!(mevals::Vector{ModelEval}, pvalues::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(mevals)
+        set_pvalues!(mevals[id], pvalues[i1:i2])
+    end
+    pvmulti = [mevals[i].pvalues for i in 1:length(mevals)]
+    for i in 1:length(mevals)
+        mevals[i].pvmulti = pvmulti
+    end
+end
+
+update!(mevals::Vector{ModelEval}) = update!.(mevals)
+
+function set_bestfit!(mevals::Vector{ModelEval}, pvalues::Vector{Float64}, uncerts::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(mevals)
+        set_bestfit!(mevals[id], pvalues[i1:i2], uncerts[i1:i2])
+    end
+end
+
+
 # ====================================================================
 """
-    MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer}
+    FitProblemChiSqMulti
 
 A structure representing the distance between a `Vector{ModelEval}` and a corresponding number of datasets. The "distance" is expressed in terms of weighted residuals.
 
@@ -75,13 +56,12 @@ A minimizer can be invoked via the `minimize!` function  to reduce such distance
 - `buffer::Vector{Float64}`: Weighted residuals for each point in the domain of each dataset;
 - `mzer::AbstractMinimizer`: Minimizer used to reduce the residuals.
 """
-struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: AbstractResiduals{T, M}
+struct FitProblemChiSqMulti <: AbstractFitProblem
     mevals::Vector{ModelEval}
-    data::Vector{T}
+    data::Vector{<: AbstractMeasures}
     buffer::Vector{Float64}
-    mzer::M
 
-    function MultiResiduals(mevals::Vector{ModelEval}, datasets::Vector{T}, mzer::M=dry()) where {T <: AbstractMeasures, M <: AbstractMinimizer}
+    function FitProblemChiSqMulti(mevals::Vector{ModelEval}, datasets::Vector{T}) where {T <: AbstractMeasures}
         @assert length(mevals) == length(datasets)
         update!(mevals)
         buffer = fill(NaN, sum(length.(datasets)))
@@ -89,56 +69,60 @@ struct MultiResiduals{T <: AbstractMeasures, M <: AbstractMinimizer} <: Abstract
     end
 end
 
-free_params(mresid::MultiResiduals) = free_params(mresid.mevals)
-nfree(mresid::MultiResiduals) = nfree(mresid.mevals)
-dof(mresid::MultiResiduals) = sum(length.(mresid.data)) - nfree(mresid)
+free_params(fitprob::FitProblemChiSqMulti) = free_params(fitprob.mevals)
+nfree(fitprob::FitProblemChiSqMulti) = nfree(fitprob.mevals)
+dof(fitprob::FitProblemChiSqMulti) = sum(length.(fitprob.data)) - nfree(fitprob)
 
-residuals(mresid::MultiResiduals) = mresid.buffer
-function residuals(mresid::MultiResiduals, pvalues::Vector{Float64})
+function update!(fitprob::FitProblemChiSqMulti, pvalues::Vector{Float64}, puncerts=Float64[]))
     # Must set pvalues on all models before any evaluation
-    update_setparvals(mresid.mevals, pvalues)
+    set_pvalues!(fitprob.mevals, pvalues)
 
     # Populate residuals
     i1 = 1
-    for i in 1:length(mresid.mevals)
-        meval = mresid.mevals[i]
-        update_evaluation!(meval)
+    for i in 1:length(fitprob.mevals)
+        meval = fitprob.mevals[i]
+        update!(meval)
         nn = length(last_evaluation(meval))
         if nn > 0
             i2 = i1 + nn - 1
-            mresid.buffer[i1:i2] .= (last_evaluation(meval) .- values(mresid.data[i])) ./ uncerts(mresid.data[i])
+            fitprob.buffer[i1:i2] .= (last_evaluation(meval) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i])
             i1 += nn
         end
     end
-    return mresid.buffer
+
+    if length(puncerts) > 0
+        set_bestfit!(fitprob.meval, pvalues, puncerts)
+    end
+
+    return fitprob.buffer
 end
 
-fit_stat(mresid::MultiResiduals) =
-    sum(abs2, mresid.buffer) / dof(mresid)
+fit_stat(fitprob::FitProblemChiSqMulti) =
+    sum(abs2, fitprob.buffer) / dof(fitprob)
 
-function finalize!(mresid::MultiResiduals, best::Vector{Float64}, uncerts::Vector{Float64})
-    @assert nfree(mresid) == length(best) == length(uncerts)
-    residuals(mresid, best)
-    for (id, i1, i2) in free_params_indices(mresid.mevals)
-        update_finalize!(mresid.mevals[id], uncerts[i1:i2])
+function finalize!(fitprob::FitProblemChiSqMulti, best::Vector{Float64}, uncerts::Vector{Float64})
+    @assert nfree(fitprob) == length(best) == length(uncerts)
+    residuals(fitprob, best)
+    for (id, i1, i2) in free_params_indices(fitprob.mevals)
+        # TODO update_finalize!(fitprob.mevals[id], uncerts[i1:i2])
     end
 end
 
 
 # ====================================================================
 """
-    minimize!(mresid::MultiResiduals)
+    minimize!(fitprob::FitProblemChiSqMulti)
 
 Invoke a minimizer to reduce the residuals between a set of models and a corresponding number of datasets.
 """
-function minimize!(mresid::MultiResiduals)
+function minimize!(fitprob::FitProblemChiSqMulti)
     starttime = time()
-    update!(mresid.mevals)
-    @assert nfree(mresid) > 0 "No free parameter in the model"
-    status = _minimize!(mresid)
-    bestfit = ModelSnapshot.(mresid.mevals)
-    stats = FitStats(mresid, status, time() - starttime)
-    # test_serialization(bestfit, stats, mresid.data)
+    update!(fitprob.mevals)
+    @assert nfree(fitprob) > 0 "No free parameter in the model"
+    status = _minimize!(fitprob)
+    bestfit = ModelSnapshot.(fitprob.mevals)
+    stats = FitStats(fitprob, status, time() - starttime)
+    # test_serialization(bestfit, stats, fitprob.data)
     return (bestfit, stats)
 end
 
@@ -151,8 +135,8 @@ Fit a multi-model to a set of empirical data sets using the specified minimizer 
 function fit!(multi::Vector{Model}, data::Vector{Measures{N}}; minimizer::AbstractMinimizer=lsqfit()) where N
     mevals = [ModelEval(multi[i], data[i].domain) for i in 1:length(multi)]
     update!(mevals)
-    mresid = MultiResiduals(mevals, data, minimizer)
-    return minimize!(mresid)
+    fitprob = FitProblemChiSqMulti(mevals, data, minimizer)
+    return minimize!(fitprob)
 end
 
 

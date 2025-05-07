@@ -20,9 +20,10 @@ function ModelSnapshot(meval::ModelEval)
     for cname in keys(meval.cevals)
         deps[cname] = dependencies(meval.model, cname)
     end
-    ModelSnapshot(deepcopy(meval.domain), deepcopy(meval.pv.params),
+
+    ModelSnapshot(deepcopy(meval.domain), deepcopy(meval.bestfit),
                   OrderedDict([Pair(cname, ceval.buffer) for (cname, ceval) in meval.cevals]),
-                  meval.maincomp[1],
+                  meval.maincomp,
                   comptypes(meval.model),
                   OrderedDict([Pair(cname, isfreezed(meval.model, cname)) for cname in keys(meval.cevals)]),
                   deps, evalcounters(meval))
@@ -40,10 +41,11 @@ comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
 comptypes(model::ModelSnapshot) = model.comptypes
 Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.params, name)
 function Base.getindex(model::ModelSnapshot, name::Symbol)
+    @assert name in keys(model.buffers)
     if name in keys(model.params)
         return model.params[name]
     end
-    error("Name $name not defined")
+    return PVComp(model.params)
 end
 
 Base.length(model::ModelSnapshot) = length(model.buffers)
