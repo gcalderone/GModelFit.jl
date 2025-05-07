@@ -104,8 +104,8 @@ struct ModelEval
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     maincomp::Symbol
-    pvalues::PVModel
-    pactual::PVModel
+    pvalues::PVModel{Float64}
+    pactual::PVModel{Float64}
     ifree::Vector{Int}
     pvmulti::Vector{PVModel{Float64}}
     bestfit::PVModel{Parameter}
@@ -299,6 +299,8 @@ function set_bestfit!(meval::ModelEval, pvalues::Vector{Float64}, uncerts::Vecto
     end
     nothing
 end
+
+include("evaluation_multi.jl")
 
 
 # ====================================================================
