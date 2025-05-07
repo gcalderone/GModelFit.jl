@@ -191,17 +191,8 @@ nfree(meval::ModelEval) = length(meval.ifree)
 
 
 # Set new model parameters
+set_pvalues!(meval::ModelEval) = set_pvalues!(meval, getfield.(free_params(meval), :val))
 function set_pvalues!(meval::ModelEval, pvalues::Vector{Float64})
-    if !isa(meval.pvalues, PVModel{Float64})
-        meval.pvalues = PVModel{Float64}()
-        meval.pactual = PVModel{Float64}()
-        for (cname, comp) in meval.model.comps
-            for (pname, par) in getparams(comp)
-                push!(meval.pvalues, cname, pname, par.val)
-                push!(meval.pactual, cname, pname, par.val)
-            end
-        end
-    end
     items(meval.pvalues)[meval.ifree] .= pvalues
     items(meval.pactual)[meval.ifree] .= pvalues
 end
