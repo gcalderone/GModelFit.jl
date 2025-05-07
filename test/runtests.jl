@@ -125,7 +125,7 @@ models = [model1, model2]
 freeze!(models[1], :bkg);
 freeze!(models[2], :bkg);
 data = GModelFit.mock(Measures, models, [Domain(x), Domain(x)], seed=1)
-res = fit(models, data, minimizer=GModelFit.cmpfit())
+res = fit(models, data, GModelFit.cmpfit())
 # GModelFit.print_param_covariance(res, sort=true, select=["[2][l1].norm"])
 
 

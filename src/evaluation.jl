@@ -217,7 +217,7 @@ function update!(meval::ModelEval)
             if !isnothing(par.patch)
                 @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
                 if isa(par.patch, Symbol)  # use same param. value from a different component
-                    meval.pactual[cname][pname] = meval.values[par.patch][pname]
+                    meval.pactual[cname][pname] = meval.pvalues[par.patch][pname]
                 else                       # invoke a patch function
                     if length(par.patch.args) == 1
                         meval.pactual[cname][pname] = par.patch(meval.pvalues)

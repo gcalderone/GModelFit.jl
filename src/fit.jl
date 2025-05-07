@@ -16,9 +16,9 @@ struct FitProblemChiSq <: AbstractFitProblem
     data::Vector{<: AbstractMeasures}
     buffer::Vector{Float64}
 
-    FitProblemChiSq(model::Model, data::AbstractMeasures) = FitProblemChiSq([model], [data])
+    # FitProblemChiSq(model::Model, data::AbstractMeasures) = FitProblemChiSq([model], [data])
 
-    function FitProblemChiSq(models::Vector{Model}, datasets::Vector{<: AbstractMeasures})
+    function FitProblemChiSq(models::Vector{Model}, datasets::Vector{Measures{N}}) where N
         @assert length(models) == length(datasets)
         mevals = ModelEval.(models, getfield.(datasets, :domain))
         update!(mevals)
@@ -80,16 +80,15 @@ struct FitStats
     dof::Int
     fitstat::Float64
     status::AbstractMinimizerStatus
-
-    function FitStats(fitprob::T, status::AbstractMinimizerStatus, elapsed::Float64) where T <: AbstractFitProblem
-        ndata = length(residuals(fitprob))
-        nf = nfree(fitprob)
-        return new(elapsed,
-                   ndata, nf, ndata - nf,
-                   fitstat(fitprob), status)
-    end
 end
 
+function FitStats(fitprob::T, status::AbstractMinimizerStatus, elapsed::Float64) where T <: AbstractFitProblem
+    ndata = length(residuals(fitprob))
+    nf = nfree(fitprob)
+    return FitStats(elapsed,
+                    ndata, nf, ndata - nf,
+                    fitstat(fitprob), status)
+end
 
 # ====================================================================
 function fit(fitprob::AbstractFitProblem, mzer::AbstractMinimizer=lsqfit())
