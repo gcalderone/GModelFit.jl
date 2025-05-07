@@ -337,7 +337,7 @@ function show(io::IO, status::AbstractMinimizerStatus)
 end
 
 
-function show(io::IO, res::FitStats)
+function show(io::IO, res::FitSummary)
     section(io, "Fit results:", newline=false)
     print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %10.5g, ", res.ndata, res.nfree, res.fitstat))
     show(io, res.status)

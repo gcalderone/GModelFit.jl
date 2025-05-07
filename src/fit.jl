@@ -1,8 +1,8 @@
 # ====================================================================
 """
-    FitStats
+    FitSummary
 
-A structure representing the results of a fitting process.
+A structure summarizing the results of a fitting process.
 
 # Fields:
 - `elapsed::Float64`: elapsed time (in seconds);
@@ -12,9 +12,9 @@ A structure representing the results of a fitting process.
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 
-Note: the `FitStats` fields are supposed to be accessed directly by the user.
+Note: the `FitSummary` fields are supposed to be accessed directly by the user.
 """
-struct FitStats
+struct FitSummary
     elapsed::Float64
     ndata::Int
     nfree::Int
@@ -23,10 +23,10 @@ struct FitStats
     status::AbstractMinimizerStatus
 end
 
-function FitStats(fitprob::FitProblem, status::AbstractMinimizerStatus, elapsed::Float64)
+function FitSummary(fitprob::FitProblem, status::AbstractMinimizerStatus, elapsed::Float64)
     ndata = length(residuals(fitprob))
     nf = nfree(fitprob)
-    return FitStats(elapsed,
+    return FitSummary(elapsed,
                     ndata, nf, ndata - nf,
                     fitstat(fitprob), status)
 end
@@ -36,7 +36,7 @@ function fit(fitprob::FitProblem, mzer::AbstractMinimizer=lsqfit())
     starttime = time()
     status = minimize!(fitprob, mzer)
     bestfit = [ModelSnapshot(meval) for meval in fitprob.mevals]
-    stats = FitStats(fitprob, status, time() - starttime)
+    stats = FitSummary(fitprob, status, time() - starttime)
     return bestfit, stats
 end
 
@@ -57,14 +57,14 @@ end
 """
     compare(model::Model, data::AbstractMeasures)
 
-Compare a model to a dataset and return a `FitStats` object.
+Compare a model to a dataset and return a `FitSummary` object.
 """
 compare(model::Model, data::AbstractMeasures) = fit(model, data, dry())
 
 """
     compare(models::Vector{Model}, data::Vector{<: AbstractMeasures})
 
-Compare a multi-model to a multi-dataset and return a `FitStats` object.
+Compare a multi-model to a multi-dataset and return a `FitSummary` object.
 """
 compare(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fit(models, data, dry())
 

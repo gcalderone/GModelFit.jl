@@ -15,7 +15,7 @@ end
 
 # ====================================================================
 #= TODO
-function print_param_covariance(fitres::FitStats;
+function print_param_covariance(fitres::FitSummary;
                                 select=nothing, sort=false, threshold=0.)
     @assert isa(fitres.status.internal, CMPFit.Result) "Minimizer is not CMPFit"
 

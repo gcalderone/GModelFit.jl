@@ -45,30 +45,30 @@ _serialize(vv::PV.PVComp) = _serialize_struct(vv)
 _serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
-_serialize(vv::FitStats) = _serialize_struct(vv, add_show=true)
+_serialize(vv::FitSummary) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMinimizerStatus) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
 
-_serialize(model::ModelSnapshot, fitstats::FitStats                         ) = _serialize([model, fitstats])
-_serialize(model::ModelSnapshot, fitstats::FitStats, data::AbstractMeasures ) = _serialize([model, fitstats, data])
+_serialize(model::ModelSnapshot, summary::FitSummary                         ) = _serialize([model, summary])
+_serialize(model::ModelSnapshot, summary::FitSummary, data::AbstractMeasures ) = _serialize([model, summary, data])
 _serialize(multi::Vector{Model        }                                     ) = _serialize(ModelSnapshot.(multi))
-_serialize(multi::Vector{ModelSnapshot}, fitstats::FitStats                 ) = _serialize([multi, fitstats])
-function _serialize(multi::Vector{ModelSnapshot}, fitstats::FitStats, data::Vector{T}) where T <: AbstractMeasures
+_serialize(multi::Vector{ModelSnapshot}, summary::FitSummary                 ) = _serialize([multi, summary])
+function _serialize(multi::Vector{ModelSnapshot}, summary::FitSummary, data::Vector{T}) where T <: AbstractMeasures
     @assert length(multi) == length(data)
-    _serialize([multi, fitstats, data])
+    _serialize([multi, summary, data])
 end
 
 
 """
-    GModelFit.serialize(filename::String, ::ModelSnapshot[, ::FitStats[, ::Measures]]; compress=false)
-    GModelFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitStats[, ::Vector{Measures}]]; compress=false)
+    GModelFit.serialize(filename::String, ::ModelSnapshot[, ::FitSummary[, ::Measures]]; compress=false)
+    GModelFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitSummary[, ::Vector{Measures}]]; compress=false)
 
 Serialize GModelFit object(s) using a JSON format. The serializable objects are:
 - `ModelSnapshot` and `Vector{ModelSnapshot}` (mandatory argument);
-- `FitStats` (optional);
+- `FitSummary` (optional);
 - `Measures` and `Vector{Measures}` (optional);
 
 If `compress=true` the resulting JSON file will be compressed using GZip.
@@ -193,14 +193,14 @@ _deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
                                                _deserialize(dd["deps"]),
                                                _deserialize(dd["evalcounters"]))
 
-_deserialize(::Val{Symbol("GModelFit.FitStats")},
+_deserialize(::Val{Symbol("GModelFit.FitSummary")},
              dd::AbstractDict) =
-                 FitStats(_deserialize(dd["elapsed"]),
-                          _deserialize(dd["ndata"]),
-                          _deserialize(dd["nfree"]),
-                          _deserialize(dd["dof"]),
-                          _deserialize(dd["fitstat"]),
-                          _deserialize(dd["status"]))
+                 FitSummary(_deserialize(dd["elapsed"]),
+                            _deserialize(dd["ndata"]),
+                            _deserialize(dd["nfree"]),
+                            _deserialize(dd["dof"]),
+                            _deserialize(dd["fitstat"]),
+                            _deserialize(dd["status"]))
 
 _deserialize(::Val{Symbol("GModelFit.MinimizerStatusOK")},
              dd::AbstractDict) = MinimizerStatusOK()
