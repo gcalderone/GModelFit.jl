@@ -46,7 +46,7 @@ end
 function minimize!(fitprob::FitProblem, mzer::lsqfit)
     params = free_params(fitprob)
     ndata = length(residuals(fitprob))
-    prog = ProgressUnknown(desc="Model (dof=$(dof(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
                                        ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
                                        update!(fitprob, pvalues)
@@ -108,7 +108,7 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
 
     update!(fitprob, guess)
     last_fitstat = fitstat(fitprob)
-    prog = ProgressUnknown(desc="Model (dof=$(dof(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
         mzer.result = CMPFit.cmpfit((pvalues) -> begin
                                         ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
