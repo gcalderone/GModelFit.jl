@@ -106,14 +106,16 @@ struct ModelEval
     maincomp::Symbol
     pvalues::PVModel{Float64}
     pactual::PVModel{Float64}
+    patched::Vector{NTuple{2, Symbol}}
     ifree::Vector{Int}
     pvmulti::Vector{PVModel{Float64}}
+    seq::Vector{Symbol}
     bestfit::PVModel{Parameter}
 
     function ModelEval(model::Model, domain::AbstractDomain)
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
-                    PVModel{Float64}(), PVModel{Float64}(), Vector{Int}(),
-                    Vector{PVModel{Float64}}(), PVModel{Parameter}())
+                    PVModel{Float64}(), PVModel{Float64}(), Vector{NTuple{2, Symbol}}(),
+                    Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}(), PVModel{Parameter}())
         update_from_model!(meval)
         return meval
     end
@@ -140,6 +142,7 @@ function update_from_model!(meval::ModelEval)
     @assert meval.maincomp == find_maincomp(meval.model) "Main component is not allowed to change after ModelEval creation"
     empty!(meval.pvalues)
     empty!(meval.pactual)
+    empty!(meval.patched)
     empty!(meval.ifree)
     empty!(meval.pvmulti)
     empty!(meval.bestfit)
@@ -159,6 +162,9 @@ function update_from_model!(meval::ModelEval)
             push!(meval.pvalues, cname, pname, par.val)
             push!(meval.pactual, cname, pname, par.val)
             push!(isfixed, isParamFixed(par)  ||  meval.model.fixed[cname])
+            if !isnothing(par.patch)  ||  !isnothing(par.mpatch)
+                push!(meval.patched, (cname, pname))
+            end
         end
         if !(cname in keys(meval.cevals))
             ceval = CompEval(comp, meval.domain)
@@ -178,6 +184,19 @@ function update_from_model!(meval::ModelEval)
             push!(ceval.deps, meval.cevals[d].buffer)
         end
     end
+
+    function compeval_sequence!(seq::Vector{Symbol}, meval::ModelEval, cname::Symbol)
+        for d in dependencies(meval.model, cname)
+            compeval_sequence!(seq, meval, d)
+        end
+        push!(seq, cname)
+        return seq
+    end
+    function compeval_sequence!(meval::ModelEval)
+        empty!(meval.seq)
+        compeval_sequence!(meval.seq, meval, meval.maincomp)
+    end
+    compeval_sequence!(meval)
 end
 
 
@@ -207,39 +226,33 @@ Update a `ModelEval` structure by evaluating all components in the model.
 """
 function update!(meval::ModelEval)
     # Patch parameter values
-    for (cname, comp) in meval.model.comps
-        for (pname, par) in getparams(comp)
-            if !isnothing(par.patch)
-                @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
-                if isa(par.patch, Symbol)  # use same param. value from a different component
-                    meval.pactual[cname][pname] = meval.pvalues[par.patch][pname]
-                else                       # invoke a patch function
-                    if length(par.patch.args) == 1
-                        meval.pactual[cname][pname] = par.patch(meval.pvalues)
-                    else
-                        meval.pactual[cname][pname] = par.patch(meval.pvalues, meval.pvalues[cname][pname])
-                    end
-                end
-            elseif !isnothing(par.mpatch)
-                @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
-                if length(par.mpatch.args) == 1
-                    meval.pactual[cname][pname] = par.mpatch(meval.pvmulti)
+    for (cname, pname) in meval.patched
+        par = getfield(meval.model[cname], pname)
+        if !isnothing(par.patch)
+            @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
+            if isa(par.patch, Symbol)  # use same param. value from a different component
+                meval.pactual[cname][pname] = meval.pvalues[par.patch][pname]
+            else                       # invoke a patch function
+                if length(par.patch.args) == 1
+                    meval.pactual[cname][pname] = par.patch(meval.pvalues)
                 else
-                    meval.pactual[cname][pname] = par.mpatch(meval.pvmulti, meval.pvalues[cname][pname])
+                    meval.pactual[cname][pname] = par.patch(meval.pvalues, meval.pvalues[cname][pname])
                 end
+            end
+        elseif !isnothing(par.mpatch)
+            @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
+            if length(par.mpatch.args) == 1
+                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti)
+            else
+                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti, meval.pvalues[cname][pname])
             end
         end
     end
 
-    # Evaluation of all components, starting from the main one and
-    # following dependencies
-    function update_compeval_recursive(meval::ModelEval, cname::Symbol)
-        for d in dependencies(meval.model, cname)
-            update_compeval_recursive(meval, d)
-        end
+    # Evaluation of all components
+    for cname in meval.seq
         update!(meval.cevals[cname], items(meval.pactual[cname]))
     end
-    update_compeval_recursive(meval, meval.maincomp)
     return meval
 end
 
