@@ -47,7 +47,7 @@ function fit!(fitprob::FitProblem, args...; kws...)
         for (cname, comp) in fitprob.mevals[i].model
             for (pname, par) in getparams(comp)
                 par.val = bestfit[i][cname][pname].val
-                par.unc = NaN
+                par.unc = bestfit[i][cname][pname].unc
             end
         end
     end
