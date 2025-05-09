@@ -169,11 +169,20 @@ end
 """
     prepare!(comp::AbstractComponent, domain::AbstractDomain)
 
-Allocate the buffer for a component evaluation on a specific domain.  Return value must be a `Vector{Float64}`.
+Allocate the buffer for a component evaluation on a specific domain.
 
-This function is invoked only once when the `ModelEval` structure is created (typically within a `fit` of `fit!` call), hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.  Default implementation returns a vector filled with `NaN`s with the same length as the domain.
+This function is invoked only once when the `ModelEval` structure is created (typically within a `fit` of `fit!` call), hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
 """
 prepare!(comp::AbstractComponent, domain::AbstractDomain) = fill(NaN, length(domain))
+
+
+"""
+    result_length(comp::AbstractComponent, domain::AbstractDomain)
+
+Return the length of the component evaluation vector.
+"""
+result_length(comp::AbstractComponent, domain::AbstractDomain) = length(domain)
+
 
 """
     dependencies(comp::AbstractComponent)

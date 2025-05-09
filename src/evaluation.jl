@@ -21,12 +21,12 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     buffer::Vector{Float64}
 
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
-        buffer = prepare!(comp, domain)
+        prepare!(comp, domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain, 0,
             fill(NaN, length(getparams(comp))),
             Vector{Vector{Float64}}(),
-            buffer)
+            fill(NaN, result_length(comp, domain)))
     end
 end
 
