@@ -10,10 +10,10 @@ mutable struct Polynomial <: AbstractComponent
 end
 
 
-function evaluate!(ceval::CompEval{Polynomial, <: AbstractDomain{1}},
+function evaluate!(::Polynomial, domain::AbstractDomain{1}, output::Vector,
                    params...)
-    ceval.buffer .= params[1]
+    output .= params[1]
     for deg in 1:length(params)-1
-        ceval.buffer .+= coords(ceval.domain).^deg .* params[deg+1]
+        output .+= coords(domain).^deg .* params[deg+1]
     end
 end

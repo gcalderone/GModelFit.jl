@@ -34,18 +34,18 @@ OffsetSlope(offset, x0, y0, slopeX, slopeY) = OffsetSlope_2D(offset, x0, y0, slo
 
 # ====================================================================
 # Evaluate component
-function evaluate!(ceval::CompEval{OffsetSlope_1D, <: AbstractDomain{1}},
+function evaluate!(::OffsetSlope_1D, domain::AbstractDomain{1}, output::Vector,
                    offset, x0, slope)
-    X = coords(ceval.domain)
-    @. (ceval.buffer = slope * (X - x0) + offset)
+    X = coords(domain)
+    @. (output = slope * (X - x0) + offset)
 end
 
 
-function evaluate!(ceval::CompEval{OffsetSlope_2D, <: AbstractDomain{2}},
+function evaluate!(::OffsetSlope_2D, domain::AbstractDomain{2}, output::Vector,
                    offset, x0, y0, slopeX, slopeY)
-    x = coords(ceval.domain, 1)
-    y = coords(ceval.domain, 2)
-    @. (ceval.buffer =
+    x = coords(domain, 1)
+    y = coords(domain, 2)
+    @. (output =
         slopeX * (x - x0) +
         slopeY * (y - y0) +
         offset)

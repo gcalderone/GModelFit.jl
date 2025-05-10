@@ -33,44 +33,11 @@ getproperty(comp::FComp, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FComp) = getfield(comp, :deps)
 
 
-function evaluate!(ceval::CompEval{FComp, <: AbstractDomain},
-                   params...)
-    if length(ceval.deps) > 0
-        ceval.buffer .= getfield(ceval.comp, :func)(ceval.deps..., params...)
+function evaluate!(comp::FComp, domain::AbstractDomain, output::Vector,
+                   deps, params...)
+    if length(deps) > 0
+        output .= getfield(comp, :func)(deps..., params...)
     else
-        ceval.buffer .= getfield(ceval.comp, :func)(params...)
-    end
-end
-
-
-# ====================================================================
-struct FCompv <: GModelFit.AbstractComponent
-    funct::Function
-    deps::Vector{Symbol}
-    params::OrderedDict{Symbol, Parameter}
-
-    FCompv(funct::Function, guess::Vector{T}) where T <: Number =
-        FCompv(funct, Symbol[], guess)
-
-    function FCompv(funct::Function, deps::Vector{Symbol}, guess::Vector{T}) where T <: Number
-        params = OrderedDict{Symbol, Parameter}()
-        for i in 1:length(guess)
-            params[Symbol(:p, i)] = Parameter(guess[i])
-        end
-        new(funct, deps, params)
-    end
-end
-
-propertynames(comp::FCompv) = collect(keys(getfield(comp, :params)))
-getproperty(comp::FCompv, key::Symbol) = getfield(comp, :params)[key]
-dependencies(comp::FCompv) = getfield(comp, :deps)
-
-
-function evaluate!(ceval::CompEval{FCompv, <: AbstractDomain},
-                   params::Vararg{Float64})
-    if length(ceval.deps) > 0
-        ceval.buffer .= getfield(ceval.comp, :func)(deps..., [params...])
-    else
-        ceval.buffer .= getfield(ceval.comp, :funct)([params...])
+        output .= getfield(comp, :func)(params...)
     end
 end

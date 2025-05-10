@@ -53,25 +53,25 @@ end
 
 # ====================================================================
 # Evaluate component
-function evaluate!(ceval::CompEval{Gaussian_1D, Domain{1}},
+function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
                    norm, center, sigma)
-    X = coords(ceval.domain)
-    @. (ceval.buffer = exp( ((X - center) / sigma)^2. / (-2.)) /
+    X = coords(domain)
+    @. (output = exp( ((X - center) / sigma)^2. / (-2.)) /
         2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
 end
 
 
-function evaluate!(ceval::CompEval{Gaussian_2D, <: AbstractDomain{2}},
+function evaluate!(::Gaussian_2D, domain::AbstractDomain{2}, output::Vector,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
     b = -sin(2angle) / sigmaX^2  / 2  +  sin(2angle) / sigmaY^2  / 2
     c =  (sin(angle) / sigmaX)^2 / 2  +  (cos(angle) / sigmaY)^2 / 2
 
-    x = coords(ceval.domain, 1)
-    y = coords(ceval.domain, 2)
+    x = coords(domain, 1)
+    y = coords(domain, 2)
 
-    @. (ceval.buffer = norm *
+    @. (output = norm *
         exp(
             -(
                 a * (x - centerX)^2. +

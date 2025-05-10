@@ -45,22 +45,22 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 
 # ====================================================================
 # Evaluate component 
-function evaluate!(ceval::CompEval{Lorentzian_1D, <: AbstractDomain{1}},
+function evaluate!(::Lorentzian_1D, domain::AbstractDomain{1}, output::Vector,
                    norm, center, fwhm)
-    X = coords(ceval.domain)
-    @. (ceval.buffer = norm /
+    X = coords(domain)
+    @. (output = norm /
         (1. +
          ((X - center) / fwhm)^2.
         ))
 end
 
 
-function evaluate!(ceval::CompEval{Lorentzian_2D, <: AbstractDomain{2}},
+function evaluate!(::Lorentzian_2D, domain::AbstractDomain{2}, output::Vector,
                    norm, centerX, centerY, fwhmX, fwhmY)
-    x = coords(ceval.domain, 1)
-    y = coords(ceval.domain, 2)
+    x = coords(domain, 1)
+    y = coords(domain, 2)
 
-    @. (ceval.buffer = norm /
+    @. (output = norm /
         (1. +
          ((x - centerX) / fwhmX)^2. +
          ((y - centerY) / fwhmY)^2.
