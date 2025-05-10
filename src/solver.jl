@@ -1,35 +1,35 @@
 # ====================================================================
-# Minimizers
+# Solvers
 #
 
 # --------------------------------------------------------------------
-abstract type AbstractMinimizerStatus end
+abstract type AbstractSolverStatus end
 
-struct MinimizerStatusOK <: AbstractMinimizerStatus
+struct SolverStatusOK <: AbstractSolverStatus
 end
 
-struct MinimizerStatusWarn <: AbstractMinimizerStatus
+struct SolverStatusWarn <: AbstractSolverStatus
     message::String
 end
 
-struct MinimizerStatusError <: AbstractMinimizerStatus
+struct SolverStatusError <: AbstractSolverStatus
     message::String
 end
 
 
 # --------------------------------------------------------------------
-abstract type AbstractMinimizer end
+abstract type AbstractSolver end
 
 
 # --------------------------------------------------------------------
 import LsqFit
 
-mutable struct lsqfit <: AbstractMinimizer
+mutable struct lsqfit <: AbstractSolver
     result
     lsqfit() = new(nothing)
 end
 
-function minimize!(fitprob::FitProblem, mzer::lsqfit)
+function solve!(fitprob::FitProblem, mzer::lsqfit)
     params = free_params(fitprob)
     ndata = length(residuals(fitprob))
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
@@ -44,11 +44,11 @@ function minimize!(fitprob::FitProblem, mzer::lsqfit)
                                    upper=getfield.(params, :high))
     ProgressMeter.finish!(prog)
     if !mzer.result.converged
-        return MinimizerStatusError("Not converged")
+        return SolverStatusError("Not converged")
     end
 
     set_bestfit!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
-    return MinimizerStatusOK()
+    return SolverStatusOK()
 end
 
 
@@ -64,11 +64,11 @@ iteration the improvement is particularly small).
 The best approach is probably to use default tolerance values and
 either increase the maximum allowed number of iterations
 (config.maxiter) or set a threshold for relative fit statistic
-improvements (ftol_after_maxiter) to be checked after the minimizer
+improvements (ftol_after_maxiter) to be checked after the solver
 iterated for the maximum allowed number of times.
 =#
 
-mutable struct cmpfit <: AbstractMinimizer
+mutable struct cmpfit <: AbstractSolver
     config::CMPFit.Config
     ftol_after_maxiter::Float64
     result
@@ -79,7 +79,7 @@ mutable struct cmpfit <: AbstractMinimizer
     end
 end
 
-function minimize!(fitprob::FitProblem, mzer::cmpfit)
+function solve!(fitprob::FitProblem, mzer::cmpfit)
     params = free_params(fitprob)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
@@ -103,7 +103,7 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
                                     end,
                                     guess, parinfo=parinfo, config=mzer.config)
         if mzer.result.status <= 0
-            return MinimizerStatusError("CMPFit status = $(mzer.result.status)")
+            return SolverStatusError("CMPFit status = $(mzer.result.status)")
         end
 
         if (mzer.result.status == 5)
@@ -122,11 +122,11 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
                      getfield.(Ref(mzer.result), :perror))
 
         if mzer.result.status == 2
-            return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
+            return SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
         elseif mzer.result.status == 5
-            return MinimizerStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
+            return SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
         end
-        return MinimizerStatusOK()
+        return SolverStatusOK()
     end
 end
 
@@ -134,7 +134,7 @@ end
 
 #=
 # --------------------------------------------------------------------
-function minimize!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
+function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
     params = free_params(fitprob)
 
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
@@ -150,8 +150,8 @@ function minimize!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonline
                    mzer)
     ProgressMeter.finish!(prog)
 
-    # TODO: uncertainties, AbstractMinimizerStatus
+    # TODO: uncertainties, AbstractSolverStatus
     set_bestfit!(fitprob, result.u, result.u .* 0)
-    return MinimizerStatusOK()
+    return SolverStatusOK()
 end
 =#

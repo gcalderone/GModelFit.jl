@@ -432,7 +432,7 @@ end
 include("evaluation.jl")
 include("fitproblem.jl")
 include("snapshot.jl")
-include("minimizers.jl")
+include("solver.jl")
 include("fit.jl")
 include("serialize.jl")
 include("show.jl")

@@ -321,11 +321,11 @@ function show(io::IO, multi::Union{Vector{Model}, Vector{ModelSnapshot}})
 end
 
 
-getmessage(status::MinimizerStatusOK) = crayon"green", "OK"
-getmessage(status::MinimizerStatusWarn) = crayon"bold yellow", "WARN\n" * status.message
-getmessage(status::MinimizerStatusError) = crayon"bold red", "ERROR\n" * status.message
+getmessage(status::SolverStatusOK) = crayon"green", "OK"
+getmessage(status::SolverStatusWarn) = crayon"bold yellow", "WARN\n" * status.message
+getmessage(status::SolverStatusError) = crayon"bold red", "ERROR\n" * status.message
 
-function show(io::IO, status::AbstractMinimizerStatus)
+function show(io::IO, status::AbstractSolverStatus)
     print(io, "Status: ")
     color, ss = getmessage(status)
     if showsettings.plain

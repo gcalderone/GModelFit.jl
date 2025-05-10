@@ -10,7 +10,7 @@ A structure summarizing the results of a fitting process.
 - `nfree::Int`: number of free parameters;
 - `dof::Int`: ndata - nfree;
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
-- `status`: minimizer exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
+- `status`: solver exit status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 
 Note: the `FitSummary` fields are supposed to be accessed directly by the user.
 """
@@ -20,10 +20,10 @@ struct FitSummary
     nfree::Int
     dof::Int
     fitstat::Float64
-    status::AbstractMinimizerStatus
+    status::AbstractSolverStatus
 end
 
-function FitSummary(fitprob::FitProblem, status::AbstractMinimizerStatus, elapsed::Float64)
+function FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, elapsed::Float64)
     ndata = length(residuals(fitprob))
     nf = nfree(fitprob)
     return FitSummary(elapsed,
@@ -32,11 +32,11 @@ function FitSummary(fitprob::FitProblem, status::AbstractMinimizerStatus, elapse
 end
 
 # ====================================================================
-# function fit(fitprob::FitProblem, mzer::Union{AbstractMinimizer, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
-function fit(fitprob::FitProblem, mzer::AbstractMinimizer=lsqfit())
+# function fit(fitprob::FitProblem, mzer::Union{AbstractSolver, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
+function fit(fitprob::FitProblem, mzer::AbstractSolver=lsqfit())
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
-    status = minimize!(fitprob, mzer)
+    status = solve!(fitprob, mzer)
     bestfit = [ModelSnapshot(fitprob.mevals[i], fitprob.bestfit[i]) for i in 1:length(fitprob.mevals)]
     stats = FitSummary(fitprob, status, time() - starttime)
     return bestfit, stats
@@ -72,9 +72,9 @@ fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fitstat(FitP
 
 
 """
-    fit(model::Model, data::Measures, minimizer::AbstractMinimizer=lsqfit())
+    fit(model::Model, data::Measures, solver::AbstractSolver=lsqfit())
 
-Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
+Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
 function fit(model::Model, data::AbstractMeasures, args...; kws...)
     bestfit, stats = fit(FitProblem(model, data), args...; kws...)
@@ -83,9 +83,9 @@ end
 
 
 """
-    fit!(model::Model, data::Measures, minimizer::AbstractMinimizer=lsqfit())
+    fit!(model::Model, data::Measures, solver::AbstractSolver=lsqfit())
 
-Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
+Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
 function fit!(model::Model, data::AbstractMeasures, args...; kws...)
     bestfit, stats = fit!(FitProblem(model, data), args...; kws...)
@@ -94,18 +94,18 @@ end
 
 
 """
-    fit(multi::Vector{Model}, data::Vector{Measures{N}}, minimizer::AbstractMinimizer=lsqfit())
+    fit(multi::Vector{Model}, data::Vector{Measures{N}}, solver::AbstractSolver=lsqfit())
 
-Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
+Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
 fit(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
     fit(FitProblem(models, datasets), args...; kws...)
 
 
 """
-    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, minimizer::AbstractMinimizer=lsqfit())
+    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, solver::AbstractSolver=lsqfit())
 
-Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
+Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
 """
 fit!(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
     fit!(FitProblem(models, datasets), args...; kws...)

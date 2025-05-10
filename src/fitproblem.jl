@@ -58,7 +58,7 @@ abstract type ChiSquared <: AbstractFitStat end
 
 A structure representing the distance between a `ModelEval` and a dataset. The "distance" is expressed in terms of weighted residuals.
 
-A minimizer can be invoked via the `minimize!` function  to reduce such distance by varying the model parameter values.
+A solver can be invoked via the `solve!` function  to reduce such distance by varying the model parameter values.
 
 # Fields:
 - `mevals::Vector{ModelEval}`: Model evaluations on the given domains;

@@ -47,7 +47,7 @@ _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
 _serialize(vv::FitSummary) = _serialize_struct(vv, add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
-_serialize(vv::AbstractMinimizerStatus) = _serialize_struct(vv, add_show=true)
+_serialize(vv::AbstractSolverStatus) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
@@ -202,14 +202,14 @@ _deserialize(::Val{Symbol("GModelFit.FitSummary")},
                             _deserialize(dd["fitstat"]),
                             _deserialize(dd["status"]))
 
-_deserialize(::Val{Symbol("GModelFit.MinimizerStatusOK")},
-             dd::AbstractDict) = MinimizerStatusOK()
+_deserialize(::Val{Symbol("GModelFit.SolverStatusOK")},
+             dd::AbstractDict) = SolverStatusOK()
 
-_deserialize(::Val{Symbol("GModelFit.MinimizerStatusWarn")},
-             dd::AbstractDict) = MinimizerStatusWarn(dd["message"])
+_deserialize(::Val{Symbol("GModelFit.SolverStatusWarn")},
+             dd::AbstractDict) = SolverStatusWarn(dd["message"])
 
-_deserialize(::Val{Symbol("GModelFit.MinimizerStatusError")},
-             dd::AbstractDict) = MinimizerStatusError(dd["message"])
+_deserialize(::Val{Symbol("GModelFit.SolverStatusError")},
+             dd::AbstractDict) = SolverStatusError(dd["message"])
 
 function _deserialize(::Val{Symbol("GModelFit.CartesianDomain")},
                       dd::AbstractDict)
