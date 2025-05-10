@@ -56,14 +56,15 @@ abstract type ChiSquared <: AbstractFitStat end
 """
     FitProblem{T <: AbstractFitStat}
 
-A structure representing the distance between a `ModelEval` and a dataset. The "distance" is expressed in terms of weighted residuals.
+A structure containing a `ModelEval` and a dataset, namly all inputs ton define a fit problem.
 
-A solver can be invoked via the `solve!` function  to reduce such distance by varying the model parameter values.
+A solver can be used to reduce the distance between model and data by varying the model parameter values.
 
 # Fields:
 - `mevals::Vector{ModelEval}`: Model evaluations on the given domains;
 - `data::Vector{AbstractMeasures}`: Empirical datasets to be compared to the models;
 - `buffer::Vector{Float64}`: Weighted residuals for each point in the domain;
+- `bestfit::Vector{PVModel{Parameter}}`: Best fit values for the parameters
 """
 struct FitProblem{T <: AbstractFitStat}
     mevals::Vector{ModelEval}

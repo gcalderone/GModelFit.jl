@@ -36,7 +36,7 @@ end
 function fit(fitprob::FitProblem, solver=Solvers.lsqfit())
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
-    status = solve!(fitprob, solver)
+    status = Solvers.solve!(fitprob, solver)
     bestfit = [ModelSnapshot(fitprob.mevals[i], fitprob.bestfit[i]) for i in 1:length(fitprob.mevals)]
     stats = FitSummary(fitprob, status, time() - starttime)
     return bestfit, stats
