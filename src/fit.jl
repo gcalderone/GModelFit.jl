@@ -32,11 +32,12 @@ function FitSummary(fitprob::FitProblem, status::AbstractMinimizerStatus, elapse
 end
 
 # ====================================================================
+# function fit(fitprob::FitProblem, mzer::Union{AbstractMinimizer, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
 function fit(fitprob::FitProblem, mzer::AbstractMinimizer=lsqfit())
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
     status = minimize!(fitprob, mzer)
-    bestfit = [ModelSnapshot(meval) for meval in fitprob.mevals]
+    bestfit = [ModelSnapshot(fitprob.mevals[i], fitprob.bestfit[i]) for i in 1:length(fitprob.mevals)]
     stats = FitSummary(fitprob, status, time() - starttime)
     return bestfit, stats
 end
@@ -98,7 +99,7 @@ end
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
 """
 fit(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
-    fit(FitProblem(models, datasets)               , args...; kws...)
+    fit(FitProblem(models, datasets), args...; kws...)
 
 
 """
@@ -107,4 +108,4 @@ fit(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where
 Fit a multi-model to a set of empirical data sets using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
 """
 fit!(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where N =
-    fit!(FitProblem(models, datasets)               , args...; kws...)
+    fit!(FitProblem(models, datasets), args...; kws...)

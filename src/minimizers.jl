@@ -28,9 +28,9 @@ abstract type AbstractMinimizer end
 struct dry <: AbstractMinimizer; end
 function minimize!(fitprob::FitProblem, mzer::dry)
     params = free_params(fitprob)
-    evaluate!(fitprob,
-              getfield.(params, :val),
-              fill(NaN, length(params)))
+    set_bestfit!(fitprob,
+                 getfield.(params, :val),
+                 fill(NaN, length(params)))
     return MinimizerStatusDry()
 end
 
@@ -61,7 +61,7 @@ function minimize!(fitprob::FitProblem, mzer::lsqfit)
         return MinimizerStatusError("Not converged")
     end
 
-    evaluate!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
+    set_bestfit!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
     return MinimizerStatusOK()
 end
 
@@ -131,9 +131,9 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
         end
 
         ProgressMeter.finish!(prog)
-        evaluate!(fitprob,
-                  getfield.(Ref(mzer.result), :param),
-                  getfield.(Ref(mzer.result), :perror))
+        set_bestfit!(fitprob,
+                     getfield.(Ref(mzer.result), :param),
+                     getfield.(Ref(mzer.result), :perror))
 
         if mzer.result.status == 2
             return MinimizerStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
@@ -143,3 +143,29 @@ function minimize!(fitprob::FitProblem, mzer::cmpfit)
         return MinimizerStatusOK()
     end
 end
+
+
+
+#=
+# --------------------------------------------------------------------
+function minimize!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
+    params = free_params(fitprob)
+
+    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    function local_evaluate!(du, u, fp)
+        ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fp))])
+        du .= evaluate!(fp, u)
+    end
+
+    result = solve(NonlinearLeastSquaresProblem(
+        NonlinearFunction(local_evaluate!,
+                          resid_prototype = zeros(length(residuals(fitprob)))),
+        getfield.(params, :val), fitprob),
+                   mzer)
+    ProgressMeter.finish!(prog)
+
+    # TODO: uncertainties, AbstractMinimizerStatus
+    set_bestfit!(fitprob, result.u, result.u .* 0)
+    return MinimizerStatusOK()
+end
+=#

@@ -9,6 +9,7 @@ using Dates
 using ProgressMeter
 using Random
 using JSON, GZip
+# using NonlinearSolve
 
 import Base.show
 import Base.ndims
@@ -429,8 +430,8 @@ end
 
 
 include("evaluation.jl")
-include("snapshot.jl")
 include("fitproblem.jl")
+include("snapshot.jl")
 include("minimizers.jl")
 include("fit.jl")
 include("serialize.jl")

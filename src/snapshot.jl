@@ -15,13 +15,13 @@ struct ModelSnapshot
     deps::OrderedDict{Symbol, Vector{Symbol}}
     evalcounters::OrderedDict{Symbol, Int}
 end
-function ModelSnapshot(meval::ModelEval)
+function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     deps = OrderedDict{Symbol, Vector{Symbol}}()
     for cname in keys(meval.cevals)
         deps[cname] = dependencies(meval.model, cname)
     end
 
-    ModelSnapshot(deepcopy(meval.domain), deepcopy(meval.bestfit),
+    ModelSnapshot(deepcopy(meval.domain), deepcopy(bestfit),
                   OrderedDict([Pair(cname, ceval.buffer) for (cname, ceval) in meval.cevals]),
                   meval.maincomp,
                   comptypes(meval.model),

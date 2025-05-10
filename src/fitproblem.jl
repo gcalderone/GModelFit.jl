@@ -46,12 +46,6 @@ function evaluate!(mevals::Vector{ModelEval})
     return evaluate!.(mevals)
 end
 
-function set_bestfit!(mevals::Vector{ModelEval}, pvalues::Vector{Float64}, uncerts::Vector{Float64})
-    for (id, i1, i2) in free_params_indices(mevals)
-        set_bestfit!(mevals[id], pvalues[i1:i2], uncerts[i1:i2])
-    end
-end
-
 
 # ====================================================================
 # Fit statistics
@@ -75,6 +69,7 @@ struct FitProblem{T <: AbstractFitStat}
     mevals::Vector{ModelEval}
     data::Vector{<: AbstractMeasures}
     buffer::Vector{Float64}
+    bestfit::Vector{PVModel{Parameter}}
 
     FitProblem(model::Model, data::Measures{N}) where N = FitProblem([model], [data])
     FitProblem(meval::ModelEval, data::Measures{N}) where N = FitProblem([meval], [data])
@@ -85,7 +80,7 @@ struct FitProblem{T <: AbstractFitStat}
         @assert length(mevals) == length(datasets)
         evaluate!(mevals)
         buffer = fill(NaN, sum(length.(datasets)))
-        return new{ChiSquared}(mevals, datasets, buffer)
+        return new{ChiSquared}(mevals, datasets, buffer, Vector{PVModel{Parameter}}())
     end
 end
 
@@ -93,10 +88,45 @@ free_params(fitprob::FitProblem) = free_params(fitprob.mevals)
 nfree(fitprob::FitProblem) = nfree(fitprob.mevals)
 residuals(fitprob::FitProblem) = return fitprob.buffer
 
+function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
+    for (id, i1, i2) in free_params_indices(fitprob.mevals)
+        meval = fitprob.mevals[id]
+        set_pvalues!(meval, pvalues[i1:i2])
+        evaluate!(meval)
+    end
+
+    empty!(fitprob.bestfit)
+    for id in 1:length(fitprob.mevals)
+        push!(fitprob.bestfit, PVModel{Parameter}())
+    end
+
+    for (id, i1, i2) in free_params_indices(fitprob.mevals)
+        meval = fitprob.mevals[id]
+        i = 1
+        for (cname, comp) in meval.model.comps
+            for (pname, _par) in getparams(comp)
+                par = deepcopy(_par)
+                par.val    = meval.pvalues[cname][pname]
+                par.actual = meval.pactual[cname][pname]
+                push!(fitprob.bestfit[id], cname, pname, par)
+                if length(fitprob.bestfit[id].data) in meval.ifree
+                    par.unc = puncerts[i1:i2][i]
+                    par.fixed = false
+                    i += 1
+                else
+                    par.fixed = true
+                end
+            end
+        end
+    end
+    nothing
+end
+
+
 # FitProblem{ChiSquared} specific methods
 dof(fitprob::FitProblem{ChiSquared}) = sum(length.(fitprob.data)) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
-function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64}, puncerts=Float64[])
+function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64})
     set_pvalues!(fitprob.mevals, pvalues)
     evaluate!(fitprob.mevals)
 
@@ -110,10 +140,6 @@ function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64}, pu
             fitprob.buffer[i1:i2] .= reshape((last_evaluation(meval) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
-    end
-
-    if length(puncerts) > 0
-        set_bestfit!(fitprob.mevals, pvalues, puncerts)
     end
     return fitprob.buffer
 end

@@ -111,12 +111,11 @@ struct ModelEval
     ifree::Vector{Int}
     pvmulti::Vector{PVModel{Float64}}
     seq::Vector{Symbol}
-    bestfit::PVModel{Parameter}
 
     function ModelEval(model::Model, domain::AbstractDomain)
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
                     PVModel{Float64}(), PVModel{Float64}(), Vector{NTuple{2, Symbol}}(),
-                    Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}(), PVModel{Parameter}())
+                    Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}())
         update!(meval, evaluate=false)
         return meval
     end
@@ -146,7 +145,6 @@ function update!(meval::ModelEval; evaluate=true)
     empty!(meval.patched)
     empty!(meval.ifree)
     empty!(meval.pvmulti)
-    empty!(meval.bestfit)
 
     isfixed = Vector{Bool}()
     for (cname, comp) in meval.model.comps
@@ -285,31 +283,6 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 """
 last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.maincomp)
 last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
-
-
-function set_bestfit!(meval::ModelEval, pvalues::Vector{Float64}, uncerts::Vector{Float64})
-    set_pvalues!(meval, pvalues)
-    evaluate!(meval)
-
-    empty!(meval.bestfit)
-    i = 1
-    for (cname, comp) in meval.model.comps
-        for (pname, _par) in getparams(comp)
-            par = deepcopy(_par)
-            par.val    = meval.pvalues[cname][pname]
-            par.actual = meval.pactual[cname][pname]
-            push!(meval.bestfit, cname, pname, par)
-            if length(meval.bestfit.data) in meval.ifree
-                par.unc = uncerts[i]
-                par.fixed = false
-                i += 1
-            else
-                par.fixed = true
-            end
-        end
-    end
-    nothing
-end
 
 
 # ====================================================================
