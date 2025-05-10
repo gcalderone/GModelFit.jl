@@ -5,6 +5,7 @@ using ProgressMeter
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, cmpfit
 
 import ..GModelFit: FitProblem, free_params, nfree, fitstat, evaluate!, residuals, set_bestfit!
+import NonlinearSolve
 
 # --------------------------------------------------------------------
 abstract type AbstractSolverStatus end
@@ -24,13 +25,14 @@ end
 # --------------------------------------------------------------------
 abstract type AbstractSolver end
 
-mutable struct WrapSolver{T <: AbstractSolver}
+mutable struct WrapSolver{T <: Union{AbstractSolver, NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}}
     solver::T
     result
-    WrapSolver(solver::T) where T <: AbstractSolver = new{T}(solver, nothing)
+    WrapSolver(solver::T) where T = new{T}(solver, nothing)
 end
 
 solve!(fitprob::FitProblem, solver::AbstractSolver) = solve!(fitprob, WrapSolver(solver))
+solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm) = solve!(fitprob, WrapSolver(solver))
 
 
 # --------------------------------------------------------------------
@@ -140,11 +142,8 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
 end
 
 
-
 # --------------------------------------------------------------------
-import NonlinearSolve
-
-function solve!(fitprob::FitProblem, wrap::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
     params = free_params(fitprob)
 
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
@@ -153,15 +152,15 @@ function solve!(fitprob::FitProblem, wrap::NonlinearSolve.NonlinearSolveBase.Abs
         du .= evaluate!(fp, u)
     end
 
-    result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
+    wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
         NonlinearSolve.NonlinearFunction(local_evaluate!,
-                          resid_prototype = zeros(length(residuals(fitprob)))),
+                                         resid_prototype = zeros(length(residuals(fitprob)))),
         getfield.(params, :val), fitprob),
-                                  wrap)
+                                       wrap.solver)
     ProgressMeter.finish!(prog)
 
     # TODO: AbstractSolverStatus
-    set_bestfit!(fitprob, result.u, result.u .* 0)
+    set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
     return SolverStatusOK()
 end
 
