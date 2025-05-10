@@ -89,7 +89,7 @@ end
 
 free_params(fitprob::FitProblem) = free_params(fitprob.mevals)
 nfree(fitprob::FitProblem) = nfree(fitprob.mevals)
-residuals(fitprob::FitProblem) = return fitprob.buffer
+ndata(fitprob::FitProblem) = length(fitprob.buffer)
 
 function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
     for (id, i1, i2) in free_params_indices(fitprob.mevals)
@@ -134,7 +134,7 @@ end
 
 
 # FitProblem{ChiSquared} specific methods
-dof(fitprob::FitProblem{ChiSquared}) = sum(length.(fitprob.data)) - nfree(fitprob)
+dof(fitprob::FitProblem{ChiSquared}) = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
 function populate_residuals!(fitprob::FitProblem{ChiSquared})
     i1 = 1

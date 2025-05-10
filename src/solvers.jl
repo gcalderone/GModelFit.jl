@@ -4,7 +4,7 @@ using ProgressMeter
 
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, cmpfit
 
-import ..GModelFit: FitProblem, free_params, nfree, fitstat, evaluate!, residuals, set_bestfit!
+import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!
 import NonlinearSolve
 
 # --------------------------------------------------------------------
@@ -42,14 +42,12 @@ struct lsqfit <: AbstractSolver end
 
 function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
     params = free_params(fitprob)
-    ndata = length(residuals(fitprob))
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     wrap.result = LsqFit.curve_fit((dummy, pvalues) -> begin
                                   ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                  evaluate!(fitprob, pvalues)
-                                  return residuals(fitprob)
+                                  return evaluate!(fitprob, pvalues)
                               end,
-                              1.:ndata, fill(0., ndata),
+                              1.:ndata(fitprob), fill(0., ndata(fitprob)),
                               getfield.(params, :val),
                               lower=getfield.(params, :low),
                               upper=getfield.(params, :high))
@@ -109,8 +107,7 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
     while true
         wrap.result = CMPFit.cmpfit((pvalues) -> begin
                                         ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                        evaluate!(fitprob, pvalues)
-                                        return residuals(fitprob)
+                                        return evaluate!(fitprob, pvalues)
                                     end,
                                     guess, parinfo=parinfo, config=wrap.solver.config)
         if wrap.result.status <= 0
@@ -153,8 +150,7 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSo
     end
 
     wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-        NonlinearSolve.NonlinearFunction(local_evaluate!,
-                                         resid_prototype = zeros(length(residuals(fitprob)))),
+        NonlinearSolve.NonlinearFunction(local_evaluate!, resid_prototype = zeros(ndata(fitprob))),
         getfield.(params, :val), fitprob),
                                        wrap.solver)
     ProgressMeter.finish!(prog)

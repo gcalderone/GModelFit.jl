@@ -23,13 +23,10 @@ struct FitSummary
     status::AbstractSolverStatus
 end
 
-function FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, elapsed::Float64)
-    ndata = length(residuals(fitprob))
-    nf = nfree(fitprob)
-    return FitSummary(elapsed,
-                    ndata, nf, ndata - nf,
-                    fitstat(fitprob), status)
-end
+FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, elapsed::Float64) =
+    FitSummary(elapsed, ndata(fitprob), nfree(fitprob), dof(fitprob),
+               fitstat(fitprob), status)
+
 
 # ====================================================================
 # function fit(fitprob::FitProblem, solver::Union{AbstractSolver, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
