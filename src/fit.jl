@@ -33,7 +33,7 @@ end
 
 # ====================================================================
 # function fit(fitprob::FitProblem, solver::Union{AbstractSolver, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
-function fit(fitprob::FitProblem, solver::Union{WrapSolver, AbstractSolver}=Solvers.lsqfit())
+function fit(fitprob::FitProblem, solver=Solvers.lsqfit())
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
     status = solve!(fitprob, solver)
@@ -72,7 +72,7 @@ fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fitstat(FitP
 
 
 """
-    fit(model::Model, data::Measures, solver::AbstractSolver=lsqfit())
+    fit(model::Model, data::Measures, solver=lsqfit())
 
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
@@ -83,7 +83,7 @@ end
 
 
 """
-    fit!(model::Model, data::Measures, solver::AbstractSolver=lsqfit())
+    fit!(model::Model, data::Measures, solver=lsqfit())
 
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
@@ -94,7 +94,7 @@ end
 
 
 """
-    fit(multi::Vector{Model}, data::Vector{Measures{N}}, solver::AbstractSolver=lsqfit())
+    fit(multi::Vector{Model}, data::Vector{Measures{N}}, solver=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
@@ -103,7 +103,7 @@ fit(models::Vector{Model}, datasets::Vector{Measures{N}}, args...; kws...) where
 
 
 """
-    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, solver::AbstractSolver=lsqfit())
+    fit!(multi::Vector{Model}, data::Vector{Measures{N}}, solver=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
 """
