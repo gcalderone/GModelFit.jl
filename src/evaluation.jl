@@ -59,7 +59,7 @@ function evaluate_comp!(ceval::CompEval, pvalues::AbstractVector{T}) where T
         ceval.counter += 1
     elseif any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)
         evaluate!(ceval.comp, ceval.domain, ceval.buffer, pvalues...)
-        (T == Float64)  &&  ceval.lastparvalues .= pvalues
+        (T == Float64)  &&  (ceval.lastparvalues .= pvalues)
         ceval.counter += 1
     end
     return ceval.buffer
