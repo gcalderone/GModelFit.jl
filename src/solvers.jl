@@ -2,7 +2,7 @@ module Solvers
 
 using ProgressMeter
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, solve!
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!
 
 import ..GModelFit: FitProblem, free_params, nfree, fitstat, evaluate!, residuals, set_bestfit!
 
@@ -28,34 +28,39 @@ end
 # --------------------------------------------------------------------
 abstract type AbstractSolver end
 
+mutable struct WrapSolver{T <: AbstractSolver}
+    solver::T
+    result
+    WrapSolver(solver::T) where T <: AbstractSolver = new{T}(solver, nothing)
+end
+
+solve!(fitprob::FitProblem, solver::AbstractSolver) = solve!(fitprob, WrapSolver(solver))
+
 
 # --------------------------------------------------------------------
 import LsqFit
 
-mutable struct lsqfit <: AbstractSolver
-    result
-    lsqfit() = new(nothing)
-end
+struct lsqfit <: AbstractSolver end
 
-function solve!(fitprob::FitProblem, mzer::lsqfit)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
     params = free_params(fitprob)
     ndata = length(residuals(fitprob))
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
-    mzer.result = LsqFit.curve_fit((dummy, pvalues) -> begin
-                                       ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                       evaluate!(fitprob, pvalues)
-                                       return residuals(fitprob)
-                                   end,
-                                   1.:ndata, fill(0., ndata),
-                                   getfield.(params, :val),
-                                   lower=getfield.(params, :low),
-                                   upper=getfield.(params, :high))
+    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> begin
+                                  ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
+                                  evaluate!(fitprob, pvalues)
+                                  return residuals(fitprob)
+                              end,
+                              1.:ndata, fill(0., ndata),
+                              getfield.(params, :val),
+                              lower=getfield.(params, :low),
+                              upper=getfield.(params, :high))
     ProgressMeter.finish!(prog)
-    if !mzer.result.converged
+    if !wrap.result.converged
         return SolverStatusError("Not converged")
     end
 
-    set_bestfit!(fitprob, getfield.(Ref(mzer.result), :param), LsqFit.stderror(mzer.result))
+    set_bestfit!(fitprob, getfield.(Ref(wrap.result), :param), LsqFit.stderror(wrap.result))
     return SolverStatusOK()
 end
 
@@ -76,18 +81,18 @@ improvements (ftol_after_maxiter) to be checked after the solver
 iterated for the maximum allowed number of times.
 =#
 
-mutable struct cmpfit <: AbstractSolver
+struct cmpfit <: AbstractSolver
     config::CMPFit.Config
     ftol_after_maxiter::Float64
-    result
+
     function cmpfit()
-        out = new(CMPFit.Config(), 1e-4, nothing)
+        out = new(CMPFit.Config(), 1e-4)
         out.config.maxiter = 1000
         return out
     end
 end
 
-function solve!(fitprob::FitProblem, mzer::cmpfit)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
     params = free_params(fitprob)
     guess = getfield.(params, :val)
     low   = getfield.(params, :low)
@@ -104,34 +109,34 @@ function solve!(fitprob::FitProblem, mzer::cmpfit)
     last_fitstat = fitstat(fitprob)
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
     while true
-        mzer.result = CMPFit.cmpfit((pvalues) -> begin
+        wrap.result = CMPFit.cmpfit((pvalues) -> begin
                                         ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
                                         evaluate!(fitprob, pvalues)
                                         return residuals(fitprob)
                                     end,
-                                    guess, parinfo=parinfo, config=mzer.config)
-        if mzer.result.status <= 0
-            return SolverStatusError("CMPFit status = $(mzer.result.status)")
+                                    guess, parinfo=parinfo, config=wrap.solver.config)
+        if wrap.result.status <= 0
+            return SolverStatusError("CMPFit status = $(wrap.result.status)")
         end
 
-        if (mzer.result.status == 5)
-            Δfitstat = (last_fitstat - mzer.result.bestnorm) / last_fitstat
-            if Δfitstat > mzer.ftol_after_maxiter
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(mzer.ftol_after_maxiter), continue minimization...\n")
-                last_fitstat = mzer.result.bestnorm
-                guess = getfield.(Ref(mzer.result), :param)
+        if (wrap.result.status == 5)
+            Δfitstat = (last_fitstat - wrap.result.bestnorm) / last_fitstat
+            if Δfitstat > wrap.ftol_after_maxiter
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(wrap.ftol_after_maxiter), continue minimization...\n")
+                last_fitstat = wrap.result.bestnorm
+                guess = getfield.(Ref(wrap.result), :param)
                 continue
             end
         end
 
         ProgressMeter.finish!(prog)
         set_bestfit!(fitprob,
-                     getfield.(Ref(mzer.result), :param),
-                     getfield.(Ref(mzer.result), :perror))
+                     getfield.(Ref(wrap.result), :param),
+                     getfield.(Ref(wrap.result), :perror))
 
-        if mzer.result.status == 2
+        if wrap.result.status == 2
             return SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
-        elseif mzer.result.status == 5
+        elseif wrap.result.status == 5
             return SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
         end
         return SolverStatusOK()
@@ -153,7 +158,7 @@ function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearS
         du .= evaluate!(fp, u)
     end
 
-    result = solve(NonlinearLeastSquaresProblem(
+    wrap.result = solve(NonlinearLeastSquaresProblem(
         NonlinearFunction(local_evaluate!,
                           resid_prototype = zeros(length(residuals(fitprob)))),
         getfield.(params, :val), fitprob),
@@ -161,7 +166,7 @@ function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearS
     ProgressMeter.finish!(prog)
 
     # TODO: uncertainties, AbstractSolverStatus
-    set_bestfit!(fitprob, result.u, result.u .* 0)
+    set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
     return SolverStatusOK()
 end
 =#
