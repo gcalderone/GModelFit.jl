@@ -141,11 +141,10 @@ end
 
 
 
-#=
 # --------------------------------------------------------------------
-# using NonlinearSolve
+import NonlinearSolve
 
-function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
+function solve!(fitprob::FitProblem, wrap::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
     params = free_params(fitprob)
 
     prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
@@ -154,17 +153,16 @@ function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearS
         du .= evaluate!(fp, u)
     end
 
-    wrap.result = solve(NonlinearLeastSquaresProblem(
-        NonlinearFunction(local_evaluate!,
+    result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
+        NonlinearSolve.NonlinearFunction(local_evaluate!,
                           resid_prototype = zeros(length(residuals(fitprob)))),
         getfield.(params, :val), fitprob),
-                   mzer)
+                                  wrap)
     ProgressMeter.finish!(prog)
 
-    # TODO: uncertainties, AbstractSolverStatus
-    set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
+    # TODO: AbstractSolverStatus
+    set_bestfit!(fitprob, result.u, result.u .* 0)
     return SolverStatusOK()
 end
-=#
 
 end
