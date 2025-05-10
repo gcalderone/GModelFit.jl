@@ -6,10 +6,8 @@ using DataStructures
 using LsqFit
 using MacroTools
 using Dates
-using ProgressMeter
 using Random
 using JSON, GZip
-# using NonlinearSolve
 
 import Base.show
 import Base.ndims
@@ -432,7 +430,8 @@ end
 include("evaluation.jl")
 include("fitproblem.jl")
 include("snapshot.jl")
-include("solver.jl")
+include("solvers.jl")
+using .Solvers
 include("fit.jl")
 include("serialize.jl")
 include("show.jl")

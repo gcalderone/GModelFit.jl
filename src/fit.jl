@@ -33,7 +33,7 @@ end
 
 # ====================================================================
 # function fit(fitprob::FitProblem, mzer::Union{AbstractSolver, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
-function fit(fitprob::FitProblem, mzer::AbstractSolver=lsqfit())
+function fit(fitprob::FitProblem, mzer::AbstractSolver=Solvers.lsqfit())
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
     status = solve!(fitprob, mzer)

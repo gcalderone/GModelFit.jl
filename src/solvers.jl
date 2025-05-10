@@ -1,3 +1,11 @@
+module Solvers
+
+using ProgressMeter
+
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, solve!
+
+import ..GModelFit: FitProblem, free_params, nfree, fitstat, evaluate!, residuals, set_bestfit!
+
 # ====================================================================
 # Solvers
 #
@@ -134,6 +142,8 @@ end
 
 #=
 # --------------------------------------------------------------------
+# using NonlinearSolve
+
 function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
     params = free_params(fitprob)
 
@@ -155,3 +165,5 @@ function solve!(fitprob::FitProblem, mzer::NonlinearSolveBase.AbstractNonlinearS
     return SolverStatusOK()
 end
 =#
+
+end

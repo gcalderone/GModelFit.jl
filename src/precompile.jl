@@ -24,7 +24,7 @@ using PrecompileTools
         model[:l2].norm.patch = :l1
         model[:l2].norm.patch = @fd (m, v) -> v + m[:l1].norm
         data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-        bestfit, stats = fit(model, data, GModelFit.cmpfit())
+        bestfit, stats = fit(model, data, GModelFit.Solvers.cmpfit())
 
 
         x = 0:0.05:6
