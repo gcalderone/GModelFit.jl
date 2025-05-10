@@ -205,9 +205,6 @@ _deserialize(::Val{Symbol("GModelFit.FitSummary")},
 _deserialize(::Val{Symbol("GModelFit.MinimizerStatusOK")},
              dd::AbstractDict) = MinimizerStatusOK()
 
-_deserialize(::Val{Symbol("GModelFit.MinimizerStatusDry")},
-             dd::AbstractDict) = MinimizerStatusDry()
-
 _deserialize(::Val{Symbol("GModelFit.MinimizerStatusWarn")},
              dd::AbstractDict) = MinimizerStatusWarn(dd["message"])
 

@@ -8,9 +8,6 @@ abstract type AbstractMinimizerStatus end
 struct MinimizerStatusOK <: AbstractMinimizerStatus
 end
 
-struct MinimizerStatusDry <: AbstractMinimizerStatus
-end
-
 struct MinimizerStatusWarn <: AbstractMinimizerStatus
     message::String
 end
@@ -22,17 +19,6 @@ end
 
 # --------------------------------------------------------------------
 abstract type AbstractMinimizer end
-
-
-# --------------------------------------------------------------------
-struct dry <: AbstractMinimizer; end
-function minimize!(fitprob::FitProblem, mzer::dry)
-    params = free_params(fitprob)
-    set_bestfit!(fitprob,
-                 getfield.(params, :val),
-                 fill(NaN, length(params)))
-    return MinimizerStatusDry()
-end
 
 
 # --------------------------------------------------------------------

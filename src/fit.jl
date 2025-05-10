@@ -57,18 +57,18 @@ end
 
 
 """
-    compare(model::Model, data::AbstractMeasures)
+    fitstat(model::Model, data::AbstractMeasures)
 
-Compare a model to a dataset and return a `FitSummary` object.
+Compare a model to a dataset and return the fit statistic.
 """
-compare(model::Model, data::AbstractMeasures) = fit(model, data, dry())
+fitstat(model::Model, data::AbstractMeasures) = fitstat(FitProblem(model, data))
 
 """
-    compare(models::Vector{Model}, data::Vector{<: AbstractMeasures})
+    fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures})
 
-Compare a multi-model to a multi-dataset and return a `FitSummary` object.
+Compare a multi-model to a multi-dataset and return fit statistic.
 """
-compare(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fit(models, data, dry())
+fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fitstat(FitProblem(models, data))
 
 
 """
@@ -77,7 +77,7 @@ compare(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fit(models, 
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  See also `fit!`.
 """
 function fit(model::Model, data::AbstractMeasures, args...; kws...)
-    bestfit, stats = fit([model], [data], args...; kws...)
+    bestfit, stats = fit(FitProblem(model, data), args...; kws...)
     return bestfit[1], stats
 end
 
@@ -88,7 +88,7 @@ end
 Fit a model to an empirical data set using the specified minimizer (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
 function fit!(model::Model, data::AbstractMeasures, args...; kws...)
-    bestfit, stats = fit!([model], [data], args...; kws...)
+    bestfit, stats = fit!(FitProblem(model, data), args...; kws...)
     return bestfit[1], stats
 end
 

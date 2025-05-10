@@ -80,7 +80,9 @@ struct FitProblem{T <: AbstractFitStat}
         @assert length(mevals) == length(datasets)
         evaluate!(mevals)
         buffer = fill(NaN, sum(length.(datasets)))
-        return new{ChiSquared}(mevals, datasets, buffer, Vector{PVModel{Parameter}}())
+        fp = new{ChiSquared}(mevals, datasets, buffer, Vector{PVModel{Parameter}}())
+        populate_residuals!(fp)
+        return fp
     end
 end
 
@@ -123,14 +125,17 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
 end
 
 
-# FitProblem{ChiSquared} specific methods
-dof(fitprob::FitProblem{ChiSquared}) = sum(length.(fitprob.data)) - nfree(fitprob)
-fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
 function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64})
     set_pvalues!(fitprob.mevals, pvalues)
     evaluate!(fitprob.mevals)
+    return populate_residuals!(fitprob)
+end
 
-    # Populate residuals
+
+# FitProblem{ChiSquared} specific methods
+dof(fitprob::FitProblem{ChiSquared}) = sum(length.(fitprob.data)) - nfree(fitprob)
+fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
+function populate_residuals!(fitprob::FitProblem{ChiSquared})
     i1 = 1
     for i in 1:length(fitprob.mevals)
         meval = fitprob.mevals[i]
