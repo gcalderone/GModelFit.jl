@@ -17,7 +17,7 @@ end
 #= TODO
 function print_param_covariance(fitres::FitSummary;
                                 select=nothing, sort=false, threshold=0.)
-    @assert isa(fitres.status.internal, CMPFit.Result) "Minimizer is not CMPFit"
+    @assert isa(fitres.status.internal, CMPFit.Result) "Solver is not CMPFit"
 
     parnames = String[]
     if isa(fitres.bestfit, Vector{GModelFit.HashHashVector{GModelFit.Parameter}})

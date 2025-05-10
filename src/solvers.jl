@@ -2,13 +2,9 @@ module Solvers
 
 using ProgressMeter
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
 
 import ..GModelFit: FitProblem, free_params, nfree, fitstat, evaluate!, residuals, set_bestfit!
-
-# ====================================================================
-# Solvers
-#
 
 # --------------------------------------------------------------------
 abstract type AbstractSolverStatus end
