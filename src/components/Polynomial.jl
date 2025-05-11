@@ -10,7 +10,7 @@ mutable struct Polynomial <: AbstractComponent
 end
 
 
-function evaluate!(::Polynomial, domain::AbstractDomain{1}, output::Vector,
+function evaluate!(::Polynomial, domain::AbstractDomain{1}, output,
                    params...)
     output .= params[1]
     for deg in 1:length(params)-1

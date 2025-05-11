@@ -132,20 +132,27 @@ function evaluate!(fitprob::FitProblem{ChiSquared}, pvalues::Vector{Float64})
     return populate_residuals!(fitprob)
 end
 
+populate_residuals!(fitprob::FitProblem) =
+    return populate_residuals!(fitprob, [last_evaluation(meval) for meval in fitprob.mevals], fitprob.buffer)
+
+
 
 # FitProblem{ChiSquared} specific methods
 dof(fitprob::FitProblem{ChiSquared}) = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
-function populate_residuals!(fitprob::FitProblem{ChiSquared})
+function populate_residuals!(fitprob::FitProblem{ChiSquared}, last_evals::Vector, output::AbstractVector)
     i1 = 1
-    for i in 1:length(fitprob.mevals)
+    for i in 1:length(last_evals)
         meval = fitprob.mevals[i]
-        nn = length(last_evaluation(meval))
+        nn = length(last_evals[i])
         if nn > 0
             i2 = i1 + nn - 1
-            fitprob.buffer[i1:i2] .= reshape((last_evaluation(meval) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            output[i1:i2] .= reshape((last_evals[i] .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end
-    return fitprob.buffer
+    return output
 end
+
+
+include("fitproblem_export.jl")

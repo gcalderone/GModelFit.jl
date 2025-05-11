@@ -53,7 +53,7 @@ end
 
 # ====================================================================
 # Evaluate component
-function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
+function evaluate!(::Gaussian_1D, domain::Domain{1}, output,
                    norm, center, sigma)
     X = coords(domain)
     @. (output = exp( ((X - center) / sigma)^2. / (-2.)) /
@@ -61,7 +61,7 @@ function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
 end
 
 
-function evaluate!(::Gaussian_2D, domain::AbstractDomain{2}, output::Vector,
+function evaluate!(::Gaussian_2D, domain::AbstractDomain{2}, output,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2

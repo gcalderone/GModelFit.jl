@@ -12,21 +12,21 @@ A container for a component to be evaluated on a specific domain.
  - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
-mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain, T}
+mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     counter::Int
     lastparvalues::Vector{Float64}
     deps::Vector{Vector{Float64}}
-    buffer::Vector{T}
+    buffer::Vector{Float64}
 
-    function CompEval(comp::AbstractComponent, domain::AbstractDomain, T)
+    function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         prepare!(comp, domain)
-        return new{typeof(comp), typeof(domain), T}(
+        return new{typeof(comp), typeof(domain)}(
             comp, domain, 0,
             fill(NaN, length(getparams(comp))),
             Vector{Vector{Float64}}(),
-            Vector{T}(undef, result_length(comp, domain)))
+            Vector{Float64}(undef, result_length(comp, domain)))
     end
 end
 
@@ -52,14 +52,14 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function evaluate_comp!(ceval::CompEval, pvalues::AbstractVector{T}) where T
+function evaluate_comp!(ceval::CompEval, pvalues::AbstractVector{Float64})
     # This is named evaluate_comp! rather than evaluate! to distinguish it from evaluate!(ceval::GModelFit.CompEval{GModelFit.FComp}, params...)
     if length(ceval.deps) > 0
         evaluate!(ceval.comp, ceval.domain, ceval.buffer, ceval.deps, pvalues...)
         ceval.counter += 1
     elseif any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)
         evaluate!(ceval.comp, ceval.domain, ceval.buffer, pvalues...)
-        (T == Float64)  &&  (ceval.lastparvalues .= pvalues)
+        ceval.lastparvalues .= pvalues
         ceval.counter += 1
     end
     return ceval.buffer
@@ -71,7 +71,7 @@ end
 # keyword.
 function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
     @assert length(dependencies(comp)) == 0 "Can't evaluate a component with dependencies as a stand-alone one."
-    ceval = CompEval(comp, domain, Float64)
+    ceval = CompEval(comp, domain)
     pvalues = OrderedDict([(pname, par.val) for (pname, par) in getparams(comp)])
     for (pname, pval) in kws
         if pname in keys(pvalues)
@@ -169,7 +169,7 @@ function update!(meval::ModelEval; evaluate=true)
             end
         end
         if !(cname in keys(meval.cevals))
-            ceval = CompEval(comp, meval.domain, Float64)
+            ceval = CompEval(comp, meval.domain)
             meval.cevals[cname] = ceval
         end
     end

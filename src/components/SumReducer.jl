@@ -9,7 +9,7 @@ end
 dependencies(comp::SumReducer) = comp.list
 
 
-function evaluate!(::SumReducer, ::AbstractDomain, output::Vector, deps)
+function evaluate!(::SumReducer, ::AbstractDomain, output, deps)
     output .= 0.
     for i in 1:length(deps)
         output .+= deps[i]

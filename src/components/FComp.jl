@@ -33,7 +33,7 @@ getproperty(comp::FComp, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FComp) = getfield(comp, :deps)
 
 
-function evaluate!(comp::FComp, domain::AbstractDomain, output::Vector,
+function evaluate!(comp::FComp, domain::AbstractDomain, output,
                    deps, params...)
     if length(deps) > 0
         output .= getfield(comp, :func)(deps..., params...)
