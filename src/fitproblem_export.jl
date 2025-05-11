@@ -131,7 +131,7 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
         meval = fp.mevals[i]
         for cname in meval.seq
             ceval = fp.mevals[i].cevals[cname]
-            print(io, "    GModelFit.evaluate!(fp.m$(i)_$(cname), fp.m$(i)domain, ")
+            print(io, "    evaluate!(fp.m$(i)_$(cname), fp.m$(i)domain, ")
             print(io, "m$(i)_$(cname)")
 
             empty!(tmp)
@@ -159,7 +159,7 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     end
 
     println(io, "\n    # Populate residuals")
-    print(io, "    return GModelFit.populate_residuals!(fp.fp, ")
+    print(io, "    return populate_residuals!(fp.fp, ")
     empty!(tmp)
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
@@ -172,19 +172,3 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     println(funcdef)
     return NamedTuple(accum), eval(Meta.parse(funcdef))
 end
-
-
-
-#=
-
-using NonlinearSolve, StaticArrays
-
-fp = GModelFit.FitProblem(model, data);
-dd, f = GModelFit.compile_model(fp)
-f(fp.buffer, dd.guess, dd)
-
-
-result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-         NonlinearSolve.NonlinearFunction(f, resid_prototype = zeros(GModelFit.ndata(fp))),
-         dd.guess, dd))
-=#

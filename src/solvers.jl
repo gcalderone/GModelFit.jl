@@ -4,7 +4,7 @@ using ProgressMeter
 
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, cmpfit
 
-import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!
+import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!, compile_model
 import NonlinearSolve
 
 # --------------------------------------------------------------------
@@ -140,6 +140,21 @@ end
 
 
 # --------------------------------------------------------------------
+function solve!(fp::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
+    dd, f = compile_model(fp)
+    # invokelatest(f, fp.buffer, dd.guess, dd)
+
+    wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
+        NonlinearSolve.NonlinearFunction((args...) -> invokelatest(f, args...),
+                                         resid_prototype = zeros(ndata(fp))),
+        dd.guess, dd), wrap.solver)
+
+    # TODO: AbstractSolverStatus
+    set_bestfit!(fp, wrap.result.u, wrap.result.u .* 0)
+    return SolverStatusOK()
+end
+
+#=
 function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
     params = free_params(fitprob)
 
@@ -159,5 +174,6 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSo
     set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
     return SolverStatusOK()
 end
+=#
 
 end
