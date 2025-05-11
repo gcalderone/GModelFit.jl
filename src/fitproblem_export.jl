@@ -32,39 +32,34 @@ function convert_patch_expression(fp::FitProblem, fd::FunctDesc, cur::String)
         sym = fd.args[2]
         out = "($(sym) -> ($(out)))($(cur))"
     end
-        
+
     return out
 end
 
-function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
-    @assert !isfile(name * ".jl")
-    tmp = Vector{String}()
-    
-    f = stdout # open(name * ".jl", "w")
-    println(f)
-    println(f, "using GModelFit, StaticArrays")
-    println(f)
-    println(f, "function $(name)_init(fp::GModelFit.FitProblem)")
 
-    println(f, "    return (")
-    println(f, "        fp = fp,")
+function compile_model(fp::FitProblem{TFitStat}) where TFitStat
+    tmp = Vector{String}()
+
+    accum = Vector{Any}()
+    push!(accum, :fp => fp)
 
     # Domains
-    println(f, join(["        m$(i)domain = fp.mevals[$i].domain" for i in 1:length(fp.mevals)], ",\n"), ",")
+    for i in 1:length(fp.mevals)
+        push!(accum, Symbol("m$(i)domain") => fp.mevals[i].domain)
+    end
 
     # Components
     empty!(tmp)
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         for (cname, comp) in meval.model.comps
-            push!(tmp, "m$(i)_$(cname) = fp.mevals[$i].model[:$(cname)]")
+            push!(accum, Symbol("m$(i)_$(cname)") => fp.mevals[i].model[cname])
         end
     end
-    println(f, join("        " .* tmp, ",\n"), ",")
 
     # Parameters
     fip = 0
-    empty!(tmp)
+    guess = Vector{Float64}()
     params = Vector{String}()
     actual = Vector{String}()
     for i in 1:length(fp.mevals)
@@ -76,7 +71,7 @@ function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
                 spname = "m$(i)_$(cname)_$(pname)"
                 if ip in meval.ifree
                     fip += 1
-                    push!(tmp, "fp.mevals[$i].model[:$(cname)].$(pname).val")  # this is the guess value
+                    push!(guess, getproperty(fp.mevals[i].model[cname], pname).val)
                     push!(params, "$(spname) = params[$(fip)]")
 
                     if !isnothing(par.patch)
@@ -86,7 +81,7 @@ function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
                         @assert length(par.mpatch.args) == 2
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.mpatch, spname))
                     end
-                else                    
+                else
                     if !isnothing(par.patch)
                         if isa(par.patch, Symbol)
                             push!(actual, "$(spname) = m$(i)_$(par.patch)_$(pname)")
@@ -98,53 +93,47 @@ function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
                         @assert length(par.mpatch.args) == 1
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.mpatch, spname))
                     else
-                        println(f, "        $(spname) = fp.mevals[$i].model[:$(cname)].$(pname).val,")  # fixed, non-patched value
+                        push!(accum, Symbol(spname) => getproperty(fp.mevals[i].model[cname], pname).val)  # fixed, non-patched value
                         push!(params, "$(spname) = fp.$(spname)")
                     end
                 end
             end
         end
     end
-    println(f, "        guess = [")
-    for i in 1:length(tmp)
-        println(f, "            ", tmp[i], (i < length(tmp))  ?  ","  :  "", "  #  $i")
-    end
-    println(f, "        ])")
-    println(f, "end")
+    push!(accum, :guess => guess)
 
     # evaluate! function
-    println(f)
-    println(f)
-    println(f, "function $(name)_evaluate!(output::AbstractArray{T, N}, params, fp) where {T, N}") 
+    io = IOBuffer()
+    println(io, "function (output::AbstractArray{T, N}, params, fp) where {T, N}")
 
-    println(f, "    # Buffers to store component evaluation")
+    println(io, "    # Buffers to store component evaluation")
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         for (cname, ceval) in meval.cevals
-            println(f, "    m$(i)_$(cname) = SizedVector{" * string(length(meval.domain)) * ", T}(undef)")
+            println(io, "    m$(i)_$(cname) = SizedVector{" * string(length(meval.domain)) * ", T}(undef)")
         end
     end
 
-    println(f, "\n    # Parameter values")
+    println(io, "\n    # Parameter values")
     for s in params
-        println(f, "    ", s)
+        println(io, "    ", s)
     end
 
     if length(actual) > 0
-        println(f, "\n    # Patched parameters")
+        println(io, "\n    # Patched parameters")
         for s in actual
-            println(f, "    ", s)
+            println(io, "    ", s)
         end
     end
 
-    println(f, "\n    # Component evaluation")
+    println(io, "\n    # Component evaluation")
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         for cname in meval.seq
             ceval = fp.mevals[i].cevals[cname]
-            print(f, "    GModelFit.evaluate!(fp.m$(i)_$(cname), fp.m$(i)domain, ")
-            print(f, "m$(i)_$(cname)")
-            
+            print(io, "    GModelFit.evaluate!(fp.m$(i)_$(cname), fp.m$(i)domain, ")
+            print(io, "m$(i)_$(cname)")
+
             empty!(tmp)
             id = 1
             for d in dependencies(meval.model, cname, select_domain=true)
@@ -155,7 +144,7 @@ function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
                 push!(tmp, "m$(i)_$(d)")
             end
             if length(tmp) > 0
-                print(f, ", [", join(tmp, ", "), "]")
+                print(io, ", [", join(tmp, ", "), "]")
             end
 
             empty!(tmp)
@@ -163,41 +152,39 @@ function export_model(name::String, fp::FitProblem{TFitStat}) where TFitStat
                 push!(tmp, "m$(i)_$(cname)_$(pname)")
             end
             if length(tmp) > 0
-                print(f, ", ", join(tmp, ", "))
+                print(io, ", ", join(tmp, ", "))
             end
-            println(f, ")")
+            println(io, ")")
         end
     end
 
-    println(f, "\n    # Populate residuals")
-    print(f, "    return GModelFit.populate_residuals!(fp.fp, ")
+    println(io, "\n    # Populate residuals")
+    print(io, "    return GModelFit.populate_residuals!(fp.fp, ")
     empty!(tmp)
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         push!(tmp, "m$(i)_$(meval.maincomp)")
     end
-    println("[", join(tmp, ", "), "], output)")
-    println(f, "end")
+    println(io, "[", join(tmp, ", "), "], output)")
+    println(io, "end")
 
-
-    # close(f)
+    funcdef = String(take!(io))
+    println(funcdef)
+    return NamedTuple(accum), eval(Meta.parse(funcdef))
 end
+
 
 
 #=
 
+using NonlinearSolve, StaticArrays
+
 fp = GModelFit.FitProblem(model, data);
-
-GModelFit.export_model("aa", fp)
-
-aa = aa_init(fp)
-aa_evaluate!(fp.buffer, aa.guess, aa)
+dd, f = GModelFit.compile_model(fp)
+f(fp.buffer, dd.guess, dd)
 
 
 result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-        NonlinearSolve.NonlinearFunction(aa_evaluate!, resid_prototype = zeros(GModelFit.ndata(fp))),
-        aa.guess, aa))
-                                       wrap.solver)
-
-
+         NonlinearSolve.NonlinearFunction(f, resid_prototype = zeros(GModelFit.ndata(fp))),
+         dd.guess, dd))
 =#
