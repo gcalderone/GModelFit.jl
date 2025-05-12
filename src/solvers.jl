@@ -36,20 +36,51 @@ solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNo
 
 
 # --------------------------------------------------------------------
-function eval_funct(fitprob::FitProblem)
+function eval_funct(fitprob::FitProblem; compiled=false, nonlinearsolve=false)
     params = free_params(fitprob)
     guess  = getfield.(params, :val)
     lowb   = getfield.(params, :low)
     highb  = getfield.(params, :high)
 
     prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
-    f = let prog=prog, fitprob=fitprob
-        pvalues -> begin
-            ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-            return evaluate!(fitprob, pvalues)
+
+    if compiled
+        shared, inner_funct = compile_model(fitprob)
+        if nonlinearsolve
+            funct = let prog=prog
+                (du, pvalues, shared) -> begin
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
+                    invokelatest(inner_funct, du, pvalues, shared)
+                end
+            end
+        else
+            funct = let prog=prog, shared=shared, inner_funct=inner_funct
+                pvalues -> begin
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
+                    invokelatest(inner_funct, shared.fp.buffer, pvalues, shared)
+                    return shared.fp.buffer
+                end
+            end
+        end
+    else
+        shared = (fp=fitprob, guess=guess, lowb=lowb, highb=highb)
+        if nonlinearsolve
+            funct = let prog=prog
+                (du, pvalues, shared) -> begin
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
+                    du .= evaluate!(fitprob, pvalues)
+                end
+            end
+        else
+            funct = let prog=prog, fitprob=fitprob
+                pvalues -> begin
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
+                    return evaluate!(fitprob, pvalues)
+                end
+            end
         end
     end
-    return prog, (guess=guess, lowb=lowb, highb=highb), f
+    return prog, shared, funct
 end
 
 
@@ -59,10 +90,10 @@ import LsqFit
 struct lsqfit <: AbstractSolver end
 
 function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
-    prog, dd, f = eval_funct(fitprob)
-    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> f(pvalues),
+    prog, shared, funct = eval_funct(fitprob)
+    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
                                    1.:ndata(fitprob), fill(0., ndata(fitprob)),
-                                   dd.guess, lower=dd.lowb, upper=dd.highb)
+                                   shared.guess, lower=shared.lowb, upper=shared.highb)
     ProgressMeter.finish!(prog)
     if !wrap.result.converged
         return SolverStatusError("Not converged")
@@ -101,20 +132,20 @@ struct cmpfit <: AbstractSolver
 end
 
 function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
-    prog, dd, f = eval_funct(fitprob)
-    parinfo = CMPFit.Parinfo(length(dd.guess))
-    for i in 1:length(dd.guess)
-        llow  = isfinite(dd.lowb[i])   ?  1  :  0
-        lhigh = isfinite(dd.highb[i])  ?  1  :  0
+    prog, shared, funct = eval_funct(fitprob)
+    parinfo = CMPFit.Parinfo(length(shared.guess))
+    for i in 1:length(shared.guess)
+        llow  = isfinite(shared.lowb[i])   ?  1  :  0
+        lhigh = isfinite(shared.highb[i])  ?  1  :  0
         parinfo[i].limited = (llow, lhigh)
-        parinfo[i].limits  = (dd.lowb[i], dd.highb[i])
+        parinfo[i].limits  = (shared.lowb[i], shared.highb[i])
     end
 
-    evaluate!(fitprob, dd.guess)
+    evaluate!(fitprob, shared.guess)
     last_fitstat = fitstat(fitprob)
-    guess = dd.guess
+    guess = shared.guess
     while true
-        wrap.result = CMPFit.cmpfit(f, guess, parinfo=parinfo, config=wrap.solver.config)
+        wrap.result = CMPFit.cmpfit(funct, guess, parinfo=parinfo, config=wrap.solver.config)
         if wrap.result.status <= 0
             return SolverStatusError("CMPFit status = $(wrap.result.status)")
         end
@@ -146,40 +177,17 @@ end
 
 
 # --------------------------------------------------------------------
-function solve!(fp::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
-    dd, f = compile_model(fp)
-    # invokelatest(f, fp.buffer, dd.guess, dd)
-
-    wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-        NonlinearSolve.NonlinearFunction((args...) -> invokelatest(f, args...),
-                                         resid_prototype = zeros(ndata(fp))),
-        dd.guess, dd), wrap.solver)
-
-    # TODO: AbstractSolverStatus
-    set_bestfit!(fp, wrap.result.u, wrap.result.u .* 0)
-    return SolverStatusOK()
-end
-
-#=
 function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
-    params = free_params(fitprob)
-
-    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
-    function local_evaluate!(du, u, fp)
-        ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fp))])
-        du .= evaluate!(fp, u)
-    end
+    prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true)
 
     wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-        NonlinearSolve.NonlinearFunction(local_evaluate!, resid_prototype = zeros(ndata(fitprob))),
-        getfield.(params, :val), fitprob),
-                                       wrap.solver)
+        NonlinearSolve.NonlinearFunction(funct, resid_prototype = zeros(ndata(fitprob))),
+        shared.guess, shared), wrap.solver)
     ProgressMeter.finish!(prog)
 
     # TODO: AbstractSolverStatus
     set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
     return SolverStatusOK()
 end
-=#
 
 end

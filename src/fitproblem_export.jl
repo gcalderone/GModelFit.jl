@@ -60,6 +60,8 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     # Parameters
     fip = 0
     guess = Vector{Float64}()
+    lowb  = Vector{Float64}()
+    highb = Vector{Float64}()
     params = Vector{String}()
     actual = Vector{String}()
     for i in 1:length(fp.mevals)
@@ -72,6 +74,8 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
                 if ip in meval.ifree
                     fip += 1
                     push!(guess, getproperty(fp.mevals[i].model[cname], pname).val)
+                    push!(lowb , getproperty(fp.mevals[i].model[cname], pname).low)
+                    push!(highb, getproperty(fp.mevals[i].model[cname], pname).high)
                     push!(params, "$(spname) = params[$(fip)]")
 
                     if !isnothing(par.patch)
@@ -101,6 +105,8 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
         end
     end
     push!(accum, :guess => guess)
+    push!(accum, :lowb  => lowb)
+    push!(accum, :highb => highb)
 
     # evaluate! function
     io = IOBuffer()
