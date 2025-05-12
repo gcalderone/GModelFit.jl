@@ -1,3 +1,5 @@
+PRINT_COMPILED_MODEL::Bool = false
+
 function convert_patch_expression(fp::FitProblem, fd::FunctDesc, cur::String)
     @assert length(fd.args) in [1,2]
     out = deepcopy(fd.display)
@@ -79,26 +81,21 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
                     push!(params, "$(spname) = params[$(fip)]")
 
                     if !isnothing(par.patch)
-                        @assert length(par.patch.args) == 2
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.patch, spname))
                     elseif !isnothing(par.mpatch)
-                        @assert length(par.mpatch.args) == 2
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.mpatch, spname))
                     end
                 else
+                    push!(accum, Symbol(spname) => getproperty(fp.mevals[i].model[cname], pname).val)  # fixed, non-patched value
+                    push!(params, "$(spname) = shared.$(spname)")
                     if !isnothing(par.patch)
                         if isa(par.patch, Symbol)
                             push!(actual, "$(spname) = m$(i)_$(par.patch)_$(pname)")
                         else
-                            @assert length(par.patch.args) == 1
                             push!(actual, "$(spname) = " * convert_patch_expression(fp, par.patch, spname))
                         end
                     elseif !isnothing(par.mpatch)
-                        @assert length(par.mpatch.args) == 1
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.mpatch, spname))
-                    else
-                        push!(accum, Symbol(spname) => getproperty(fp.mevals[i].model[cname], pname).val)  # fixed, non-patched value
-                        push!(params, "$(spname) = shared.$(spname)")
                     end
                 end
             end
@@ -190,6 +187,6 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     println(io, "end")
 
     funcdef = String(take!(io))
-    # println(funcdef)
+    PRINT_COMPILED_MODEL  &&  println(funcdef)
     return NamedTuple(accum), eval(Meta.parse(funcdef))
 end
