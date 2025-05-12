@@ -98,7 +98,7 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
                         push!(actual, "$(spname) = " * convert_patch_expression(fp, par.mpatch, spname))
                     else
                         push!(accum, Symbol(spname) => getproperty(fp.mevals[i].model[cname], pname).val)  # fixed, non-patched value
-                        push!(params, "$(spname) = fp.$(spname)")
+                        push!(params, "$(spname) = shared.$(spname)")
                     end
                 end
             end
