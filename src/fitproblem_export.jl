@@ -116,7 +116,8 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         for (cname, ceval) in meval.cevals
-            println(io, "    m$(i)_$(cname) = SizedVector{" * string(length(meval.domain)) * ", T}(undef)")
+            # Avoid using SizedVector here: an error may occur when ndata is large because of the attempt to unroll loops
+            println(io, "    m$(i)_$(cname) = Vector{T}(undef, " * string(length(meval.domain)) * ")")
         end
     end
 
@@ -175,6 +176,6 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     println(io, "end")
 
     funcdef = String(take!(io))
-    println(funcdef)
+    # println(funcdef)
     return NamedTuple(accum), eval(Meta.parse(funcdef))
 end

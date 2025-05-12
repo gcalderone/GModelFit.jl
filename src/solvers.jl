@@ -31,8 +31,8 @@ mutable struct WrapSolver{T <: Union{AbstractSolver, NonlinearSolve.NonlinearSol
     WrapSolver(solver::T) where T = new{T}(solver, nothing)
 end
 
-solve!(fitprob::FitProblem, solver::AbstractSolver) = solve!(fitprob, WrapSolver(solver))
-solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm) = solve!(fitprob, WrapSolver(solver))
+solve!(fitprob::FitProblem, solver::AbstractSolver; kws...) = solve!(fitprob, WrapSolver(solver); kws...)
+solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm; kws...) = solve!(fitprob, WrapSolver(solver); kws...)
 
 
 # --------------------------------------------------------------------
@@ -56,7 +56,7 @@ function eval_funct(fitprob::FitProblem; compiled=false, nonlinearsolve=false)
         else
             funct = let prog=prog, shared=shared, inner_funct=inner_funct
                 pvalues -> begin
-                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
                     invokelatest(inner_funct, shared.fp.buffer, pvalues, shared)
                     return shared.fp.buffer
                 end
@@ -68,14 +68,14 @@ function eval_funct(fitprob::FitProblem; compiled=false, nonlinearsolve=false)
             funct = let prog=prog
                 (du, pvalues, shared) -> begin
                     ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                    du .= evaluate!(fitprob, pvalues)
+                    du .= evaluate!(shared.fp, pvalues)
                 end
             end
         else
-            funct = let prog=prog, fitprob=fitprob
+            funct = let prog=prog, shared=shared
                 pvalues -> begin
-                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                    return evaluate!(fitprob, pvalues)
+                    ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
+                    return evaluate!(shared.fp, pvalues)
                 end
             end
         end
@@ -89,8 +89,8 @@ import LsqFit
 
 struct lsqfit <: AbstractSolver end
 
-function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
-    prog, shared, funct = eval_funct(fitprob)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit}; compiled=false)
+    prog, shared, funct = eval_funct(fitprob, compiled=compiled)
     wrap.result = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
                                    1.:ndata(fitprob), fill(0., ndata(fitprob)),
                                    shared.guess, lower=shared.lowb, upper=shared.highb)
@@ -131,8 +131,8 @@ struct cmpfit <: AbstractSolver
     end
 end
 
-function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
-    prog, shared, funct = eval_funct(fitprob)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit}; compiled=false)
+    prog, shared, funct = eval_funct(fitprob, compiled=compiled)
     parinfo = CMPFit.Parinfo(length(shared.guess))
     for i in 1:length(shared.guess)
         llow  = isfinite(shared.lowb[i])   ?  1  :  0
@@ -177,8 +177,8 @@ end
 
 
 # --------------------------------------------------------------------
-function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
-    prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true)
+function solve!(fitprob::FitProblem, wrap::WrapSolver{T}; compiled=true) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
+    prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true, compiled=compiled)
 
     wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
         NonlinearSolve.NonlinearFunction(funct, resid_prototype = zeros(ndata(fitprob))),

@@ -29,11 +29,10 @@ FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, elapsed::Float64) 
 
 
 # ====================================================================
-# function fit(fitprob::FitProblem, solver::Union{AbstractSolver, NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}=lsqfit())
-function fit(fitprob::FitProblem, solver=Solvers.lsqfit())
+function fit(fitprob::FitProblem, solver=Solvers.lsqfit(); kws...)
     starttime = time()
     @assert nfree(fitprob) > 0 "No free parameter in the model"
-    status = Solvers.solve!(fitprob, solver)
+    status = Solvers.solve!(fitprob, solver; kws...)
     bestfit = [ModelSnapshot(fitprob.mevals[i], fitprob.bestfit[i]) for i in 1:length(fitprob.mevals)]
     stats = FitSummary(fitprob, status, time() - starttime)
     return bestfit, stats
