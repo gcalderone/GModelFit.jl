@@ -36,21 +36,33 @@ solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNo
 
 
 # --------------------------------------------------------------------
+function eval_funct(fitprob::FitProblem)
+    params = free_params(fitprob)
+    guess  = getfield.(params, :val)
+    lowb   = getfield.(params, :low)
+    highb  = getfield.(params, :high)
+
+    prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    f = let prog=prog, fitprob=fitprob
+        pvalues -> begin
+            ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
+            return evaluate!(fitprob, pvalues)
+        end
+    end
+    return prog, (guess=guess, lowb=lowb, highb=highb), f
+end
+
+
+# --------------------------------------------------------------------
 import LsqFit
 
 struct lsqfit <: AbstractSolver end
 
 function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
-    params = free_params(fitprob)
-    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
-    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> begin
-                                  ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                  return evaluate!(fitprob, pvalues)
-                              end,
-                              1.:ndata(fitprob), fill(0., ndata(fitprob)),
-                              getfield.(params, :val),
-                              lower=getfield.(params, :low),
-                              upper=getfield.(params, :high))
+    prog, dd, f = eval_funct(fitprob)
+    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> f(pvalues),
+                                   1.:ndata(fitprob), fill(0., ndata(fitprob)),
+                                   dd.guess, lower=dd.lowb, upper=dd.highb)
     ProgressMeter.finish!(prog)
     if !wrap.result.converged
         return SolverStatusError("Not converged")
@@ -89,27 +101,20 @@ struct cmpfit <: AbstractSolver
 end
 
 function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
-    params = free_params(fitprob)
-    guess = getfield.(params, :val)
-    low   = getfield.(params, :low)
-    high  = getfield.(params, :high)
-    parinfo = CMPFit.Parinfo(length(guess))
-    for i in 1:length(guess)
-        llow  = isfinite(low[i])   ?  1  :  0
-        lhigh = isfinite(high[i])  ?  1  :  0
+    prog, dd, f = eval_funct(fitprob)
+    parinfo = CMPFit.Parinfo(length(dd.guess))
+    for i in 1:length(dd.guess)
+        llow  = isfinite(dd.lowb[i])   ?  1  :  0
+        lhigh = isfinite(dd.highb[i])  ?  1  :  0
         parinfo[i].limited = (llow, lhigh)
-        parinfo[i].limits  = (low[i], high[i])
+        parinfo[i].limits  = (dd.lowb[i], dd.highb[i])
     end
 
-    evaluate!(fitprob, guess)
+    evaluate!(fitprob, dd.guess)
     last_fitstat = fitstat(fitprob)
-    prog = ProgressUnknown(desc="Model (#free=$(nfree(fitprob))) evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    guess = dd.guess
     while true
-        wrap.result = CMPFit.cmpfit((pvalues) -> begin
-                                        ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(fitprob))])
-                                        return evaluate!(fitprob, pvalues)
-                                    end,
-                                    guess, parinfo=parinfo, config=wrap.solver.config)
+        wrap.result = CMPFit.cmpfit(f, guess, parinfo=parinfo, config=wrap.solver.config)
         if wrap.result.status <= 0
             return SolverStatusError("CMPFit status = $(wrap.result.status)")
         end
@@ -123,19 +128,20 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
                 continue
             end
         end
-
-        ProgressMeter.finish!(prog)
-        set_bestfit!(fitprob,
-                     getfield.(Ref(wrap.result), :param),
-                     getfield.(Ref(wrap.result), :perror))
-
-        if wrap.result.status == 2
-            return SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
-        elseif wrap.result.status == 5
-            return SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
-        end
-        return SolverStatusOK()
+        break
     end
+    ProgressMeter.finish!(prog)
+
+    set_bestfit!(fitprob,
+                 getfield.(Ref(wrap.result), :param),
+                 getfield.(Ref(wrap.result), :perror))
+
+    if wrap.result.status == 2
+        return SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
+    elseif wrap.result.status == 5
+        return SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
+    end
+    return SolverStatusOK()
 end
 
 
