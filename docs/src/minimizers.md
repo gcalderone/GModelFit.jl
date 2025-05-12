@@ -18,12 +18,12 @@ There is also a dummy minimizer, `GModelFit.dry()`, whose purpose is to compare 
 using GModelFit
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, Domain(1:0.1:50), seed=1)
-bestfit, stats = fit(model, data, minimizer=GModelFit.lsqfit())
+bestfit, stats = fit(model, data, lsqfit())
 println(); # hide
 ```
 or
 ```@example abc
-bestfit, stats = fit(model, data, minimizer=GModelFit.cmpfit())
+bestfit, stats = fit(model, data, cmpfit())
 println(); # hide
 ```
 
@@ -43,12 +43,12 @@ The `cmpfit()` minimizer allows to specify several options to fine-tune the mini
   data = GModelFit.mock(Measures, model, dom, seed=1)
   
   # Set minimizer options
-  mzer = GModelFit.cmpfit()
-  mzer.config.maxiter = 1
-  mzer.ftol_after_maxiter = 1e-8
+  solver = GModelFit.cmpfit()
+  solver.config.maxiter = 1
+  solver.ftol_after_maxiter = 1e-8
   
   # Run the fit
   model[:main].T.val = 10  # guess value, purposely far from true one
-  bestfit, stats = fit(model, data, minimizer=mzer)
+  bestfit, stats = fit(model, data, solver)
   println(); # hide
   ```
