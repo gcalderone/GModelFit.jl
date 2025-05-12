@@ -107,17 +107,31 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     push!(accum, :guess => guess)
     push!(accum, :lowb  => lowb)
     push!(accum, :highb => highb)
+    push!(accum, :prealloc => Dict{DataType, Vector{Vector}}())
 
     # evaluate! function
     io = IOBuffer()
-    println(io, "function (output::AbstractArray{T, N}, params, fp) where {T, N}")
+    println(io, "function (output::AbstractArray{T, N}, params, shared) where {T, N}")
 
     println(io, "    # Buffers to store component evaluation")
+    println(io, "    if !(T in keys(shared.prealloc))")
+    println(io, "        shared.prealloc[T] = Vector{Vector{T}}()")
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
         for (cname, ceval) in meval.cevals
             # Avoid using SizedVector here: an error may occur when ndata is large because of the attempt to unroll loops
-            println(io, "    m$(i)_$(cname) = Vector{T}(undef, " * string(length(meval.domain)) * ")")
+            println(io, "        push!(shared.prealloc[T], Vector{T}(undef, " * string(length(meval.domain)) * "))")
+        end
+    end
+    println(io, "    end")
+    println(io, "    prealloc = shared.prealloc[T]")
+
+    ip = 0
+    for i in 1:length(fp.mevals)
+        meval = fp.mevals[i]
+        for (cname, ceval) in meval.cevals
+            ip += 1
+            println(io, "    m$(i)_$(cname)::Vector{T} = prealloc[$(ip)]")
         end
     end
 
@@ -138,13 +152,13 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
         meval = fp.mevals[i]
         for cname in meval.seq
             ceval = fp.mevals[i].cevals[cname]
-            print(io, "    evaluate!(fp.m$(i)_$(cname), fp.m$(i)domain, ")
+            print(io, "    evaluate!(shared.m$(i)_$(cname), shared.m$(i)domain, ")
             print(io, "m$(i)_$(cname)")
 
             empty!(tmp)
             id = 1
             for d in dependencies(meval.model, cname, select_domain=true)
-                push!(tmp, "coords(fp.m$(i)domain, $id)")
+                push!(tmp, "coords(shared.m$(i)domain, $id)")
                 id += 1
             end
             for d in dependencies(meval.model, cname, select_domain=false)
@@ -166,7 +180,7 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     end
 
     println(io, "\n    # Populate residuals")
-    print(io, "    return populate_residuals!(fp.fp, ")
+    print(io, "    return populate_residuals!(shared.fp, ")
     empty!(tmp)
     for i in 1:length(fp.mevals)
         meval = fp.mevals[i]
