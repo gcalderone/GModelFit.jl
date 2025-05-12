@@ -2,7 +2,7 @@ module Solvers
 
 using ProgressMeter
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, cmpfit
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
 
 import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!, compile_model
 import NonlinearSolve
@@ -120,7 +120,7 @@ improvements (ftol_after_maxiter) to be checked after the solver
 iterated for the maximum allowed number of times.
 =#
 
-struct cmpfit <: AbstractSolver
+mutable struct cmpfit <: AbstractSolver
     config::CMPFit.Config
     ftol_after_maxiter::Float64
 
@@ -152,7 +152,7 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit}; compiled=false)
 
         if (wrap.result.status == 5)
             Δfitstat = (last_fitstat - wrap.result.bestnorm) / last_fitstat
-            if Δfitstat > wrap.ftol_after_maxiter
+            if Δfitstat > wrap.solver.ftol_after_maxiter
                 println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(wrap.ftol_after_maxiter), continue minimization...\n")
                 last_fitstat = wrap.result.bestnorm
                 guess = getfield.(Ref(wrap.result), :param)

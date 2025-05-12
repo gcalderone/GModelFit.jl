@@ -202,13 +202,13 @@ _deserialize(::Val{Symbol("GModelFit.FitSummary")},
                             _deserialize(dd["fitstat"]),
                             _deserialize(dd["status"]))
 
-_deserialize(::Val{Symbol("GModelFit.SolverStatusOK")},
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusOK")},
              dd::AbstractDict) = SolverStatusOK()
 
-_deserialize(::Val{Symbol("GModelFit.SolverStatusWarn")},
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusWarn")},
              dd::AbstractDict) = SolverStatusWarn(dd["message"])
 
-_deserialize(::Val{Symbol("GModelFit.SolverStatusError")},
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusError")},
              dd::AbstractDict) = SolverStatusError(dd["message"])
 
 function _deserialize(::Val{Symbol("GModelFit.CartesianDomain")},

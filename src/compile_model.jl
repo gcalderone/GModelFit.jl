@@ -187,6 +187,10 @@ function compile_model(fp::FitProblem{TFitStat}) where TFitStat
     println(io, "end")
 
     funcdef = String(take!(io))
-    PRINT_COMPILED_MODEL  &&  println(funcdef)
+    filename = joinpath(tempdir(), "GModelFit_compiled_model.jl")
+    f = open(filename, "w")
+    println(f, funcdef)
+    close(f)
+    @warn "compile_model() is an EXPERIMENTAL feature.  You can check the generated code in $filename."
     return NamedTuple(accum), eval(Meta.parse(funcdef))
 end
