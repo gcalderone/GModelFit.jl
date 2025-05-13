@@ -114,7 +114,7 @@ println() # hide
 The following example shows how to implement a component which interpolates a theoretical model onto a specific empirical domain, with the only parameter being a global scaling factor:
 ```@example abc
 using GModelFit, Interpolations
-import GModelFit.prepare!, result_length, GModelFit.evaluate!
+import GModelFit: prepare!, result_length, evaluate!
 
 # Define the component structure and constructor
 struct Interpolator <: GModelFit.AbstractComponent
@@ -139,12 +139,12 @@ function prepare!(comp::Interpolator, domain::AbstractDomain{1})
     append!(comp.interp_y, itp(coords(domain)))
 end
 
-result_length(comp::Interpolator, domain::AbstractDomain{1}) = length(comp.interp_y)
+result_length(comp::Interpolator, domain::AbstractDomain{1}) = length(domain)
 
 # Component evaluation (apply scaling factor)
 function evaluate!(comp::Interpolator, ::AbstractDomain{1}, output,
                    scale)
-    output .= scale .* ceval.comp.interp_y
+    output .= scale .* comp.interp_y
 end
 println() # hide
 ```
