@@ -65,7 +65,7 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function evaluate_comp!(ceval::CompEval, tpar::CompEvalT{T}, pvalues::AbstractVector{T}) where T
+function evaluate_comp!(ceval::CompEval, tpar::CompEvalT, pvalues::AbstractVector)
     if length(tpar.deps) > 0
         evaluate!(ceval.comp, ceval.domain, tpar.buffer, tpar.deps, pvalues...)
         ceval.counter += 1
@@ -79,7 +79,7 @@ end
 
 # TODO: is this necessary ? This is named evaluate_comp! rather than evaluate! to distinguish it from evaluate!(ceval::GModelFit.CompEval{GModelFit.FComp}, params...)
 evaluate_comp!(ceval, pvalues::AbstractVector{Float64}) = evaluate_comp!(ceval, ceval.tpar  , pvalues)
-evaluate_comp!(ceval, pvalues::AbstractVector{Dual})    = evaluate_comp!(ceval, ceval.tparad, pvalues)
+evaluate_comp!(ceval, pvalues::AbstractVector)          = evaluate_comp!(ceval, ceval.tparad, pvalues)
 
 
 
@@ -255,13 +255,13 @@ nfree(meval::ModelEval) = length(meval.ifree)
 
 
 # Set new model parameters
-function set_pvalues!(meval::ModelEval, tpar::ModelEvalT{T}, pvalues::AbstractVector{T}) where T
+function set_pvalues!(meval::ModelEval, tpar::ModelEvalT, pvalues::AbstractVector)
     items(tpar.pvalues)[meval.ifree] .= pvalues
     items(tpar.pactual)[meval.ifree] .= pvalues
 end
 
 set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Float64}) = set_pvalues!(meval, meval.tpar, pvalues)
-set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Dual})    = set_pvalues!(meval, meval.tparad, pvalues)
+set_pvalues!(meval::ModelEval, pvalues::AbstractVector)          = set_pvalues!(meval, meval.tparad, pvalues)
 
 
 """
@@ -276,12 +276,12 @@ function evaluate!(meval::ModelEval, pvalues::AbstractVector{Float64})
     evaluate!(meval, meval.tpar, pvalues)
     return meval.cevals[meval.seq[end]].tpar.buffer
 end
-function evaluate!(meval::ModelEval, pvalues::AbstractVector{Dual})
+function evaluate!(meval::ModelEval, pvalues::AbstractVector)
     evaluate!(meval, meval.tparad, pvalues)
     return meval.cevals[meval.seq[end]].tparad.buffer
 end
 
-function evaluate!(meval::ModelEval, tpar::ModelEvalT{T}, pvalues::AbstractVector{T}) where T
+function evaluate!(meval::ModelEval, tpar::ModelEvalT, pvalues::AbstractVector)
     set_pvalues!(meval, pvalues)
 
     # Patch parameter values

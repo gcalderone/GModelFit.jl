@@ -45,9 +45,11 @@ function evaluate!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where 
                 append!(mevals[i].tparad.pvmulti, pv2)
             end
         end
-        output = Vector{Vector{T}}()
         for (id, i1, i2) in free_params_indices(mevals)
             set_pvalues!(mevals[id], pvalues[i1:i2])
+        end
+        output = Vector{Vector{T}}()
+        for (id, i1, i2) in free_params_indices(mevals)
             push!(output, evaluate!(mevals[id], pvalues[i1:i2]))
         end
         return output
@@ -98,10 +100,9 @@ ndata(fitprob::FitProblem) = sum(length.(fitprob.data))
 
 function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
     for (id, i1, i2) in free_params_indices(fitprob.mevals)
-        meval = fitprob.mevals[id]
-        set_pvalues!(meval, pvalues[i1:i2])
-        evaluate!(meval)
+        set_pvalues!(fitprob.mevals[id], pvalues[i1:i2])
     end
+    evaluate!(fitprob.mevals, pvalues)
 
     empty!(fitprob.bestfit)
     for id in 1:length(fitprob.mevals)

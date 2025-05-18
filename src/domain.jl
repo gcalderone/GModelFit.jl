@@ -128,9 +128,10 @@ ndims(d::AbstractMeasures) = ndims(domain(d))
 length(d::AbstractMeasures) = length(domain(d))
 size(d::AbstractMeasures) = size(domain(d))
 
-reshape(d::Domain, v::Vector{Float64}) = v
-function reshape(d::CartesianDomain, v::Vector{Float64})
-    out = fill(NaN, size(d))
+reshape(d::Domain, v::Vector) = v
+function reshape(d::CartesianDomain, v::Vector{T}) where T <: Real
+    out = Matrix{T}(undef(size(d)))
+    out .= NaN
     out[d.roi] .= v
     return out
 end

@@ -176,7 +176,7 @@ end
 
 
 # --------------------------------------------------------------------
-function solve!(fitprob::FitProblem, wrap::WrapSolver{T}; compiled=true) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
+function solve!(fitprob::FitProblem, wrap::WrapSolver{T}; compiled=false) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
     prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true, compiled=compiled)
 
     wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
