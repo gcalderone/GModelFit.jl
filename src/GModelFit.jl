@@ -429,7 +429,6 @@ end
 
 include("evaluation.jl")
 include("fitproblem.jl")
-include("compile_model.jl")
 include("snapshot.jl")
 include("solvers.jl")
 using .Solvers
