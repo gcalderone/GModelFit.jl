@@ -8,7 +8,6 @@ using MacroTools
 using Dates
 using Random
 using JSON, GZip
-using StaticArrays
 
 import Base.show
 import Base.ndims

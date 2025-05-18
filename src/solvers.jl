@@ -4,7 +4,7 @@ using ProgressMeter
 
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
 
-import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!, compile_model
+import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate_residuals!, set_bestfit!, compile_model
 import NonlinearSolve
 
 # --------------------------------------------------------------------
@@ -63,19 +63,19 @@ function eval_funct(fitprob::FitProblem; compiled=false, nonlinearsolve=false)
             end
         end
     else
-        shared = (fp=fitprob, guess=guess, lowb=lowb, highb=highb)
+        shared = (fp=fitprob, guess=guess, lowb=lowb, highb=highb, output=Vector{Float64}(undef, ndata(fitprob)))
         if nonlinearsolve
             funct = let prog=prog
                 (du, pvalues, shared) -> begin
                     ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                    du .= evaluate!(shared.fp, pvalues)
+                    evaluate_residuals!(du, shared.fp, pvalues)
                 end
             end
         else
             funct = let prog=prog, shared=shared
                 pvalues -> begin
                     ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                    return evaluate!(shared.fp, pvalues)
+                    return evaluate_residuals!(shared.output, shared.fp, pvalues)
                 end
             end
         end
@@ -141,7 +141,6 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit}; compiled=false)
         parinfo[i].limits  = (shared.lowb[i], shared.highb[i])
     end
 
-    evaluate!(fitprob, shared.guess)
     last_fitstat = fitstat(fitprob)
     guess = shared.guess
     while true

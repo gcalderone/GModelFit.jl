@@ -1,3 +1,4 @@
+import ForwardDiff: Dual
 
 """
     CompEval(comp::AbstractComponent, domain::AbstractDomain)
@@ -12,21 +13,33 @@ A container for a component to be evaluated on a specific domain.
  - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
+mutable struct CompEvalT{T <: Real}
+    lastparvalues::Vector{Union{T, Float64}}
+    deps::Vector{Vector{Union{T, Float64}}}
+    buffer::Vector{T}
+
+    CompEvalT{T}(npar::Int, nres::Int) where T <: Real =
+        new{T}(
+            Vector{       Union{T, Float64}}( undef, npar),
+            Vector{Vector{Union{T, Float64}}}(),
+            Vector{             T}(           undef, nres))
+end
+
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
     counter::Int
-    lastparvalues::Vector{Float64}
-    deps::Vector{Vector{Float64}}
-    buffer::Vector{Float64}
+    tpar::CompEvalT{Float64}
+    tparad::CompEvalT{Dual}
 
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         prepare!(comp, domain)
+        npar = length(getparams(comp))
+        nres = result_length(comp, domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain, 0,
-            fill(NaN, length(getparams(comp))),
-            Vector{Vector{Float64}}(),
-            Vector{Float64}(undef, result_length(comp, domain)))
+            CompEvalT{Float64}(npar, nres),
+            CompEvalT{Dual}(   npar, nres))
     end
 end
 
@@ -36,7 +49,7 @@ end
 
 Evaluate a component using the provided parameter values.  Outcomes shall be stored in the `CompEval.buffer` vector.
 """
-evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
+evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate! method implemented for $(TComp), $(TDomain)")
 
 
@@ -52,18 +65,22 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function evaluate_comp!(ceval::CompEval, pvalues::AbstractVector{Float64})
-    # This is named evaluate_comp! rather than evaluate! to distinguish it from evaluate!(ceval::GModelFit.CompEval{GModelFit.FComp}, params...)
-    if length(ceval.deps) > 0
-        evaluate!(ceval.comp, ceval.domain, ceval.buffer, ceval.deps, pvalues...)
+function evaluate_comp!(ceval::CompEval, tpar::CompEvalT{T}, pvalues::AbstractVector{T}) where T
+    if length(tpar.deps) > 0
+        evaluate!(ceval.comp, ceval.domain, tpar.buffer, tpar.deps, pvalues...)
         ceval.counter += 1
-    elseif any(ceval.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)
-        evaluate!(ceval.comp, ceval.domain, ceval.buffer, pvalues...)
-        ceval.lastparvalues .= pvalues
+    elseif any(tpar.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)
+        evaluate!(ceval.comp, ceval.domain, tpar.buffer, pvalues...)
+        tpar.lastparvalues .= pvalues
         ceval.counter += 1
     end
-    return ceval.buffer
+    return tpar.buffer
 end
+
+# TODO: is this necessary ? This is named evaluate_comp! rather than evaluate! to distinguish it from evaluate!(ceval::GModelFit.CompEval{GModelFit.FComp}, params...)
+evaluate_comp!(ceval, pvalues::AbstractVector{Float64}) = evaluate_comp!(ceval, ceval.tpar  , pvalues)
+evaluate_comp!(ceval, pvalues::AbstractVector{Dual})    = evaluate_comp!(ceval, ceval.tparad, pvalues)
+
 
 
 # Evaluate component on the given domain.  Parameter values are the
@@ -80,8 +97,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
         end
     end
-    evaluate_comp!(ceval, collect(values(pvalues)))
-    return ceval.buffer
+    return evaluate_comp!(ceval, collect(values(pvalues)))
 end
 
 
@@ -103,29 +119,46 @@ A structure containing the required informations to evaluate a model on a specif
 
 The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
 """
+struct ModelEvalT{T <: Real}
+    pvalues::PVModel{Union{T, Float64}}
+    pactual::PVModel{Union{T, Float64}}
+    pvmulti::Vector{PVModel{Union{T, Float64}}}
+
+    ModelEvalT{T}() where T  <: Real =
+        new(PVModel{Union{T, Float64}}(),
+            PVModel{Union{T, Float64}}(),
+            Vector{PVModel{Union{T, Float64}}}())
+end
+
+function empty!(v::ModelEvalT)
+    empty!(v.pvalues)
+    empty!(v.pactual)
+    empty!(v.pvmulti)
+end
+
+
 struct ModelEval
     model::Model
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
-    maincomp::Symbol
-    pvalues::PVModel{Float64}
-    pactual::PVModel{Float64}
-    patched::Vector{NTuple{2, Symbol}}
     ifree::Vector{Int}
-    pvmulti::Vector{PVModel{Float64}}
+    patched::Vector{NTuple{2, Symbol}}
+    tpar::ModelEvalT{Float64}
+    tparad::ModelEvalT{Dual}
     seq::Vector{Symbol}
 
     function ModelEval(model::Model, domain::AbstractDomain)
-        meval = new(model, domain, OrderedDict{Symbol, CompEval}(), find_maincomp(model),
-                    PVModel{Float64}(), PVModel{Float64}(), Vector{NTuple{2, Symbol}}(),
-                    Vector{Int}(), Vector{PVModel{Float64}}(), Vector{Symbol}())
-        update!(meval, evaluate=false)
+        meval = new(model, domain, OrderedDict{Symbol, CompEval}(),
+                    Vector{Int}(), Vector{NTuple{2, Symbol}}(),
+                    ModelEvalT{Float64}(), ModelEvalT{Dual}(),
+                    Vector{CompEval}())
+        scan_model!(meval, evaluate=false)
         return meval
     end
 end
 
 
-function update!(meval::ModelEval; evaluate=true)
+function scan_model!(meval::ModelEval; evaluate=true)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -142,12 +175,10 @@ function update!(meval::ModelEval; evaluate=true)
         return par.fixed
     end
 
-    @assert meval.maincomp == find_maincomp(meval.model) "Main component is not allowed to change after ModelEval creation"
-    empty!(meval.pvalues)
-    empty!(meval.pactual)
-    empty!(meval.patched)
     empty!(meval.ifree)
-    empty!(meval.pvmulti)
+    empty!(meval.patched)
+    empty!(meval.tpar)
+    empty!(meval.tparad)
 
     isfixed = Vector{Bool}()
     for (cname, comp) in meval.model.comps
@@ -161,12 +192,15 @@ function update!(meval::ModelEval; evaluate=true)
                 error(s)
             end
 
-            push!(meval.pvalues, cname, pname, par.val)
-            push!(meval.pactual, cname, pname, par.val)
             push!(isfixed, isParamFixed(par)  ||  meval.model.fixed[cname])
             if !isnothing(par.patch)  ||  !isnothing(par.mpatch)
                 push!(meval.patched, (cname, pname))
             end
+
+            push!(meval.tpar.pvalues  , cname, pname, par.val)
+            push!(meval.tpar.pactual  , cname, pname, par.val)
+            push!(meval.tparad.pvalues, cname, pname, Dual{:tag}(0., 0.))
+            push!(meval.tparad.pactual, cname, pname, Dual{:tag}(0., 0.))
         end
         if !(cname in keys(meval.cevals))
             ceval = CompEval(comp, meval.domain)
@@ -176,31 +210,34 @@ function update!(meval::ModelEval; evaluate=true)
     append!(meval.ifree, findall(.! isfixed))
 
     for (cname, ceval) in meval.cevals
-        empty!(ceval.deps)
+        empty!(ceval.tpar.deps)
+        empty!(ceval.tparad.deps)
         i = 1
         for d in dependencies(meval.model, cname, select_domain=true)
-            push!(ceval.deps, coords(meval.domain, i))
+            push!(ceval.tpar.deps  , coords(meval.domain, i))
+            push!(ceval.tparad.deps, coords(meval.domain, i))
             i += 1
         end
         for d in dependencies(meval.model, cname, select_domain=false)
-            push!(ceval.deps, meval.cevals[d].buffer)
+            push!(ceval.tpar.deps  , meval.cevals[d].tpar.buffer)
+            push!(ceval.tparad.deps, meval.cevals[d].tparad.buffer)
         end
     end
 
-    function compeval_sequence!(seq::Vector{Symbol}, meval::ModelEval, cname::Symbol)
+    function compeval_sequence!(meval::ModelEval, cname::Symbol)
         for d in dependencies(meval.model, cname)
-            compeval_sequence!(seq, meval, d)
+            compeval_sequence!(meval, d)
         end
-        push!(seq, cname)
-        return seq
+        push!(meval.seq, cname)
     end
     function compeval_sequence!(meval::ModelEval)
         empty!(meval.seq)
-        compeval_sequence!(meval.seq, meval, meval.maincomp)
+        compeval_sequence!(meval, find_maincomp(meval.model))
     end
     compeval_sequence!(meval)
 
     evaluate  &&  evaluate!(meval)
+    nothing
 end
 
 
@@ -213,14 +250,18 @@ function free_params(meval::ModelEval)
     end
     return out[meval.ifree]
 end
+free_params_val(meval::ModelEval) = getfield.(free_params(meval), :val)
 nfree(meval::ModelEval) = length(meval.ifree)
 
 
 # Set new model parameters
-function set_pvalues!(meval::ModelEval, pvalues::Vector{Float64})
-    items(meval.pvalues)[meval.ifree] .= pvalues
-    items(meval.pactual)[meval.ifree] .= pvalues
+function set_pvalues!(meval::ModelEval, tpar::ModelEvalT{T}, pvalues::AbstractVector{T}) where T
+    items(tpar.pvalues)[meval.ifree] .= pvalues
+    items(tpar.pactual)[meval.ifree] .= pvalues
 end
+
+set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Float64}) = set_pvalues!(meval, meval.tpar, pvalues)
+set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Dual})    = set_pvalues!(meval, meval.tparad, pvalues)
 
 
 """
@@ -228,36 +269,50 @@ end
 
 Update a `ModelEval` structure by evaluating all components in the model.
 """
-function evaluate!(meval::ModelEval)
+
+evaluate!(meval::ModelEval) = evaluate!(meval, free_params_val(meval))
+
+function evaluate!(meval::ModelEval, pvalues::AbstractVector{Float64})
+    evaluate!(meval, meval.tpar, pvalues)
+    return meval.cevals[meval.seq[end]].tpar.buffer
+end
+function evaluate!(meval::ModelEval, pvalues::AbstractVector{Dual})
+    evaluate!(meval, meval.tparad, pvalues)
+    return meval.cevals[meval.seq[end]].tparad.buffer
+end
+
+function evaluate!(meval::ModelEval, tpar::ModelEvalT{T}, pvalues::AbstractVector{T}) where T
+    set_pvalues!(meval, pvalues)
+
     # Patch parameter values
     for (cname, pname) in meval.patched
         par = getfield(meval.model[cname], pname)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
             if isa(par.patch, Symbol)  # use same param. value from a different component
-                meval.pactual[cname][pname] = meval.pvalues[par.patch][pname]
+                tpar.pactual[cname][pname] = tpar.pvalues[par.patch][pname]
             else                       # invoke a patch function
                 if length(par.patch.args) == 1
-                    meval.pactual[cname][pname] = par.patch(meval.pvalues)
+                    tpar.pactual[cname][pname] = par.patch(tpar.pvalues)
                 else
-                    meval.pactual[cname][pname] = par.patch(meval.pvalues, meval.pvalues[cname][pname])
+                    tpar.pactual[cname][pname] = par.patch(tpar.pvalues, tpar.pvalues[cname][pname])
                 end
             end
         elseif !isnothing(par.mpatch)
-            @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
+            @assert length(tpar.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
             if length(par.mpatch.args) == 1
-                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti)
+                tpar.pactual[cname][pname] = par.mpatch(tpar.pvmulti)
             else
-                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti, meval.pvalues[cname][pname])
+                tpar.pactual[cname][pname] = par.mpatch(tpar.pvmulti, tpar.pvalues[cname][pname])
             end
         end
     end
 
     # Evaluation of all components
     for cname in meval.seq
-        evaluate_comp!(meval.cevals[cname], items(meval.pactual[cname]))
+        evaluate_comp!(meval.cevals[cname], items(tpar.pactual[cname]))
     end
-    return meval
+    nothing
 end
 
 
@@ -278,24 +333,20 @@ Return a `OrderedDict{Symbol, Int}` with the number of times each model componen
 evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
 
 
-"""
-    last_evaluation(meval::ModelEval)
-    last_evaluation(meval::ModelEval, name::Symbol)
-
-Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
-"""
-last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.maincomp)
-last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.cevals[name].buffer)
+# """
+#     last_evaluation(meval::ModelEval)
+#     last_evaluation(meval::ModelEval, name::Symbol)
+#
+# Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
+# """
+# last_evaluation(meval::ModelEval) = last_evaluation(meval, meval.seq[end])
+# last_evaluation(meval::ModelEval, name::Symbol) = reshape(meval.domain, meval.cevals[name].tpar.buffer)
 
 
 # ====================================================================
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     meval = ModelEval(model, domain)
-    evaluate!(meval)
-    if isnothing(cname)
-        return last_evaluation(meval)
-    else
-        return last_evaluation(meval, cname)
-    end
+    isnothing(cname)  &&  (cname = meval.seq[end])
+    return meval.cevals[cname].tpar.buffer
 end
