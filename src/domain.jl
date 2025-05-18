@@ -130,7 +130,7 @@ size(d::AbstractMeasures) = size(domain(d))
 
 reshape(d::Domain, v::Vector) = v
 function reshape(d::CartesianDomain, v::Vector{T}) where T <: Real
-    out = Matrix{T}(undef(size(d)))
+    out = Matrix{T}(undef, size(d))
     out .= NaN
     out[d.roi] .= v
     return out

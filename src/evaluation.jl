@@ -14,12 +14,13 @@ A container for a component to be evaluated on a specific domain.
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
 mutable struct CompEvalT{T <: Real}
+    counter::Int
     lastparvalues::Vector{Union{T, Float64}}
     deps::Vector{Vector{Union{T, Float64}}}
     buffer::Vector{T}
 
     CompEvalT{T}(npar::Int, nres::Int) where T <: Real =
-        new{T}(
+        new{T}(0,
             Vector{       Union{T, Float64}}( undef, npar),
             Vector{Vector{Union{T, Float64}}}(),
             Vector{             T}(           undef, nres))
@@ -28,7 +29,6 @@ end
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
     domain::TDomain
-    counter::Int
     tpar::CompEvalT{Float64}
     tparad::CompEvalT{Dual}
 
@@ -37,7 +37,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
         npar = length(getparams(comp))
         nres = result_length(comp, domain)
         return new{typeof(comp), typeof(domain)}(
-            comp, domain, 0,
+            comp, domain,
             CompEvalT{Float64}(npar, nres),
             CompEvalT{Dual}(   npar, nres))
     end
@@ -68,11 +68,11 @@ If none of the above applies, no evaluation occurs.
 function evaluate_comp!(ceval::CompEval, tpar::CompEvalT, pvalues::AbstractVector)
     if length(tpar.deps) > 0
         evaluate!(ceval.comp, ceval.domain, tpar.buffer, tpar.deps, pvalues...)
-        ceval.counter += 1
-    elseif any(tpar.lastparvalues .!= pvalues)  ||  (ceval.counter == 0)
+        tpar.counter += 1
+    elseif (tpar.counter == 0)  ||  any(tpar.lastparvalues .!= pvalues)
         evaluate!(ceval.comp, ceval.domain, tpar.buffer, pvalues...)
         tpar.lastparvalues .= pvalues
-        ceval.counter += 1
+        tpar.counter += 1
     end
     return tpar.buffer
 end
@@ -321,7 +321,7 @@ end
 
 Return the number of times a component has been evaluated.
 """
-evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].counter
+evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.counter + meval.cevals[cname].tparad.counter
 evalcounter(model::Model, cname::Symbol) = "???"
 
 
