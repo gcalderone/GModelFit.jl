@@ -78,12 +78,13 @@ function evaluate(ceval::CompEval, pvalues::AbstractVector{Float64})
 end
 
 function evaluate(ceval::CompEval, pvalues::AbstractVector)
+    @info typeof(pvalues)
     if length(ceval.tparad.deps) > 0
         evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, ceval.tparad.deps, pvalues...)
         ceval.tparad.counter += 1
     elseif (ceval.tparad.counter == 0)  ||  any(ceval.tparad.lastparvalues .!= pvalues)
         evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, pvalues...)
-        ceval.tparad.lastparadvalues .= pvalues
+        ceval.tparad.lastparvalues .= pvalues
         ceval.tparad.counter += 1
     end
     return ceval.tparad.buffer
