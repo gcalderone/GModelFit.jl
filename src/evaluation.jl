@@ -304,7 +304,7 @@ end
 
 Update a `ModelEval` structure by evaluating all components in the model.
 """
-evaluate(meval::ModelEval) = evaluate(meval, free_params_val(meval))
+evaluate(meval::ModelEval) = evaluate(meval, items(meval.tpar.pvalues)[meval.ifree])
 
 function evaluate(meval::ModelEval, cname::Symbol)
     evaluate(meval)
