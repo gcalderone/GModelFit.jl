@@ -78,7 +78,6 @@ function evaluate(ceval::CompEval, pvalues::AbstractVector{Float64})
 end
 
 function evaluate(ceval::CompEval, pvalues::AbstractVector)
-    @info typeof(pvalues)
     if length(ceval.tparad.deps) > 0
         evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, ceval.tparad.deps, pvalues...)
         ceval.tparad.counter += 1
@@ -258,7 +257,7 @@ function free_params(meval::ModelEval)
     end
     return out[meval.ifree]
 end
-free_params_val(meval::ModelEval) = getfield.(free_params(meval), :val)
+free_params_val(meval::ModelEval) = convert(Vector{Float64}, getfield.(free_params(meval), :val))  # convert() is useful when there are no free parameters
 nfree(meval::ModelEval) = length(meval.ifree)
 
 
