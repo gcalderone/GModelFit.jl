@@ -30,10 +30,10 @@ free_params_val(mevals::Vector{ModelEval}) = getfield.(free_params(mevals), :val
 nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
 
-evaluate!(mevals::Vector{ModelEval}) = evaluate!(mevals, free_params_val(mevals))
-function evaluate!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
+evaluate(mevals::Vector{ModelEval}) = evaluate(mevals, free_params_val(mevals))
+function evaluate(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
     if length(mevals) == 1
-        return [evaluate!(mevals[1], pvalues)]
+        return [evaluate(mevals[1], pvalues)]
     else
         if length(mevals[1].tpar.pvmulti) == 0
             pv1 = [mevals[i].tpar.pvalues for i in 1:length(mevals)]
@@ -50,7 +50,7 @@ function evaluate!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where 
         end
         output = Vector{Vector{T}}()
         for (id, i1, i2) in free_params_indices(mevals)
-            push!(output, evaluate!(mevals[id], pvalues[i1:i2]))
+            push!(output, evaluate(mevals[id], pvalues[i1:i2]))
         end
         return output
     end
@@ -102,7 +102,7 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
     for (id, i1, i2) in free_params_indices(fitprob.mevals)
         set_pvalues!(fitprob.mevals[id], pvalues[i1:i2])
     end
-    evaluate!(fitprob.mevals, pvalues)
+    evaluate(fitprob.mevals, pvalues)
 
     empty!(fitprob.bestfit)
     for id in 1:length(fitprob.mevals)
@@ -137,7 +137,7 @@ dof(fitprob::FitProblem{ChiSquared}) = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
 
 function evaluate_residuals!(output::Vector{T}, fitprob::FitProblem{ChiSquared}, pvalues::Vector{T}) where T
-    evals = evaluate!(fitprob.mevals, pvalues)
+    evals = evaluate(fitprob.mevals, pvalues)
     i1 = 1
     for i in 1:length(fitprob.mevals)
         nn = length(evals[i])
