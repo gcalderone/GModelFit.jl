@@ -304,7 +304,6 @@ end
 
 Update a `ModelEval` structure by evaluating all components in the model.
 """
-
 evaluate(meval::ModelEval) = evaluate(meval, free_params_val(meval))
 
 function evaluate(meval::ModelEval, cname::Symbol)
@@ -325,7 +324,7 @@ function evaluate(meval::ModelEval, pvalues::AbstractVector)
     set_pvalues!(meval, pvalues)
     run_patch_functs!(meval, meval.tparad)
     for cname in meval.seq
-        evaluate(meval.cevals[cname], items(tparad.pactual[cname]))
+        evaluate(meval.cevals[cname], items(meval.tparad.pactual[cname]))
     end
     return meval.cevals[meval.seq[end]].tparad.buffer
 end

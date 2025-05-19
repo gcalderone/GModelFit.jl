@@ -4,7 +4,7 @@ using ProgressMeter
 
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
 
-import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate_residuals!, set_bestfit!
+import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!
 import NonlinearSolve
 
 # --------------------------------------------------------------------
@@ -31,9 +31,8 @@ mutable struct WrapSolver{T <: Union{AbstractSolver, NonlinearSolve.NonlinearSol
     WrapSolver(solver::T) where T = new{T}(solver, nothing)
 end
 
-solve!(fitprob::FitProblem, solver::AbstractSolver; kws...) = solve!(fitprob, WrapSolver(solver); kws...)
-solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm; kws...) = solve!(fitprob, WrapSolver(solver); kws...)
-
+solve!(fitprob::FitProblem, solver::Union{AbstractSolver, NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}; kws...) =
+    solve!(fitprob, WrapSolver(solver); kws...)
 
 # --------------------------------------------------------------------
 function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
@@ -49,14 +48,14 @@ function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
         funct = let prog=prog
             (du, pvalues, shared) -> begin
                 ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                evaluate_residuals!(du, shared.fp, pvalues)
+                evaluate!(shared.fp, du, pvalues)
             end
         end
     else
         funct = let prog=prog, shared=shared
             pvalues -> begin
                 ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                return evaluate_residuals!(shared.output, shared.fp, pvalues)
+                return evaluate!(shared.fp, shared.output, pvalues)
             end
         end
     end
