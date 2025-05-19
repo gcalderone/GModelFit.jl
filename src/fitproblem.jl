@@ -90,6 +90,7 @@ struct FitProblem{T <: AbstractFitStat}
     function FitProblem(mevals::Vector{ModelEval}, datasets::Vector{Measures{N}}) where N
         @assert length(mevals) == length(datasets)
         fp = new{ChiSquared}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
+        evaluate!(fp, fp.buffer, free_params_val(fp.mevals))
         return fp
     end
 end

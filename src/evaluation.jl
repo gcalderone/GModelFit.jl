@@ -243,7 +243,7 @@ function scan_model!(meval::ModelEval; evaluate=true)
     end
     compeval_sequence!(meval)
 
-    evaluate  &&  evaluate(meval)
+    evaluate  &&  GModelFit.evaluate(meval)
     nothing
 end
 
