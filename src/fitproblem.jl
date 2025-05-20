@@ -29,7 +29,7 @@ end
 free_params_val(mevals::Vector{ModelEval}) = getfield.(free_params(mevals), :val)
 nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
-
+update_eval!(mevals::Vector{ModelEval}) = update_eval!(mevals, free_params_val(mevals))
 function update_eval!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
     if length(mevals) == 1
         return [update_eval!(mevals[1], pvalues)]

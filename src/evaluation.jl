@@ -243,7 +243,8 @@ function scan_model!(meval::ModelEval; evaluate=true)
     end
     compeval_sequence!(meval)
 
-    evaluate  &&  GModelFit.update_eval!(meval)
+    # Avoid early evaluation since ModelEval ina multi-model situation may not yet been created
+    evaluate  &&  update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
     nothing
 end
 
@@ -346,9 +347,13 @@ evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname)
 
 Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
 """
-last_eval(meval::ModelEval) = meval.cevals[meval.seq[end]].tpar.buffer
-last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
-
+last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
+function last_eval(meval::ModelEval, cname::Symbol)
+    if meval.cevals[cname].tpar.counter == 0  # Ensure model is evaluated
+        update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
+    end
+    meval.cevals[cname].tpar.buffer
+end
 
 # ====================================================================
 # Evaluate Model on the given domain

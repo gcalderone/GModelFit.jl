@@ -84,7 +84,7 @@ No systematic error is considered when generating mock dataset(s).
 """
 function mock(::Type{Measures}, meval::ModelEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     rng = MersenneTwister(seed);
-    values = evaluate(meval)
+    values = last_eval(meval)
     ee = extrema(values)
     range = ee[2] - ee[1]
     @assert range > 0
@@ -96,7 +96,7 @@ mock(::Type{T}, model::Model, domain::AbstractDomain; kws...) where T =
     mock(T, ModelEval(model, domain); kws...)
 
 function mock(T, multi::Vector{ModelEval}; kws...)
-    evaluate(multi)
+    update_eval!(multi)
     return [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 end
 
