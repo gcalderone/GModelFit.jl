@@ -2,7 +2,7 @@ module Solvers
 
 using ProgressMeter
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, CaptureSolution, solve!, lsqfit, cmpfit
 
 import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, update_eval!, set_bestfit!
 import NonlinearSolve
@@ -25,14 +25,14 @@ end
 # --------------------------------------------------------------------
 abstract type AbstractSolver end
 
-mutable struct WrapSolver{T <: Union{AbstractSolver, NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}}
+mutable struct CaptureSolution{T <: Union{AbstractSolver, NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}}
     solver::T
-    result
-    WrapSolver(solver::T) where T = new{T}(solver, nothing)
+    sol
+    CaptureSolution(solver::T) where T = new{T}(solver, nothing)
 end
 
 solve!(fitprob::FitProblem, solver::Union{AbstractSolver, NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm}; kws...) =
-    solve!(fitprob, WrapSolver(solver); kws...)
+    solve!(fitprob, CaptureSolution(solver); kws...)
 
 # --------------------------------------------------------------------
 function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
@@ -68,17 +68,17 @@ import LsqFit
 
 struct lsqfit <: AbstractSolver end
 
-function solve!(fitprob::FitProblem, wrap::WrapSolver{lsqfit})
+function solve!(fitprob::FitProblem, capture::CaptureSolution{lsqfit})
     prog, shared, funct = eval_funct(fitprob)
-    wrap.result = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
+    capture.sol = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
                                    1.:ndata(fitprob), fill(0., ndata(fitprob)),
                                    shared.guess, lower=shared.lowb, upper=shared.highb)
     ProgressMeter.finish!(prog)
-    if !wrap.result.converged
+    if !capture.sol.converged
         return SolverStatusError("Not converged")
     end
 
-    set_bestfit!(fitprob, getfield.(Ref(wrap.result), :param), LsqFit.stderror(wrap.result))
+    set_bestfit!(fitprob, getfield.(Ref(capture.sol), :param), LsqFit.stderror(capture.sol))
     return SolverStatusOK()
 end
 
@@ -110,7 +110,7 @@ mutable struct cmpfit <: AbstractSolver
     end
 end
 
-function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
+function solve!(fitprob::FitProblem, capture::CaptureSolution{cmpfit})
     prog, shared, funct = eval_funct(fitprob)
     parinfo = CMPFit.Parinfo(length(shared.guess))
     for i in 1:length(shared.guess)
@@ -123,17 +123,17 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
     last_fitstat = fitstat(fitprob)
     guess = shared.guess
     while true
-        wrap.result = CMPFit.cmpfit(funct, guess, parinfo=parinfo, config=wrap.solver.config)
-        if wrap.result.status <= 0
-            return SolverStatusError("CMPFit status = $(wrap.result.status)")
+        capture.sol = CMPFit.cmpfit(funct, guess, parinfo=parinfo, config=capture.solver.config)
+        if capture.sol.status <= 0
+            return SolverStatusError("CMPFit status = $(capture.sol.status)")
         end
 
-        if (wrap.result.status == 5)
-            Δfitstat = (last_fitstat - wrap.result.bestnorm) / last_fitstat
-            if Δfitstat > wrap.solver.ftol_after_maxiter
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(wrap.ftol_after_maxiter), continue minimization...\n")
-                last_fitstat = wrap.result.bestnorm
-                guess = getfield.(Ref(wrap.result), :param)
+        if (capture.sol.status == 5)
+            Δfitstat = (last_fitstat - capture.sol.bestnorm) / last_fitstat
+            if Δfitstat > capture.solver.ftol_after_maxiter
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(capture.ftol_after_maxiter), continue minimization...\n")
+                last_fitstat = capture.sol.bestnorm
+                guess = getfield.(Ref(capture.sol), :param)
                 continue
             end
         end
@@ -142,12 +142,12 @@ function solve!(fitprob::FitProblem, wrap::WrapSolver{cmpfit})
     ProgressMeter.finish!(prog)
 
     set_bestfit!(fitprob,
-                 getfield.(Ref(wrap.result), :param),
-                 getfield.(Ref(wrap.result), :perror))
+                 getfield.(Ref(capture.sol), :param),
+                 getfield.(Ref(capture.sol), :perror))
 
-    if wrap.result.status == 2
+    if capture.sol.status == 2
         return SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
-    elseif wrap.result.status == 5
+    elseif capture.sol.status == 5
         return SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
     end
     return SolverStatusOK()
@@ -155,17 +155,19 @@ end
 
 
 # --------------------------------------------------------------------
-function solve!(fitprob::FitProblem, wrap::WrapSolver{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
+function solve!(fitprob::FitProblem, capture::CaptureSolution{T}) where T <: NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm
     prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true)
 
-    wrap.result = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
+    capture.sol = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
         NonlinearSolve.NonlinearFunction(funct, resid_prototype = zeros(ndata(fitprob))),
-        shared.guess, shared), wrap.solver)
+        shared.guess, shared), capture.solver)
     ProgressMeter.finish!(prog)
 
-    # TODO: AbstractSolverStatus
-    set_bestfit!(fitprob, wrap.result.u, wrap.result.u .* 0)
-    return SolverStatusOK()
+    set_bestfit!(fitprob, capture.sol.u, capture.sol.u .* 0)
+    if NonlinearSolve.SciMLBase.successful_retcode(capture.sol.retcode)
+        return SolverStatusOK()
+    end
+    return SolverStatusError(string(capture.sol.retcode))
 end
 
 end
