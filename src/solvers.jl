@@ -4,7 +4,7 @@ using ProgressMeter
 
 export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, WrapSolver, solve!, lsqfit, cmpfit
 
-import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, evaluate!, set_bestfit!
+import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, update_eval!, set_bestfit!
 import NonlinearSolve
 
 # --------------------------------------------------------------------
@@ -48,14 +48,14 @@ function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
         funct = let prog=prog
             (du, pvalues, shared) -> begin
                 ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                evaluate!(shared.fp, du, pvalues)
+                update_eval!(shared.fp, du, pvalues)
             end
         end
     else
         funct = let prog=prog, shared=shared
             pvalues -> begin
                 ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                return evaluate!(shared.fp, shared.output, pvalues)
+                return update_eval!(shared.fp, shared.output, pvalues)
             end
         end
     end

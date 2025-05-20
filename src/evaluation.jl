@@ -9,7 +9,7 @@ A container for a component to be evaluated on a specific domain.
  - `comp::AbstractComponent`: the wrapped component;
  - `domain::AbstractDomain`: the domain where the component is supposed to be evaluated;
  - `counter::Int`: the number of times the component has been evaluated since creatio of the `CompEval` object;
- - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `evaluate()` with the same values stored in `lastparvalues` will not result in a new evaluation;
+ - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `update_eval!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
  - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
  - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
 """
@@ -45,16 +45,16 @@ end
 
 
 """
-    evaluate(ceval::CompEval, pvalues::Vector{Float64})
+    evaluate!(ceval::CompEval, pvalues::Vector{Float64})
 
 Evaluate a component using the provided parameter values.  Outcomes shall be stored in the `CompEval.buffer` vector.
 """
-evaluate(::AbstractComponent, ::AbstractDomain, args...) =
+evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
 """
-    evaluate_comp!(ceval::CompEval, pvalues::Vector{Float64})
+    update_eval!(ceval::CompEval, pvalues::Vector{Float64})
 
 Update a `CompEval` structure using the provided parameter values.
 
@@ -65,7 +65,7 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function evaluate(ceval::CompEval, pvalues::AbstractVector{Float64})
+function update_eval!(ceval::CompEval, pvalues::AbstractVector{Float64})
     if length(ceval.tpar.deps) > 0
         evaluate!(ceval.comp, ceval.domain, ceval.tpar.buffer, ceval.tpar.deps, pvalues...)
         ceval.tpar.counter += 1
@@ -77,7 +77,7 @@ function evaluate(ceval::CompEval, pvalues::AbstractVector{Float64})
     return ceval.tpar.buffer
 end
 
-function evaluate(ceval::CompEval, pvalues::AbstractVector)
+function update_eval!(ceval::CompEval, pvalues::AbstractVector)
     if length(ceval.tparad.deps) > 0
         evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, ceval.tparad.deps, pvalues...)
         ceval.tparad.counter += 1
@@ -104,7 +104,7 @@ function (comp::AbstractComponent)(domain::AbstractDomain; kws...)
             @warn "$pname is not a parameter name for $(typeof(comp)). Valid names are: " * join(string.(keys(pvalues)), ", ")
         end
     end
-    return evaluate(ceval, collect(values(pvalues)))
+    return update_eval!(ceval, collect(values(pvalues)))
 end
 
 
@@ -243,7 +243,7 @@ function scan_model!(meval::ModelEval; evaluate=true)
     end
     compeval_sequence!(meval)
 
-    evaluate  &&  GModelFit.evaluate(meval)
+    evaluate  &&  GModelFit.update_eval!(meval)
     nothing
 end
 
@@ -300,31 +300,24 @@ end
 
 
 """
-    evaluate(meval::ModelEval)
+    update_eval!(meval::ModelEval)
 
 Update a `ModelEval` structure by evaluating all components in the model.
 """
-evaluate(meval::ModelEval) = evaluate(meval, items(meval.tpar.pvalues)[meval.ifree])
-
-function evaluate(meval::ModelEval, cname::Symbol)
-    evaluate(meval)
-    return meval.cevals[cname].tpar.buffer
-end
-
-function evaluate(meval::ModelEval, pvalues::AbstractVector{Float64})
+function update_eval!(meval::ModelEval, pvalues::AbstractVector{Float64})
     set_pvalues!(meval, pvalues)
     run_patch_functs!(meval, meval.tpar)
     for cname in meval.seq
-        evaluate(meval.cevals[cname], items(meval.tpar.pactual[cname]))
+        update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
     end
     return meval.cevals[meval.seq[end]].tpar.buffer
 end
 
-function evaluate(meval::ModelEval, pvalues::AbstractVector)
+function update_eval!(meval::ModelEval, pvalues::AbstractVector)
     set_pvalues!(meval, pvalues)
     run_patch_functs!(meval, meval.tparad)
     for cname in meval.seq
-        evaluate(meval.cevals[cname], items(meval.tparad.pactual[cname]))
+        update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
     end
     return meval.cevals[meval.seq[end]].tparad.buffer
 end
@@ -345,6 +338,16 @@ evalcounter(model::Model, cname::Symbol) = "???"
 Return a `OrderedDict{Symbol, Int}` with the number of times each model component has been evaluated.
 """
 evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
+
+
+"""
+    last_eval(meval::ModelEval)
+    last_eval(meval::ModelEval, name::Symbol)
+
+Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
+"""
+last_eval(meval::ModelEval) = meval.cevals[meval.seq[end]].tpar.buffer
+last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
 
 
 # ====================================================================

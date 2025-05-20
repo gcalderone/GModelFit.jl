@@ -30,10 +30,9 @@ free_params_val(mevals::Vector{ModelEval}) = getfield.(free_params(mevals), :val
 nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
 
 
-evaluate(mevals::Vector{ModelEval}) = evaluate(mevals, free_params_val(mevals))
-function evaluate(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
+function update_eval!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
     if length(mevals) == 1
-        return [evaluate(mevals[1], pvalues)]
+        return [update_eval!(mevals[1], pvalues)]
     else
         if length(mevals[1].tpar.pvmulti) == 0
             pv1 = [mevals[i].tpar.pvalues for i in 1:length(mevals)]
@@ -50,7 +49,7 @@ function evaluate(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
         end
         output = Vector{Vector{T}}()
         for (id, i1, i2) in free_params_indices(mevals)
-            push!(output, evaluate(mevals[id], pvalues[i1:i2]))
+            push!(output, update_eval!(mevals[id], pvalues[i1:i2]))
         end
         return output
     end
@@ -90,7 +89,7 @@ struct FitProblem{T <: AbstractFitStat}
     function FitProblem(mevals::Vector{ModelEval}, datasets::Vector{Measures{N}}) where N
         @assert length(mevals) == length(datasets)
         fp = new{ChiSquared}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
-        evaluate!(fp, fp.buffer, free_params_val(fp.mevals))
+        update_eval!(fp, fp.buffer, free_params_val(fp.mevals))
         return fp
     end
 end
@@ -100,7 +99,7 @@ nfree(fitprob::FitProblem) = nfree(fitprob.mevals)
 ndata(fitprob::FitProblem) = sum(length.(fitprob.data))
 
 function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
-    evaluate(fitprob.mevals, pvalues)
+    update_eval!(fitprob.mevals, pvalues)
 
     empty!(fitprob.bestfit)
     for id in 1:length(fitprob.mevals)
@@ -134,8 +133,8 @@ end
 dof(fitprob::FitProblem{ChiSquared}) = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{ChiSquared}) = sum(abs2, fitprob.buffer) / dof(fitprob)
 
-function evaluate!(fitprob::FitProblem{ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where T
-    evals = evaluate(fitprob.mevals, pvalues)
+function update_eval!(fitprob::FitProblem{ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where T
+    evals = update_eval!(fitprob.mevals, pvalues)
     i1 = 1
     for i in 1:length(fitprob.mevals)
         nn = length(evals[i])
