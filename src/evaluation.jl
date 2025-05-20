@@ -16,14 +16,24 @@ A container for a component to be evaluated on a specific domain.
 mutable struct CompEvalT{T <: Real}
     counter::Int
     lastparvalues::Vector{Union{T, Float64}}
-    deps::Vector{Vector{Union{T, Float64}}}
+    lastdepscounter::Vector{Int}
+    deps::Vector{CompEvalT}
     buffer::Vector{T}
 
     CompEvalT{T}(npar::Int, nres::Int) where T <: Real =
         new{T}(0,
-            Vector{       Union{T, Float64}}( undef, npar),
-            Vector{Vector{Union{T, Float64}}}(),
-            Vector{             T}(           undef, nres))
+               Vector{Union{T, Float64}}( undef, npar),
+               Vector{Int}(),
+               Vector{CompEvalT}(),
+               Vector{T}(undef, nres))
+
+    # The following is used only for domain coordinates in _update_eval()
+    CompEvalT{T}(buffer::Vector{T}) where T <: Real =
+        new{T}(1,
+               Vector{Union{T, Float64}}(),
+               Vector{Int}(),
+               Vector{CompEvalT}(),
+               buffer)
 end
 
 mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
@@ -65,28 +75,30 @@ The component is actually evaluated if one of the following applies:
 
 If none of the above applies, no evaluation occurs.
 """
-function update_eval!(ceval::CompEval, pvalues::AbstractVector{Float64})
-    if length(ceval.tpar.deps) > 0
-        evaluate!(ceval.comp, ceval.domain, ceval.tpar.buffer, ceval.tpar.deps, pvalues...)
-        ceval.tpar.counter += 1
-    elseif (ceval.tpar.counter == 0)  ||  any(ceval.tpar.lastparvalues .!= pvalues)
-        evaluate!(ceval.comp, ceval.domain, ceval.tpar.buffer, pvalues...)
-        ceval.tpar.lastparvalues .= pvalues
-        ceval.tpar.counter += 1
-    end
-    return ceval.tpar.buffer
-end
+update_eval!(ceval::CompEval, pvalues::AbstractVector{Float64}) = _update_eval!(ceval, ceval.tpar  , pvalues)
+update_eval!(ceval::CompEval, pvalues::AbstractVector)          = _update_eval!(ceval, ceval.tparad, pvalues)
 
-function update_eval!(ceval::CompEval, pvalues::AbstractVector)
-    if length(ceval.tparad.deps) > 0
-        evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, ceval.tparad.deps, pvalues...)
-        ceval.tparad.counter += 1
-    elseif (ceval.tparad.counter == 0)  ||  any(ceval.tparad.lastparvalues .!= pvalues)
-        evaluate!(ceval.comp, ceval.domain, ceval.tparad.buffer, pvalues...)
-        ceval.tparad.lastparvalues .= pvalues
-        ceval.tparad.counter += 1
+function _update_eval!(ceval::CompEval, tpar::CompEvalT, pvalues::AbstractVector)
+    doeval = (tpar.counter == 0)                                  ||
+        any(tpar.lastparvalues   .!= pvalues)                     ||
+        length(tpar.lastdepscounter) != length(tpar.deps)         ||
+        any(tpar.lastdepscounter .!= getfield.(tpar.deps, :counter))
+    if doeval
+        if length(tpar.deps) > 0
+            evaluate!(ceval.comp, ceval.domain, tpar.buffer, getfield.(tpar.deps, :buffer), pvalues...)
+            if length(  tpar.lastdepscounter) != length(tpar.deps)
+                empty!( tpar.lastdepscounter)
+                append!(tpar.lastdepscounter, getfield.(tpar.deps, :counter))
+            else
+               tpar.lastdepscounter .= getfield.(tpar.deps, :counter)
+            end
+        else
+            evaluate!(ceval.comp, ceval.domain, tpar.buffer, pvalues...)
+        end
+        tpar.lastparvalues .= pvalues
+        tpar.counter += 1
     end
-    return ceval.tparad.buffer
+    return tpar.buffer
 end
 
 
@@ -217,17 +229,25 @@ function scan_model!(meval::ModelEval; evaluate=true)
     append!(meval.ifree, findall(.! isfixed))
 
     for (cname, ceval) in meval.cevals
-        empty!(ceval.tpar.deps)
-        empty!(ceval.tparad.deps)
-        i = 1
-        for d in dependencies(meval.model, cname, select_domain=true)
-            push!(ceval.tpar.deps  , coords(meval.domain, i))
-            push!(ceval.tparad.deps, coords(meval.domain, i))
-            i += 1
-        end
-        for d in dependencies(meval.model, cname, select_domain=false)
-            push!(ceval.tpar.deps  , meval.cevals[d].tpar.buffer)
-            push!(ceval.tparad.deps, meval.cevals[d].tparad.buffer)
+        if length(ceval.tpar.deps) == 0
+            i = 1
+            for d in dependencies(meval.model, cname, select_domain=true)
+                push!(ceval.tpar.deps  , CompEvalT{Float64}(coords(meval.domain, i)))
+                push!(ceval.tparad.deps, CompEvalT{Float64}(coords(meval.domain, i)))
+                i += 1
+            end
+            for d in dependencies(meval.model, cname, select_domain=false)
+                push!(ceval.tpar.deps  , meval.cevals[d].tpar)
+                push!(ceval.tparad.deps, meval.cevals[d].tparad)
+            end
+        else
+            d        = dependencies(meval.model, cname, select_domain=true)
+            append!(d, dependencies(meval.model, cname, select_domain=false))
+            deleteat!(d, 1:length(ceval.tpar.deps))
+            for d in d
+                push!(ceval.tpar.deps  , meval.cevals[d].tpar)
+                push!(ceval.tparad.deps, meval.cevals[d].tparad)
+            end
         end
     end
 
