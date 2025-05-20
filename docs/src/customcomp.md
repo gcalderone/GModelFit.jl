@@ -27,7 +27,7 @@ Optionally, the user may choose to extend also the following functions:
 - [`GModelFit.dependencies`](@ref): to specify the list of the component dependencies.
 
 
-Note that before being evaluated, all components need to be wrapped into a [`GModelFit.CompEval`](@ref) structure, and that the above mentioned `evaluate!` function requires a `CompEval` object as first argument.  The outcomes of the evaluations should be placed in `CompEval.buffer`.
+Note that before being evaluated, all components need to be wrapped into a `CompEval` structure, and that the above mentioned `evaluate!` function requires a `CompEval` object as first argument.  The outcomes of the evaluations should be placed in `CompEval.buffer`.
 
 The following example shows how to define a custom component:
 
@@ -52,7 +52,7 @@ end
 function evaluate!(ceval::GModelFit.CompEval{MyComponent, <: AbstractDomain{1}},
                    param1)
     println(" -> call to evaluate!() with parameter value: ", param1)
-    ceval.buffer .= param1
+    ceval.tpar.buffer .= param1
 end
 
 println() # hide
@@ -66,7 +66,7 @@ println() # hide
 
 1. The component is created by invoking its constructor, and is added to a [`Model`](@ref) object;
 
-1. When the [`fit!`](@ref) function is invoked, all components in a `Model` are wrapped into [`GModelFit.CompEval`](@ref) objects;
+1. When the [`fit!`](@ref) function is invoked, all components in a `Model` are wrapped into `CompEval` objects;
 
     - During creation of the `CompEval` structure the [`GModelFit.prepare!`](@ref) function is invoked to allocate the proper buffer for evaluations.  Note that the `prepare!` function is called only once for each `fit!` invocation, hence it is the perfect place to pre-compute quantities which will be used during the component evaluation;
 
@@ -87,7 +87,7 @@ GModelFit.evaluate!(ceval, 2)
 GModelFit.evaluate!(ceval, 3)
 
 # Retrieve results
-println(ceval.buffer)
+println(ceval.tpar.buffer)
 ```
 
 The actual life cycle during minimization is slightly more complex since the `evaluate!` function is invoked only if a change in the parameter values with respect to previous evaluation has been detected.

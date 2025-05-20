@@ -27,7 +27,7 @@ import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     CompEval, Model, @fd, SumReducer, domain, comptype,
-    isfreezed, thaw!, freeze!, fit, fit!, fitstat
+    isfreezed, thaw!, freeze!, fit, fit!, fitstat, select_maincomp!
 
 include("PV.jl")
 using .PV
@@ -170,7 +170,7 @@ end
 
 Allocate the buffer for a component evaluation on a specific domain.
 
-This function is invoked only once when the `ModelEval` structure is created (typically within a `fit` of `fit!` call), hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
+This function is invoked only once when the component is first evaluated hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
 """
 prepare!(comp::AbstractComponent, domain::AbstractDomain) = nothing
 
@@ -178,7 +178,7 @@ prepare!(comp::AbstractComponent, domain::AbstractDomain) = nothing
 """
     result_length(comp::AbstractComponent, domain::AbstractDomain)
 
-Return the length of the component evaluation vector.
+Return the length of the component result vector.
 """
 result_length(comp::AbstractComponent, domain::AbstractDomain) = length(domain)
 
@@ -188,7 +188,7 @@ result_length(comp::AbstractComponent, domain::AbstractDomain) = length(domain)
 
 Return the name of dependecies for a component. Return value must be a `Vector{Symbol}`.
 
-Default implementation returns `Symbol[]` (i.e. no dependencies.
+Default implementation returns `Symbol[]` (i.e. no dependencies).
 """
 dependencies(comp::AbstractComponent) = Symbol[]
 

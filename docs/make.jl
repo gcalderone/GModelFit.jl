@@ -2,7 +2,7 @@ using Revise, Documenter, GModelFit, Gnuplot
 
 makedocs(sitename="GModelFit.jl",
          authors = "Giorgio Calderone",
-         # format = Documenter.HTML(prettyurls = false),  # uncomment for local use, comment for deployment
+         format = Documenter.HTML(prettyurls = false),  # uncomment for local use, comment for deployment
          modules=[GModelFit],
          pages = [
              "Home" => "index.md",

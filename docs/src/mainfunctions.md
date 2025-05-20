@@ -74,11 +74,11 @@ include("setup.jl")
 
   The [`fit`](@ref) function returns a tuple with:
   - a [`GModelFit.ModelSnapshot`](@ref) structure containing a snapshot of the best fit model;
-  - a [`GModelFit.FitStats`](@ref) structure containing statistics on the fit.
+  - a [`GModelFit.FitSummary`](@ref) structure containing statistics on the fit.
 
   To perform a [Multi-dataset fitting](@ref) simply pass a `Vector{Model}` and a `Vector{Measures` to the `fit` function.
 
-- *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitStats`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.  The best fit model, fit statistics and mock dataset used above can be serialized with:
+- *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.  The best fit model, fit statistics and mock dataset used above can be serialized with:
   ```@example abc
   GModelFit.serialize("my_snapshot.json", bestfit, stats, data)
   println() # hide

@@ -1,18 +1,5 @@
 import ForwardDiff: Dual
 
-"""
-    CompEval(comp::AbstractComponent, domain::AbstractDomain)
-
-A container for a component to be evaluated on a specific domain.
-
-# Fields:
- - `comp::AbstractComponent`: the wrapped component;
- - `domain::AbstractDomain`: the domain where the component is supposed to be evaluated;
- - `counter::Int`: the number of times the component has been evaluated since creatio of the `CompEval` object;
- - `lastparvalues::Vector{Float64}`: the parameter values used in the last evaluation.  A call to `update_eval!()` with the same values stored in `lastparvalues` will not result in a new evaluation;
- - `deps::Vector{Vector{Float64}}`: the evaluation buffers of all dependencies;
- - `buffer::Vector{Float64}`: the buffer to store the outcome of the component.
-"""
 mutable struct CompEvalT{T <: Real}
     counter::Int
     lastparvalues::Vector{Union{T, Float64}}
@@ -63,18 +50,6 @@ evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
-"""
-    update_eval!(ceval::CompEval, pvalues::Vector{Float64})
-
-Update a `CompEval` structure using the provided parameter values.
-
-The component is actually evaluated if one of the following applies:
-- the component has never been evaluated;
-- the component has at least one dependency (whose evaluation may have changed since its last evaluation);
-- at least one parameter value has changed since last evaluation.
-
-If none of the above applies, no evaluation occurs.
-"""
 update_eval!(ceval::CompEval, pvalues::AbstractVector{Float64}) = _update_eval!(ceval, ceval.tpar  , pvalues)
 update_eval!(ceval::CompEval, pvalues::AbstractVector)          = _update_eval!(ceval, ceval.tparad, pvalues)
 
@@ -131,13 +106,6 @@ include("components/SumReducer.jl")
 
 
 # ====================================================================
-"""
-    ModelEval(model::Model, domain::AbstractDomain)
-
-A structure containing the required informations to evaluate a model on a specific domain, and to compare the outcomes to a single empirical dataset.
-
-The model and all component evaluation can be obtained by using the `Model` object has if it was a function: with no arguments it will return the main component evaluation, while if a `Symbol` is given as argument it will return the evaluation of the component with the same name.
-"""
 struct ModelEvalT{T <: Real}
     pvalues::PVModel{Union{T, Float64}}
     pactual::PVModel{Union{T, Float64}}
@@ -320,11 +288,6 @@ function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
 end
 
 
-"""
-    update_eval!(meval::ModelEval)
-
-Update a `ModelEval` structure by evaluating all components in the model.
-"""
 function update_eval!(meval::ModelEval, pvalues::AbstractVector{Float64})
     set_pvalues!(meval, pvalues)
     run_patch_functs!(meval, meval.tpar)

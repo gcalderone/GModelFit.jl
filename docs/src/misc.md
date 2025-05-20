@@ -27,7 +27,7 @@ bestfit, stats = fit(model, data)
 
 ## Serialization
 
-A few structures, namely [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitStats`](@ref) and [`Measures{N}`](@ref), as well as `Vector`(s) of such structures can be *serialized*, i.e. stored in a file using a dedicated JSON format.  The structures can lated be *de-serialized* in a separata Julia session without the need to re-run the fitting process used to create them in the first place.
+A few structures, namely [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref), as well as `Vector`(s) of such structures can be *serialized*, i.e. stored in a file using a dedicated JSON format.  The structures can lated be *de-serialized* in a separata Julia session without the need to re-run the fitting process used to create them in the first place.
 
 ### Example
 
