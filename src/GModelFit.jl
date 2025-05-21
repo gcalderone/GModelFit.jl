@@ -432,7 +432,7 @@ include("fitproblem.jl")
 include("snapshot.jl")
 include("solvers.jl")
 using .Solvers
-export WrapSolver, cmpfit, lsqfit  # export symbols from .Solvers
+export cmpfit, lsqfit  # export symbols from .Solvers
 include("fit.jl")
 include("serialize.jl")
 include("show.jl")

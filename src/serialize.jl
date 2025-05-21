@@ -45,7 +45,9 @@ _serialize(vv::PV.PVComp) = _serialize_struct(vv)
 _serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
-_serialize(vv::FitSummary) = _serialize_struct(vv, add_show=true)
+
+drop_solver_retval(s::FitSummary) = FitSummary(s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing)
+_serialize(vv::FitSummary) = _serialize_struct(drop_solver_retval(vv), add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractSolverStatus) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
@@ -54,7 +56,7 @@ _serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
 
 _serialize(model::ModelSnapshot, summary::FitSummary                         ) = _serialize([model, summary])
 _serialize(model::ModelSnapshot, summary::FitSummary, data::AbstractMeasures ) = _serialize([model, summary, data])
-_serialize(multi::Vector{Model        }                                     ) = _serialize(ModelSnapshot.(multi))
+_serialize(multi::Vector{Model        }                                      ) = _serialize(ModelSnapshot.(multi))
 _serialize(multi::Vector{ModelSnapshot}, summary::FitSummary                 ) = _serialize([multi, summary])
 function _serialize(multi::Vector{ModelSnapshot}, summary::FitSummary, data::Vector{T}) where T <: AbstractMeasures
     @assert length(multi) == length(data)
@@ -193,14 +195,14 @@ _deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
                                                _deserialize(dd["deps"]),
                                                _deserialize(dd["evalcounters"]))
 
-_deserialize(::Val{Symbol("GModelFit.FitSummary")},
+_deserialize(::Val{Symbol("GModelFit.Solvers.FitSummary")},
              dd::AbstractDict) =
                  FitSummary(_deserialize(dd["elapsed"]),
                             _deserialize(dd["ndata"]),
                             _deserialize(dd["nfree"]),
-                            _deserialize(dd["dof"]),
                             _deserialize(dd["fitstat"]),
-                            _deserialize(dd["status"]))
+                            _deserialize(dd["status"]),
+                            nothing)
 
 _deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusOK")},
              dd::AbstractDict) = SolverStatusOK()

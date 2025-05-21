@@ -327,7 +327,7 @@ getmessage(status::SolverStatusWarn) = crayon"bold yellow", "WARN\n" * status.me
 getmessage(status::SolverStatusError) = crayon"bold red", "ERROR\n" * status.message
 
 function show(io::IO, status::AbstractSolverStatus)
-    print(io, "Status: ")
+    print(io, "status: ")
     color, ss = getmessage(status)
     if showsettings.plain
         print(io, @sprintf("%-8s", ss))
@@ -339,7 +339,7 @@ end
 
 function show(io::IO, res::FitSummary)
     section(io, "Fit summary:", newline=false)
-    print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %10.5g, ", res.ndata, res.nfree, res.fitstat))
+    print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %.5g, ", res.ndata, res.nfree, res.fitstat))
     show(io, res.status)
     println(io)
 end
