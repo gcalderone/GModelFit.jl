@@ -17,10 +17,11 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
 - model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters (see [Parameter constraints](@ref));
 - multiple data sets can be fitted simultaneously against different models whose parameters can be patched (see [Multi-dataset fitting](@ref));
-- it supports different minimizers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) and [CMPFit](https://github.com/gcalderone/CMPFit.jl)), both aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Minimizers](@ref));
+- it supports different solvers ([LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl), [CMPFit](https://github.com/gcalderone/CMPFit.jl) and [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/)), all aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Solvers](@ref));
+- it supports forward mode automatic differentiation (AD) of models via [ForwardDiff](https://juliadiff.org/ForwardDiff.jl/stable);
 - it provides facilities for interactive fitting and quick plotting (see [Quick plot (1D)](@ref)).
 
-The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen minimizer.  The purpose of **GModelFit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the minimizer).
+The fitting process involves the automatic variation of the parameter values, subject to the user defined constraints, until the differences between the evaluated model and the empirical data are minimized. The implementation details depends on the chosen solver.  The purpose of **GModelFit.jl** is thus to act as an interface between the high-level model definition and manipulation (facing the user), and the low-level implementation details (facing the solver).
 
 ## Installation
 
@@ -65,20 +66,20 @@ data = Measures(dom, meas, unc)
 model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-bestfit, stats = fit(model, data)
+bestfit, fsumm = fit(model, data)
 nothing # hide
 ```
 
 The **GModelFit.jl** package implements a `show` method for many of the data types involved, hence the above code results in the following output:
 ```@example abc
-show((bestfit, stats)) # hide
+show((bestfit, fsumm)) # hide
 ```
-showing the best fit parameter values and the associated uncertaintites, as well as a few statistics concerning the fitting process.
+showing the best fit parameter values and the associated uncertaintites, as well as a few summarizing concerning the fitting process.
 
 If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
 ```@example abc
 model[:main].a0.val = 5
-bestfit, stats = fit(model, data)
+bestfit, fsumm = fit(model, data)
 nothing # hide
 ```
 
@@ -96,7 +97,7 @@ Also, you can easily access the numerical results for further analysis, e.g.:
 println("Best fit value for the offset parameter: ", 
 	bestfit[:main].a0.val, " ± ", 
 	bestfit[:main].a0.unc, "\n",
-	"Reduced χ^2: ", stats.fitstat)
+	"Reduced χ^2: ", fsumm.fitstat)
 ```
 
 The above example is definitely a simple one, but more complex ones follow essentially the same workflow.
