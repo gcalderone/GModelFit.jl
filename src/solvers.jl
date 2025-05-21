@@ -163,7 +163,7 @@ function solve!(fitprob::FitProblem, capture::CaptureSolution{T}) where T <: Non
         shared.guess, shared), capture.solver)
     ProgressMeter.finish!(prog)
 
-    set_bestfit!(fitprob, capture.sol.u, capture.sol.u .* 0)
+    set_bestfit!(fitprob, capture.sol.u, capture.sol.u .* NaN)
     if NonlinearSolve.SciMLBase.successful_retcode(capture.sol.retcode)
         return SolverStatusOK()
     end

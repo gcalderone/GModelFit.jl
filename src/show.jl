@@ -117,7 +117,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
         range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
         # (range == "-Inf:Inf")  &&  (range = "")
         patch = ""
-        isa(param.patch, Symbol)  &&  (patch = string(param.patch))
+        isa(param.patch, Symbol)     &&  (patch = string(param.patch))
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
         isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
         table = vcat(table,
@@ -126,7 +126,8 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
                                   (param.fixed | cfixed  ?  " (fixed)"  :  param.unc),
                                   (patch == ""  ?  ""  :  param.actual), patch]))
         push!(fixed, param.fixed)
-        if !param.fixed  &&  (isnan(param.unc)  ||  (param.unc <= 0.))
+        if !param.fixed  &&  (isinf(param.unc)  ||  (param.unc <= 0.))
+            display(param)
             push!(warns, true)
             table[end,6] = ""
         else
@@ -337,7 +338,7 @@ end
 
 
 function show(io::IO, res::FitSummary)
-    section(io, "Fit results:", newline=false)
+    section(io, "Fit summary:", newline=false)
     print(io, @sprintf(" #data: %d, #free pars: %d, red. fit stat.: %10.5g, ", res.ndata, res.nfree, res.fitstat))
     show(io, res.status)
     println(io)
