@@ -232,7 +232,7 @@ function scan_model!(meval::ModelEval; evaluate=true)
     compeval_sequence!(meval)
 
     # Avoid early evaluation since ModelEval ina multi-model situation may not yet been created
-    evaluate  &&  update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
+    evaluate  &&  update_eval!(meval)
     nothing
 end
 
@@ -288,6 +288,7 @@ function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
 end
 
 
+update_eval!(meval::ModelEval) = update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
 function update_eval!(meval::ModelEval, pvalues::AbstractVector{Float64})
     set_pvalues!(meval, pvalues)
     run_patch_functs!(meval, meval.tpar)
@@ -333,7 +334,7 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 function last_eval(meval::ModelEval, cname::Symbol)
     if meval.cevals[cname].tpar.counter == 0  # Ensure model is evaluated
-        update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
+        update_eval!(meval)
     end
     meval.cevals[cname].tpar.buffer
 end
@@ -342,6 +343,7 @@ end
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     meval = ModelEval(model, domain)
+    update_eval!(meval)
     isnothing(cname)  &&  (cname = meval.seq[end])
-    return meval.cevals[cname].tpar.buffer
+    return last_eval(meval, cname)
 end

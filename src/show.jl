@@ -127,7 +127,6 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
                                   (patch == ""  ?  ""  :  param.actual), patch]))
         push!(fixed, param.fixed)
         if !param.fixed  &&  (isinf(param.unc)  ||  (param.unc <= 0.))
-            display(param)
             push!(warns, true)
             table[end,6] = ""
         else
