@@ -32,14 +32,14 @@ include("setup.jl")
   Note: a component with dependencies can't be evaluated as a stand-alone since it requires the corresponding dependencies to be available in a model.
 
 
-- *Model definition* and *manipulation*: a [`Model`](@ref) object is essentially a dictionary of components with `Symbol` keys.  The `keys()`, `haskey()` and `iterate()` methods defined for the `Model` object provide the usual functionalities as for any dictionary.  .  A model object can be created and manipulated as follows:
+- *Model definition* and *manipulation*: a [`Model`](@ref) object is essentially a dictionary of components with `Symbol` keys.  The `keys()`, `haskey()` and `iterate()` methods defined for the `Model` object provide the usual functionalities as for any dictionary.  A model object can be created and manipulated as follows:
   ```@example abc
   using GModelFit
   
   # Create an empty model
   model = Model()
   
-  # Add a two Gaussian components, and a third one representing their sum
+  # Add two Gaussian components, and a third one representing their sum
   model[:comp1] = GModelFit.Gaussian(1, 3, 1)
   model[:comp2] = GModelFit.Gaussian(0.5, 4, 0.3)
   model[:sum] = @fd (comp1, comp2) -> comp1 .+ comp2
@@ -69,23 +69,23 @@ include("setup.jl")
 
   The following code shows how to fit the previously generated mock data set to the above model:
   ```@example abc
-  bestfit, stats = fit(model, data)
+  bestfit, fsumm = fit(model, data)
   ```
 
   The [`fit`](@ref) function returns a tuple with:
   - a [`GModelFit.ModelSnapshot`](@ref) structure containing a snapshot of the best fit model;
-  - a [`GModelFit.FitSummary`](@ref) structure containing statistics on the fit.
+  - a [`GModelFit.FitSummary`](@ref) structure summarizing the fit result.
 
-  To perform a [Multi-dataset fitting](@ref) simply pass a `Vector{Model}` and a `Vector{Measures` to the `fit` function.
+  To perform a [Multi-dataset fitting](@ref) simply pass a `Vector{Model}` and a `Vector{Measures}` to the `fit` function.
 
 - *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref)) can be *serialized*, i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.  The best fit model, fit statistics and mock dataset used above can be serialized with:
   ```@example abc
-  GModelFit.serialize("my_snapshot.json", bestfit, stats, data)
+  GModelFit.serialize("my_snapshot.json", bestfit, fsumm, data)
   println() # hide
   ```
   In a separate Julia session, you can obtain a copy of exactly the same data with
   ```@example abc
   using GModelFit
-  (bestit, stats, data) = GModelFit.deserialize("my_snapshot.json")
+  (bestit, fsumm, data) = GModelFit.deserialize("my_snapshot.json")
   println() # hide
   ```

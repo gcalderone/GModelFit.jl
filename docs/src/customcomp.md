@@ -6,7 +6,7 @@ include("setup.jl")
 
 Besides the [Built-in components](@ref), the user may define any number of custom components.  The latter are structures satisfying the following constraints:
 
-- They must be structures inheriting from `GModelFit.AbstractComponent`;
+- They should inherit from `GModelFit.AbstractComponent`;
 
 - The component parameters (if present) must be defined as fields with type `Parameter`, e.g.:
   ```julia
@@ -22,18 +22,17 @@ Besides the [Built-in components](@ref), the user may define any number of custo
 
 
 Optionally, the user may choose to extend also the following functions:
-- [`GModelFit.prepare!`](@ref): to pre-compute quantities depending on the evaluation domain, and to allocate the evaluation buffer;
+- [`GModelFit.dependencies`](@ref): to specify the list of the component dependencies.  If not defined, the fallback method returns `Symbol[]`;
+- [`GModelFit.prepare!`](@ref): to pre-compute quantities depending on the evaluation domain.  If not defined, the fallback method does nothing;
+- [`GModelFit.result_length`](@ref): to specify the length of the output vector. This is used to pre-allocate the evaluation buffer.  If not defined, the fallback method returns the length of the domain.
 
-- [`GModelFit.dependencies`](@ref): to specify the list of the component dependencies.
 
 
-Note that before being evaluated, all components need to be wrapped into a `CompEval` structure, and that the above mentioned `evaluate!` function requires a `CompEval` object as first argument.  The outcomes of the evaluations should be placed in `CompEval.buffer`.
-
-The following example shows how to define a custom component:
+The following example shows how to define a custom component and implement all of the above methods:
 
 ```@example abc
 using GModelFit
-import GModelFit: prepare!, evaluate!
+import GModelFit: prepare!, result_length, dependencies, evaluate!
 
 struct MyComponent <: GModelFit.AbstractComponent
     param1::GModelFit.Parameter
@@ -44,54 +43,87 @@ struct MyComponent <: GModelFit.AbstractComponent
      end
 end
 
-function prepare!(comp::MyComponent, domain::AbstractDomain)
-    println(" -> call to prepare!()")
-    return fill(NaN, length(domain)) # buffer for evaluations
+function dependencies(comp::MyComponent)
+    println(" -> call to dependencies()")
+    return Symbol[]
 end
 
-function evaluate!(ceval::GModelFit.CompEval{MyComponent, <: AbstractDomain{1}},
-                   param1)
+function prepare!(comp::MyComponent, domain::AbstractDomain)
+    println(" -> call to prepare!()")
+end
+
+function result_length(comp::MyComponent, domain::AbstractDomain)
+    println(" -> call to result_length()")
+    return length(domain)
+end
+
+function evaluate!(comp::MyComponent, domain::AbstractDomain, output::Vector, param1)
     println(" -> call to evaluate!() with parameter value: ", param1)
-    ceval.tpar.buffer .= param1
+    output .= param1
 end
 
 println() # hide
 ```
 
 
+!!! note
+    In the vast majority of cases there is no need to extend the `dependencies`, `prepare!` and `result_length` functions. The only mandatory implementaion is the one for `evaluate!`.
+
 
 ## Life cycle of a component
 
-  The life cycle of a component is as follows:
+The life cycle of a component is as follows:
 
-1. The component is created by invoking its constructor, and is added to a [`Model`](@ref) object;
+1. The component is created by invoking its constructor;
 
-1. When the [`fit!`](@ref) function is invoked, all components in a `Model` are wrapped into `CompEval` objects;
+1. In order to prepare the data structures for component evaluation the following functions are invoked:
+   - `GModelFit.dependencies`;
+   - `GModelFit.prepare!`;
+   - `GModelFit.result_length`;
 
-    - During creation of the `CompEval` structure the [`GModelFit.prepare!`](@ref) function is invoked to allocate the proper buffer for evaluations.  Note that the `prepare!` function is called only once for each `fit!` invocation, hence it is the perfect place to pre-compute quantities which will be used during the component evaluation;
+1. Finally the `GModelFit.evaluate!` method is invoked to actually evaluate the component.
 
-1. During the minimization process the [`GModelFit.evaluate!`](@ref) function is repeatedly invoked to evalute the component varying the parameter values until a convergence criterion is met.
 
-The following example shows how to simulate the life cycle for the `MyComponent` structure defined above:
+A quick way to evaluate a component on a `Domain` is as follows:
 ```@example abc
-# Create a component and a domain for evaluation
+# Create a domain and a component
+dom = Domain(1:4)
 comp = MyComponent(1)
-dom = Domain(1:5)
 
-# Create CompEval object (the `prepare!` function is invoked here):
-ceval = GModelFit.CompEval(comp, dom)
-
-# Repeated evaluations varying parameter value:
-GModelFit.evaluate!(ceval, 1)
-GModelFit.evaluate!(ceval, 2)
-GModelFit.evaluate!(ceval, 3)
-
-# Retrieve results
-println(ceval.tpar.buffer)
+# Evaluate component on the domain
+comp(dom)
+nothing  # hide
 ```
 
-The actual life cycle during minimization is slightly more complex since the `evaluate!` function is invoked only if a change in the parameter values with respect to previous evaluation has been detected.
+It is also possible to evaluate the component specifying a custom value for the component:
+```@example abc
+comp(dom, param1=4.5)
+nothing  # hide
+```
 
+A similar life cycle is observed when the componens is evaluated from within a `Model`:
+```@example abc
+# Create a domain and a model
+dom = Domain(1:4)
+model = Model(:mycomp => MyComponent(1))
+
+# Evaluate model on the domain
+model(dom)
+nothing  # hide
+```
+
+It is possible to modify the `param1` and re-evaluate with:
+```@example abc
+model[:mycomp].param1.val = 4.5
+model(dom)
+nothing  # hide
+```
+
+Finally, when fitting a model the `prepare!` and `result_length` are invoked only once.  The `dependencies` function is invoked a number of times to create the internal data structures, while `evaluate!` is invoked each time the solver needs to probe the model on a specific set of parameter values:
+```@example abc
+bestfit, fsumm = fit(model, Measures(dom, [9., 9., 9., 9.], 1.))
+nothing  # hide
+```
 
 
 ## Complete example

@@ -2,17 +2,17 @@
 
 The **GModelFit.jl** main purpose is to act as an high-level interface between the user and the underlying solver.
 Currently supported solvers are:
-- [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl) (default);
+- [LsqFit](https://julianlsolvers.github.io/LsqFit.jl/latest/) (default);
 - [CMPFit](https://github.com/gcalderone/CMPFit.jl);
 - [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/).
 
 More solvers may be added in the future.
 
 To choose a specific solver add a third argument to the [`fit()`](@ref) or [`fit!()`](@ref) functions, e.g. 
-```
-fit(model, data) # use default solver: lsqfit
-fit(model, data, cmpfit())
-fit(model, data, TrustRegion())
+```julia
+fit(model, data)                 # use default solver: lsqfit
+fit(model, data, cmpfit())       # use CMPFIT solver
+fit(model, data, TrustRegion())  # use NonlinearSolve.TrustRegion solver
 ```
 
 
@@ -35,7 +35,9 @@ bestfit, fsumm = fit(model, data, NewtonRaphson())
 ```
 
 The above solvers typically provide the same results, although in some complex case the results may differ.
-Also note that solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
+
+!!! warning
+    Unlink LsqFit and CMPFIT, the solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
 
 
 ## The `cmpfit()` solver

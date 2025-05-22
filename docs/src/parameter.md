@@ -7,16 +7,16 @@ include("setup.jl")
 Models are characterized by *parameters* (see [Basic concepts and data types](@ref)) whose values are modified during fitting until a convergence criterion is met, and the *best fit* values are identified.  In many cases, however, the parameters can not vary arbitrarily but should satisfy some constraints for their values to be meaningful.  **GModelFit.jl** supports the definition of constraints by fixing the parameter to a specific value, limiting the value in a user defined range, or by dynamically calculating its value using a mathematical expression involving other parameter values.  In the latter case the parameter is not free to vary in the fit since its actual value is determined by the patch constraint, hence it is dubbed a *patched* parameter.  Such unused parameter can optionally be repurposed as a new free parameter in a *parametrized patch expression* (see example below).
 
 An important concept to bear in mind is that the [`GModelFit.Parameter`](@ref) structure provides two field for the associated numerical value:
-- `val`: is the parameter value which is being varied by the minimizer during fitting.  The value set before the fitting is the *guess* value.  The value after fitting is the *best fit* one;
+- `val`: is the parameter value which is being varied by the solver during fitting.  The value set before the fitting is the *guess* value.  The value after fitting is the *best fit* one;
 - `actual`: is the result of the patch expression evaluation, and the actual value used when evaluating a component via its `evaluate!` method.  Note that this value will be overwitten at each model evaluation, hence setting this field has no effect. The `val` and `actual` values are identical if no patch constraint has been defined.
 
-A parameter constraint is defined by explicitly modifiying the fields of the corresponding [`GModelFit.Parameter`](@ref) structure. More specifically:
-1. to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
-1. to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
-1. to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`);
-1. to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to an anonymous function generated with the [`@fd`](@ref) macro.  The function must accept a single argument (actually a dictionary of components) and return a scalar numberl;
-1. to define a parametrized patch expression: create an anonymous function with the [`@fd`](@ref) macro with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
-1. to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the `Vector{Model}` object.
+A parameter constraint is defined by modifiying the fields of the corresponding [`GModelFit.Parameter`](@ref) structure. More specifically:
+- to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
+- to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
+- to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`);
+- to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to an anonymous function generated with the [`@fd`](@ref) macro.  The function must accept a single argument (actually a dictionary of components) and return a scalar number;
+- to define a parametrized patch expression: create an anonymous function with the [`@fd`](@ref) macro with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
+- to define a patch constraint involving parameters from other models in a [Multi-dataset fitting](@ref) scenario: simply use `mpatch` in place of `patch`, and the first argument to the λ-function will be a vector with as many elements as the number of models in the `Vector{Model}` object.
 
 The following examples show how to define constraints for each of the afore-mentioned cases.
 

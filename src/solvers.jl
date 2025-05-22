@@ -34,7 +34,7 @@ A structure summarizing the results of a fitting process.
 - `dof::Int`: ndata - nfree;
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimization process status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
-- `solver_retval`: solver return value
+- `solver_retval`: solver return value.
 
 Note: the `solver_retval` field can not be serialized, will contain `nothing` when deserialized.
 """

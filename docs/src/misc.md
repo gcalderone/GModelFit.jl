@@ -51,6 +51,8 @@ using GModelFit
 bestfit, stats, data = GModelFit.deserialize("save_for_future_use.json")
 ```
 
+!!! warning
+    The `solver_retval` field in the [`GModelFit.FitSummary`](@ref) structure can not be serialized.  Upon deserialization it will contain `nothing`.
 
 
 ## Quick plot (1D)
