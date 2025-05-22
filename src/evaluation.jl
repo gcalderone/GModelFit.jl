@@ -42,9 +42,9 @@ end
 
 
 """
-    evaluate!(ceval::CompEval, pvalues::Vector{Float64})
+    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps, param1, param2....
 
-Evaluate a component using the provided parameter values.  Outcomes shall be stored in the `CompEval.buffer` vector.
+Evaluate component `comp` on the given `domain` using `deps` dependencies and `param1`, `param2, ... parameters.  Output should be stored in the `output` vector.
 """
 evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
