@@ -15,6 +15,7 @@ Model
 @fd
 axis
 comptype
+comptypes
 coords
 domain
 fit
@@ -36,16 +37,12 @@ values
 The following symbols are not exported by the **GModelFit.jl** package since they are typically not used in every day work, or aimed to debugging purposes.  Still, they can be useful in some case, hence they are documented here.
 
 ```@docs
-GModelFit.evalcounter
-GModelFit.evalcounters
 GModelFit.FitSummary
 GModelFit.FunctDesc
 GModelFit.ModelSnapshot
 GModelFit.Parameter
-GModelFit.comptypes
 GModelFit.dependencies
 GModelFit.evaluate!
-GModelFit.last_eval
 GModelFit.mock
 GModelFit.prepare!
 GModelFit.result_length

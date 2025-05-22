@@ -26,7 +26,7 @@ import Base.push!
 import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
-    CompEval, Model, @fd, SumReducer, domain, comptype,
+    CompEval, Model, @fd, SumReducer, domain, comptype, comptypes,
     isfreezed, thaw!, freeze!, fit, fit!, fitstat, select_maincomp!
 
 include("PV.jl")
@@ -168,7 +168,7 @@ end
 """
     prepare!(comp::AbstractComponent, domain::AbstractDomain)
 
-Allocate the buffer for a component evaluation on a specific domain.
+Allow to precompute component-specific quantities
 
 This function is invoked only once when the component is first evaluated hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
 """
@@ -403,7 +403,7 @@ Base.length(model::Model) = length(model.comps)
 """
     comptype(model::Model, cname::Symbol)
 
-Return a component type as a string.
+Return the type of a component within a Model.  Return type is a String.
 """
 comptype(model::Model, cname::Symbol) = replace(string(typeof(model[cname])), "GModelFit." => "")
 
@@ -411,7 +411,7 @@ comptype(model::Model, cname::Symbol) = replace(string(typeof(model[cname])), "G
 """
     comptypes(model::Model)
 
-Return a `OrderedDict{Symbol, String}` with the model component types.
+Return a `OrderedDict{Symbol, String}` with the types of all components within a Model.
 """
 comptypes(model::Model) = OrderedDict([cname => comptype(model, cname) for cname in keys(model)])
 

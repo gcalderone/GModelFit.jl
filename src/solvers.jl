@@ -28,10 +28,10 @@ end
 A structure summarizing the results of a fitting process.
 
 # Fields:
+- `start::DateTime`: timestamp at the beginning of the fitting process;
 - `elapsed::Float64`: elapsed time (in seconds);
 - `ndata::Int`: number of data empirical points;
 - `nfree::Int`: number of free parameters;
-- `dof::Int`: ndata - nfree;
 - `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimization process status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 - `solver_retval`: solver return value.
@@ -39,6 +39,7 @@ A structure summarizing the results of a fitting process.
 Note: the `solver_retval` field can not be serialized, will contain `nothing` when deserialized.
 """
 struct FitSummary
+    start::DateTime
     elapsed::Float64
     ndata::Int
     nfree::Int
@@ -47,8 +48,8 @@ struct FitSummary
     solver_retval
 end
 
-FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, elapsed::Float64, solver_retval=nothing) =
-    FitSummary(elapsed, ndata(fitprob), nfree(fitprob), fitstat(fitprob), status, solver_retval)
+FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, start::DateTime, elapsed::Float64, solver_retval=nothing) =
+    FitSummary(start, elapsed, ndata(fitprob), nfree(fitprob), fitstat(fitprob), status, solver_retval)
 
 
 # --------------------------------------------------------------------
@@ -64,7 +65,7 @@ function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
 
     prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
 
-    shared = (fp=fitprob, start=time(), guess=guess, lowb=lowb, highb=highb, output=Vector{Float64}(undef, ndata(fitprob)))
+    shared = (fp=fitprob, start=now(), guess=guess, lowb=lowb, highb=highb, output=Vector{Float64}(undef, ndata(fitprob)))
     if nonlinearsolve
         funct = let prog=prog
             (du, pvalues, shared) -> begin
@@ -102,7 +103,7 @@ function solve!(fitprob::FitProblem, solver::lsqfit)
     end
 
     set_bestfit!(fitprob, getfield.(Ref(solver_retval), :param), LsqFit.stderror(solver_retval))
-    return FitSummary(fitprob, status, time() - shared.start, solver_retval)
+    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
 end
 
 
@@ -176,7 +177,7 @@ function solve!(fitprob::FitProblem, solver::cmpfit)
     elseif solver_retval.status == 5
         status = SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
     end
-    return FitSummary(fitprob, status, time() - shared.start, solver_retval)
+    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
 end
 
 
@@ -194,7 +195,7 @@ function solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.A
     if !NonlinearSolve.SciMLBase.successful_retcode(solver_retval.retcode)
         status = SolverStatusError(string(solver_retval.retcode))
     end
-    return FitSummary(fitprob, status, time() - shared.start, solver_retval)
+    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
 end
 
 end

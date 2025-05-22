@@ -6,7 +6,7 @@ abstract type AbstractDomain{N} end
 """
     Domain{N}
 
-An object representing a model, or a dataset, N-dimensional linear domain.
+An object representing a N-dimensional linear domain.
 
 Available constructors:
 - `Domain(coords...)`: each argument is a vector, one for each dimension (all arguments must have same lengths);

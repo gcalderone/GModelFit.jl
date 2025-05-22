@@ -46,7 +46,7 @@ _serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
 
-drop_solver_retval(s::FitSummary) = FitSummary(s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing)
+drop_solver_retval(s::FitSummary) = FitSummary(s.start, s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing)
 _serialize(vv::FitSummary) = _serialize_struct(drop_solver_retval(vv), add_show=true)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractSolverStatus) = _serialize_struct(vv, add_show=true)
@@ -197,7 +197,8 @@ _deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
 
 _deserialize(::Val{Symbol("GModelFit.Solvers.FitSummary")},
              dd::AbstractDict) =
-                 FitSummary(_deserialize(dd["elapsed"]),
+                 FitSummary(_deserialize(dd["start"]),
+                            _deserialize(dd["elapsed"]),
                             _deserialize(dd["ndata"]),
                             _deserialize(dd["nfree"]),
                             _deserialize(dd["fitstat"]),

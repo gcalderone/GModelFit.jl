@@ -42,9 +42,14 @@ end
 
 
 """
-    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps, param1, param2....
+    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, param1, param2....
+    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps::AbstractVector, param1, param2....
 
 Evaluate component `comp` on the given `domain` using `deps` dependencies and `param1`, `param2, ... parameters.  Output should be stored in the `output` vector.
+
+If the component has no dependencies the `deps` argument should not be present.
+
+The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing `Float64` values to evaluate the component, or with `ForwardDiff.Dual` values to evaluate the component derivatives.
 """
 evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
@@ -308,29 +313,29 @@ function update_eval!(meval::ModelEval, pvalues::AbstractVector)
 end
 
 
-"""
-    evalcounter(meval::ModelEval, cname::Symbol)
+#=
+evalcounter(meval::ModelEval, cname::Symbol)
 
-Return the number of times a component has been evaluated.
-"""
+Return the number of times the component with name `cname` has been evaluated.
+=#
 evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.counter + meval.cevals[cname].tparad.counter
 evalcounter(model::Model, cname::Symbol) = "???"
 
 
-"""
-    evalcounters(meval::ModelEval)
+#=
+evalcounters(meval::ModelEval)
 
-Return a `OrderedDict{Symbol, Int}` with the number of times each model component has been evaluated.
-"""
+Return a `OrderedDict{Symbol, Int}` with the number of times each component has been evaluated.
+=#
 evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
 
 
-"""
-    last_eval(meval::ModelEval)
-    last_eval(meval::ModelEval, name::Symbol)
+#=
+last_eval(meval::ModelEval)
+last_eval(meval::ModelEval, name::Symbol)
 
 Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
-"""
+=#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 function last_eval(meval::ModelEval, cname::Symbol)
     if meval.cevals[cname].tpar.counter == 0  # Ensure model is evaluated
