@@ -1,3 +1,17 @@
+# Version 0.5.0
+    * GModelFit now supports all solvers from NonlinearSolve, as well as forward mode automatic differentiation via ForwardDiff;
+
+	* Signature of the `evaluate!` functions for component evaluation has changed (this may break your code if you implemented custom components, check `evaluate!` documentation);
+
+    * The `prepare!` function is now supposed to be used just for pre-computing quantities, while the length of the evaluation vector is now provided by the `result_length` function;
+
+	* The solver is now passed as third argument to the `fit` and `fit!` functions (rather than being specified using the `solver=` keyword);
+
+	* The `FitStats` structure is has been replaced by the `FitSummary` one.
+
+# Version 0.4.0
+    * Refactored deserialization methods;
+
 # Version 0.3.2
     * Updated docstrings and documentation;
 

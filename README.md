@@ -6,7 +6,7 @@
 `GModelFit` is a general purpose, data-driven model fitting framework for Julia.
 
 > [!WARNING]
-> The code in version 0.3.0 underwent a signficant refactoring, and a few details may break your code.
+> The code in version 0.5.0 underwent a signficant refactoring, and a few details may break your code.
 > **Please have a look at ChangeLog.md !!**
 
 ## Installation
@@ -33,7 +33,7 @@ data = Measures(dom, meas, unc)
 model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-bestfit, stats = fit(model, data)
+bestfit, fsumm = fit(model, data)
 ```
 
 The output is as follows:
@@ -42,7 +42,7 @@ The output is as follows:
 ╭───────────┬───────┬───────┬─────────────┬───────────┬───────────┬───────────┬─────────╮
 │ Component │ Type  │ #Free │ Eval. count │ Min       │ Max       │ Mean      │ NaN/Inf │
 ├───────────┼───────┼───────┼─────────────┼───────────┼───────────┼───────────┼─────────┤
-│ main      │ FComp │ 3     │ 76          │     6.088 │     25.84 │     13.56 │ 0       │
+│ main      │ FComp │ 3     │ 66          │     6.088 │     25.84 │     13.56 │ 0       │
 ╰───────────┴───────┴───────┴─────────────┴───────────┴───────────┴───────────┴─────────╯
 
 Parameters:
@@ -53,6 +53,6 @@ Parameters:
 │           │       │ a1     │ -Inf:Inf │    -0.106 │     1.317 │        │       │
 │           │       │ a0     │ -Inf:Inf │     6.087 │     1.142 │        │       │
 ╰───────────┴───────┴────────┴──────────┴───────────┴───────────┴────────┴───────╯
-, Fit results: #data: 5, #free pars: 3, red. fit stat.:     1.0129, Status: OK      
+, Fit summary: #data: 5, #free pars: 3, red. fit stat.: 1.0129, status: OK
 )
 ```
