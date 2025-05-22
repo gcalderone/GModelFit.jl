@@ -37,7 +37,7 @@ bestfit, fsumm = fit(model, data, NewtonRaphson())
 The above solvers typically provide the same results, although in some complex case the results may differ.
 
 !!! warning
-    Unlink LsqFit and CMPFIT, the solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
+    Unlike LsqFit and CMPFIT, the solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
 
 
 ## The `cmpfit()` solver
