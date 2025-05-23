@@ -13,6 +13,13 @@ An important concept to bear in mind is that the [`GModelFit.Parameter`](@ref) s
 A parameter constraint is defined by modifiying the fields of the corresponding [`GModelFit.Parameter`](@ref) structure. More specifically:
 - to set a parameter to a specific value: set the `val` field to the numeric value and set the `fixed` field to `true`;
 - to set a parameter value range: set one or both the `low` and `high` fields (default values are `-Inf` and `+Inf` respectively);
+
+!!! note
+    Some solvers do not handle parameter limits, hence parameter values are checked and possibly adjusted before fitting.
+
+!!! warning
+	Values are not checked during the fitting process.  If you need a parameter to respect the allowed range you should use a suitable solver such as LsqFit or CMPFit.
+
 - to constraint a parameter to have the same numerical value as another one with the same name (but in another component): set the `patch` value to the component name (it must be a `Symbol`);
 - to dynamically calculate an `actual` value using a mathematical expression depending on other parameter values: set the `patch` field to an anonymous function generated with the [`@fd`](@ref) macro.  The function must accept a single argument (actually a dictionary of components) and return a scalar number;
 - to define a parametrized patch expression: create an anonymous function with the [`@fd`](@ref) macro with two arguments, the first has the same meaning as in the previous case, and the second is the free parameter value.  Note that patched parameter loses its original meaning, and becomes the parameter of the patch expression;
@@ -69,7 +76,7 @@ bestfit, stats = fit(model, data)
 show((bestfit, stats)) # hide
 ```
 and plot the results with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
-```@example abc 
+```@example abc
 using Gnuplot
 @gp    coords(dom) values(data) uncerts(data) "w yerr t 'Data'" :-
 @gp :- coords(dom) model(dom) "w l t 'Model'"

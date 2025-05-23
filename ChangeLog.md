@@ -1,8 +1,7 @@
 # Version 0.5.1
 	* Fixed a bug when evaluating a `SumReducer` component using ForwardDiff.Dual numbers;
 
-	* Some solvers do not handles parameter limits, hence parameter values are checked and adjusted before starting the fitting process.
-	NOTE: values are NOT checked during the fitting process.  If you need a parameter to stay within the allowed range you should use a suitable solver such as LsqFit or CMPFit.
+	* Some solvers do not handle parameter limits, hence parameter values are checked and possibly adjusted before fitting.  Warning: values are NOT checked during the fitting process, if you need a parameter to respect the allowed range you should use a suitable solver such as LsqFit or CMPFit.
 
 # Version 0.5.0
 GModelFit v0.5.0 now supports all solvers from NonlinearSolve, as well as forward mode automatic differentiation via ForwardDiff.

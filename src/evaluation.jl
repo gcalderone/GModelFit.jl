@@ -49,7 +49,7 @@ Evaluate component `comp` on the given `domain` using `deps` dependencies and `p
 
 If the component has no dependencies the `deps` argument should not be present.
 
-The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing `Float64` values to evaluate the component, or with `ForwardDiff.Dual` values to evaluate the component derivatives.
+The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing either `Float64` values (to evaluate the component) or `ForwardDiff.Dual` values (to evaluate the component derivatives).
 """
 evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
@@ -175,7 +175,7 @@ function scan_model!(meval::ModelEval; evaluate=true)
     isfixed = Vector{Bool}()
     for (cname, comp) in meval.model.comps
         for (pname, par) in getparams(comp)
-            # Some solvers do not handles parameter limits, ensure values are in the allowed range
+            # Some solvers do not handle parameter limits, ensure values are in the allowed range
             if par.val < par.low
                 s = string(par) * "[$(cname)].$(pname) value outside allowed range, using lower limit"
                 @warn s
