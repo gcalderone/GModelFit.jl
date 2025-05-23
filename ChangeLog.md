@@ -1,7 +1,8 @@
 # Version 0.5.0
 GModelFit v0.5.0 now supports all solvers from NonlinearSolve, as well as forward mode automatic differentiation via ForwardDiff.
 A signficant refactor was needed to accomodate the above functionalities, as well as to improve performance, resulting in a number of breaking changes:
-	* Signature of the `evaluate!` functions for component evaluation has changed (this may break your code if you implemented custom components, check `evaluate!` documentation);
+
+    * Signature of the `evaluate!` functions for component evaluation has changed (this may break your code if you implemented custom components, check `evaluate!` documentation);
 
     * The `prepare!` function is now supposed to be used just for pre-computing quantities, while the length of the evaluation vector is now provided by the `result_length` function;
 
