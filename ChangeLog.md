@@ -1,5 +1,6 @@
 # Version 0.5.0
-- Breaking Changes:
+GModelFit v0.5.0 now supports all solvers from NonlinearSolve, as well as forward mode automatic differentiation via ForwardDiff.
+A signficant refactor was needed to accomodate the above functionalities, as well as to improve performance, resulting in a number of breaking changes:
     * GModelFit now supports all solvers from NonlinearSolve, as well as forward mode automatic differentiation via ForwardDiff;
 
 	* Signature of the `evaluate!` functions for component evaluation has changed (this may break your code if you implemented custom components, check `evaluate!` documentation);
