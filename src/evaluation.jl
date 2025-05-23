@@ -5,14 +5,14 @@ mutable struct CompEvalT{T <: Real}
     lastparvalues::Vector{Union{T, Float64}}
     lastdepscounter::Vector{Int}
     deps::Vector{CompEvalT}
-    buffer::Vector{T}
+    buffer::Vector{Union{T, Float64}}
 
     CompEvalT{T}(npar::Int, nres::Int) where T <: Real =
         new{T}(0,
                Vector{Union{T, Float64}}( undef, npar),
                Vector{Int}(),
                Vector{CompEvalT}(),
-               Vector{T}(undef, nres))
+               Vector{Union{T, Float64}}(undef, nres))
 
     # The following is used only for domain coordinates in _update_eval()
     CompEvalT{T}(buffer::Vector{T}) where T <: Real =
@@ -175,9 +175,14 @@ function scan_model!(meval::ModelEval; evaluate=true)
     isfixed = Vector{Bool}()
     for (cname, comp) in meval.model.comps
         for (pname, par) in getparams(comp)
-            if !(par.low <= par.val <= par.high)
-                s = "Value outside limits for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
+            # Some solvers do not handles parameter limits, ensure values are in the allowed range
+            if par.val < par.low
+                s = string(par) * "[$(cname)].$(pname) value outside allowed range, using lower limit"
+                @warn s
+                par.val = par.low
+            elseif par.val > par.high
+                s = string(par) * "[$(cname)].$(pname) value outside allowed range, using upper limit"
+                par.val = par.high
             end
             if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
                 s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
@@ -191,8 +196,8 @@ function scan_model!(meval::ModelEval; evaluate=true)
 
             push!(meval.tpar.pvalues  , cname, pname, par.val)
             push!(meval.tpar.pactual  , cname, pname, par.val)
-            push!(meval.tparad.pvalues, cname, pname, Dual{:tag}(0., 0.))
-            push!(meval.tparad.pactual, cname, pname, Dual{:tag}(0., 0.))
+            push!(meval.tparad.pvalues, cname, pname, par.val)
+            push!(meval.tparad.pactual, cname, pname, par.val)
         end
         if !(cname in keys(meval.cevals))
             ceval = CompEval(comp, meval.domain)
