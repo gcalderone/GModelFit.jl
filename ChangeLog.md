@@ -1,3 +1,6 @@
+# Version 0.5.2
+	* Fixed a bug in reporting elapsed time after fitting.
+
 # Version 0.5.1
 	* Fixed a bug when evaluating a `SumReducer` component using ForwardDiff.Dual numbers;
 

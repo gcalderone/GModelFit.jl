@@ -48,8 +48,8 @@ struct FitSummary
     solver_retval
 end
 
-FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, start::DateTime, elapsed::Float64, solver_retval=nothing) =
-    FitSummary(start, elapsed, ndata(fitprob), nfree(fitprob), fitstat(fitprob), status, solver_retval)
+FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, start::DateTime, elapsed::TimePeriod, solver_retval=nothing) =
+    FitSummary(start, Dates.value(convert(Millisecond, elapsed)) / 1000., ndata(fitprob), nfree(fitprob), fitstat(fitprob), status, solver_retval)
 
 
 # --------------------------------------------------------------------
@@ -103,7 +103,7 @@ function solve!(fitprob::FitProblem, solver::lsqfit)
     end
 
     set_bestfit!(fitprob, getfield.(Ref(solver_retval), :param), LsqFit.stderror(solver_retval))
-    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
+    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 
 
@@ -177,7 +177,7 @@ function solve!(fitprob::FitProblem, solver::cmpfit)
     elseif solver_retval.status == 5
         status = SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
     end
-    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
+    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 
 
@@ -195,7 +195,7 @@ function solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.A
     if !NonlinearSolve.SciMLBase.successful_retcode(solver_retval.retcode)
         status = SolverStatusError(string(solver_retval.retcode))
     end
-    return FitSummary(fitprob, status, shared.start, time() - datetime2unix(shared.start), solver_retval)
+    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 
 end
