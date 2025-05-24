@@ -83,22 +83,22 @@ No systematic error is considered when generating mock dataset(s).
 - `seed=nothing`: seed for the `Random.MersenneTwister` generator.
 """
 function mock(::Type{Measures}, meval::ModelEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
-    rng = MersenneTwister(seed);
+    update_eval!(meval)
     values = last_eval(meval)
     ee = extrema(values)
     range = ee[2] - ee[1]
     @assert range > 0
     err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
-    values .+= err .* randn(rng, size(values))
+    values .+= err .* randn(MersenneTwister(seed), size(values))
     Measures(meval.domain, values, err)
 end
 mock(::Type{T}, model::Model, domain::AbstractDomain; kws...) where T =
     mock(T, ModelEval(model, domain); kws...)
 
-function mock(T, multi::Vector{ModelEval}; kws...)
+function mock(T, multi::MultiModelEval; kws...)
     update_eval!(multi)
     return [mock(T, multi[i]; kws...) for i in 1:length(multi)]
 end
 
 mock(::Type{T}, models::Vector{Model}, domains::Vector{<: AbstractDomain}; kws...) where T =
-    mock(T, [ModelEval(models[i], domains[i]) for i in 1:length(models)])
+    mock(T, MultiModelEval(models, domains))

@@ -144,13 +144,14 @@ struct ModelEval
                     Vector{Int}(), Vector{NTuple{2, Symbol}}(),
                     ModelEvalT{Float64}(), ModelEvalT{Dual}(),
                     Vector{CompEval}())
-        scan_model!(meval, evaluate=false)
+        scan_model!(meval)
+        # Can't evaluate here because other models ina multi-model case may not yet be available
         return meval
     end
 end
 
 
-function scan_model!(meval::ModelEval; evaluate=true)
+function scan_model!(meval::ModelEval; evaluate=false)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -241,7 +242,6 @@ function scan_model!(meval::ModelEval; evaluate=true)
     end
     compeval_sequence!(meval)
 
-    # Avoid early evaluation since ModelEval ina multi-model situation may not yet been created
     evaluate  &&  update_eval!(meval)
     nothing
 end
@@ -342,12 +342,8 @@ last_eval(meval::ModelEval, name::Symbol)
 Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
 =#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
-function last_eval(meval::ModelEval, cname::Symbol)
-    if meval.cevals[cname].tpar.counter == 0  # Ensure model is evaluated
-        update_eval!(meval)
-    end
-    meval.cevals[cname].tpar.buffer
-end
+last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
+
 
 # ====================================================================
 # Evaluate Model on the given domain

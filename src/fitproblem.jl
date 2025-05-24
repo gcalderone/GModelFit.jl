@@ -1,7 +1,23 @@
 # ====================================================================
-# Methods to deal with Vector{ModelEval}
-#
-function free_params_indices(mevals::Vector{ModelEval})
+struct MultiModelEval <: AbstractVector{ModelEval}
+    v::Vector{ModelEval}
+
+    function MultiModelEval(models::Vector{Model}, domains::Vector{<: AbstractDomain})
+        @assert length(models) == length(domains)
+        return MultiModelEval([ModelEval(models[i], domains[i]) for i in 1:length(models)])
+    end
+
+    function MultiModelEval(mevals::Vector{ModelEval})
+        out = new(mevals)
+        scan_model!(out)
+        return out
+    end
+end
+length(mevals::MultiModelEval) = length(mevals.v)
+getindex(mevals::MultiModelEval, i) = mevals.v[i]
+
+
+function free_params_indices(mevals::MultiModelEval)
     out = Vector{NTuple{3, Int}}()
     i1 = 1
     for id in 1:length(mevals)
@@ -16,34 +32,39 @@ function free_params_indices(mevals::Vector{ModelEval})
 end
 
 
-scan_model!(mevals::Vector{ModelEval}) = scan_model!.(mevals)
+function scan_model!(mevals::MultiModelEval; evaluate=false)
+    for i in 1:length(mevals)
+        scan_model!(mevals[i])
+    end
+    pv1 = [mevals[i].tpar.pvalues for i in 1:length(mevals)]
+    for i in 1:length(mevals)
+        empty!( mevals[i].tpar.pvmulti)
+        append!(mevals[i].tpar.pvmulti, pv1)
+    end
+    pv2 = [mevals[i].tparad.pvalues for i in 1:length(mevals)]
+    for i in 1:length(mevals)
+        empty!( mevals[i].tparad.pvmulti)
+        append!(mevals[i].tparad.pvmulti, pv2)
+    end
+    evaluate  &&  update_eval!(mevals)
+end
 
 
-function free_params(mevals::Vector{ModelEval})
+function free_params(mevals::MultiModelEval)
     out = Vector{Parameter}()
     for id in 1:length(mevals)
         append!(out, free_params(mevals[id]))
     end
     return out
 end
-free_params_val(mevals::Vector{ModelEval}) = getfield.(free_params(mevals), :val)
-nfree(mevals::Vector{ModelEval}) = sum(nfree.(mevals))
+free_params_val(mevals::MultiModelEval) = getfield.(free_params(mevals), :val)
+nfree(mevals::MultiModelEval) = sum(nfree.(mevals.v))
 
-update_eval!(mevals::Vector{ModelEval}) = update_eval!(mevals, free_params_val(mevals))
-function update_eval!(mevals::Vector{ModelEval}, pvalues::AbstractVector{T}) where T
+update_eval!(mevals::MultiModelEval) = [update_eval!(m) for m in mevals.v]
+function update_eval!(mevals::MultiModelEval, pvalues::AbstractVector{T}) where T
     if length(mevals) == 1
         return [update_eval!(mevals[1], pvalues)]
     else
-        if length(mevals[1].tpar.pvmulti) == 0
-            pv1 = [mevals[i].tpar.pvalues for i in 1:length(mevals)]
-            for i in 1:length(mevals)
-                append!(mevals[i].tpar.pvmulti, pv1)
-            end
-            pv2 = [mevals[i].tparad.pvalues for i in 1:length(mevals)]
-            for i in 1:length(mevals)
-                append!(mevals[i].tparad.pvmulti, pv2)
-            end
-        end
         for (id, i1, i2) in free_params_indices(mevals)
             set_pvalues!(mevals[id], pvalues[i1:i2])
         end
@@ -63,17 +84,15 @@ abstract type ChiSquared <: AbstractFitStat end
 
 # ====================================================================
 struct FitProblem{T <: AbstractFitStat}
-    mevals::Vector{ModelEval}
+    mevals::MultiModelEval
     data::Vector{<: AbstractMeasures}
     bestfit::Vector{PVModel{Parameter}}
     buffer::Vector{Float64}
 
-    FitProblem(model::Model, data::Measures{N}) where N = FitProblem([model], [data])
-    FitProblem(meval::ModelEval, data::Measures{N}) where N = FitProblem([meval], [data])
-    FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N =
-        FitProblem(ModelEval.(models, getfield.(datasets, :domain)), datasets)
+    FitProblem(model::Model         , data::Measures{N}) where N = FitProblem(MultiModelEval([model], [domain(data)]), [data])
+    FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N = FitProblem(MultiModelEval(models, getfield.(datasets, :domain)), datasets)
 
-    function FitProblem(mevals::Vector{ModelEval}, datasets::Vector{Measures{N}}) where N
+    function FitProblem(mevals::MultiModelEval, datasets::Vector{Measures{N}}) where N
         @assert length(mevals) == length(datasets)
         fp = new{ChiSquared}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
         update_eval!(fp, fp.buffer, free_params_val(fp.mevals))
