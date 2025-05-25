@@ -57,7 +57,6 @@ evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
 
 update_eval!(ceval::CompEval, pvalues::AbstractVector{Float64}) = _update_eval!(ceval, ceval.tpar  , pvalues)
 update_eval!(ceval::CompEval, pvalues::AbstractVector)          = _update_eval!(ceval, ceval.tparad, pvalues)
-
 function _update_eval!(ceval::CompEval, tpar::CompEvalT, pvalues::AbstractVector)
     doeval = (tpar.counter == 0)                                  ||
         any(tpar.lastparvalues   .!= pvalues)                     ||
@@ -151,7 +150,7 @@ struct ModelEval
 end
 
 
-function scan_model!(meval::ModelEval; evaluate=false)
+function scan_model!(meval::ModelEval)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -241,8 +240,6 @@ function scan_model!(meval::ModelEval; evaluate=false)
         compeval_sequence!(meval, find_maincomp(meval.model))
     end
     compeval_sequence!(meval)
-
-    evaluate  &&  update_eval!(meval)
     nothing
 end
 

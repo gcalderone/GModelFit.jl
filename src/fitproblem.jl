@@ -32,7 +32,7 @@ function free_params_indices(mevals::MultiModelEval)
 end
 
 
-function scan_model!(mevals::MultiModelEval; evaluate=false)
+function scan_model!(mevals::MultiModelEval)
     for i in 1:length(mevals)
         scan_model!(mevals[i])
     end
@@ -46,7 +46,6 @@ function scan_model!(mevals::MultiModelEval; evaluate=false)
         empty!( mevals[i].tparad.pvmulti)
         append!(mevals[i].tparad.pvmulti, pv2)
     end
-    evaluate  &&  update_eval!(mevals)
 end
 
 
