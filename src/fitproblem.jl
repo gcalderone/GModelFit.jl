@@ -32,6 +32,7 @@ function free_params_indices(mevals::MultiModelEval)
 end
 
 
+scan_model!(mevals::MultiModelEval{1}) = scan_model!(mevals[1])
 function scan_model!(mevals::MultiModelEval)
     for i in 1:length(mevals)
         scan_model!(mevals[i])
@@ -95,7 +96,6 @@ struct FitProblem{T <: AbstractFitStat}
     bestfit::Vector{PVModel{Parameter}}
     buffer::Vector{Float64}
 
-    FitProblem(model::Model         , data::Measures{N}) where N = FitProblem(MultiModelEval([model], [domain(data)]), [data])
     FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N = FitProblem(MultiModelEval(models, getfield.(datasets, :domain)), datasets)
 
     function FitProblem(mevals::MultiModelEval, datasets::Vector{Measures{N}}) where N

@@ -41,7 +41,7 @@ fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fitstat(FitP
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
 function fit(model::Model, data::AbstractMeasures, args...; kws...)
-    bestfit, fsumm = fit(FitProblem(model, data), args...; kws...)
+    bestfit, fsumm = fit(FitProblem([model], [data]), args...; kws...)
     return bestfit[1], fsumm
 end
 

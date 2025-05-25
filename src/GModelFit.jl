@@ -26,7 +26,7 @@ import Base.push!
 import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
-    CompEval, Model, @fd, SumReducer, domain, comptype, comptypes,
+    Model, @fd, SumReducer, domain, comptype, comptypes,
     isfreezed, thaw!, freeze!, fit, fit!, fitstat, select_maincomp!
 
 include("PV.jl")
