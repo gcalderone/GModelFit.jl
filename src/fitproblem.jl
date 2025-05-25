@@ -1,5 +1,5 @@
 # ====================================================================
-struct MultiModelEval <: AbstractVector{ModelEval}
+struct MultiModelEval{N}
     v::Vector{ModelEval}
 
     function MultiModelEval(models::Vector{Model}, domains::Vector{<: AbstractDomain})
@@ -8,7 +8,7 @@ struct MultiModelEval <: AbstractVector{ModelEval}
     end
 
     function MultiModelEval(mevals::Vector{ModelEval})
-        out = new(mevals)
+        out = new{length(mevals)}(mevals)
         scan_model!(out)
         return out
     end
@@ -59,21 +59,28 @@ end
 free_params_val(mevals::MultiModelEval) = getfield.(free_params(mevals), :val)
 nfree(mevals::MultiModelEval) = sum(nfree.(mevals.v))
 
-update_eval!(mevals::MultiModelEval) = [update_eval!(m) for m in mevals.v]
-function update_eval!(mevals::MultiModelEval, pvalues::AbstractVector{T}) where T
-    if length(mevals) == 1
-        return [update_eval!(mevals[1], pvalues)]
+
+function set_pvalues!(mevals::MultiModelEval{N}, pvalues::AbstractVector) where N
+    if N == 1
+        set_pvalues!(mevals.v[1], pvalues)
     else
         for (id, i1, i2) in free_params_indices(mevals)
             set_pvalues!(mevals[id], pvalues[i1:i2])
         end
-        output = Vector{Vector{T}}()
-        for (id, i1, i2) in free_params_indices(mevals)
-            push!(output, update_eval!(mevals[id], pvalues[i1:i2]))
-        end
-        return output
     end
 end
+
+function update_eval!(mevals::MultiModelEval, pvalues::AbstractVector{Float64})
+    set_pvalues!(mevals, pvalues)
+    return update_eval!.(mevals.v)
+end
+
+function update_eval!(mevals::MultiModelEval{N}, pvalues::AbstractVector) where N
+    set_pvalues!(mevals, pvalues)
+    return update_eval_ad!.(mevals.v)
+end
+
+update_eval!(mevals::MultiModelEval) = update_eval!.(mevals.v)
 
 
 # ====================================================================

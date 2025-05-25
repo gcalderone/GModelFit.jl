@@ -295,9 +295,7 @@ function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
 end
 
 
-update_eval!(meval::ModelEval) = update_eval!(meval, items(meval.tpar.pvalues)[meval.ifree])
-function update_eval!(meval::ModelEval, pvalues::AbstractVector{Float64})
-    set_pvalues!(meval, pvalues)
+function update_eval!(meval::ModelEval)
     run_patch_functs!(meval, meval.tpar)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
@@ -305,8 +303,7 @@ function update_eval!(meval::ModelEval, pvalues::AbstractVector{Float64})
     return meval.cevals[meval.seq[end]].tpar.buffer
 end
 
-function update_eval!(meval::ModelEval, pvalues::AbstractVector)
-    set_pvalues!(meval, pvalues)
+function update_eval_ad!(meval::ModelEval)
     run_patch_functs!(meval, meval.tparad)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
