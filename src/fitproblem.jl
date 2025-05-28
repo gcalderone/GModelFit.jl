@@ -90,17 +90,17 @@ abstract type AbstractFitStat end
 abstract type ChiSquared <: AbstractFitStat end
 
 # ====================================================================
-struct FitProblem{N, T <: AbstractFitStat}
+struct FitProblem{N, M <: AbstractMeasures, T <: AbstractFitStat}
     mevals::MultiModelEval
-    data::Vector{<: AbstractMeasures}
+    data::Vector{M}
     bestfit::Vector{PVModel{Parameter}}
     buffer::Vector{Float64}  # local buffer used to calculate fit statistic
 
     FitProblem(models::Vector{Model}, datasets::Vector{Measures{N}}) where N = FitProblem(MultiModelEval(models, getfield.(datasets, :domain)), datasets)
 
-    function FitProblem(mevals::MultiModelEval, datasets::Vector{Measures{N}}) where N
+    function FitProblem(mevals::MultiModelEval, datasets::Vector{Measures{N}}, fitstat=ChiSquared) where N
         @assert length(mevals) == length(datasets)
-        fp = new{length(mevals), ChiSquared}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
+        fp = new{length(mevals), Measures{N}, fitstat}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
         update_eval!(fp, fp.buffer, free_params_val(fp.mevals))
         return fp
     end
@@ -142,10 +142,10 @@ end
 
 
 # FitProblem{ChiSquared} specific methods
-dof(fitprob::FitProblem{N, ChiSquared}) where N = ndata(fitprob) - nfree(fitprob)
-fitstat(fitprob::FitProblem{N, ChiSquared}) where N = sum(abs2, fitprob.buffer) / dof(fitprob)
+dof(fitprob::FitProblem{N, M, ChiSquared}) where {N,M} = ndata(fitprob) - nfree(fitprob)
+fitstat(fitprob::FitProblem{N, M, ChiSquared}) where {N,M} = sum(abs2, fitprob.buffer) / dof(fitprob)
 
-function update_eval!(fitprob::FitProblem{N, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {N,T}
+function update_eval!(fitprob::FitProblem{N, M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {N,M,T}
     evals = update_eval!(fitprob.mevals, pvalues)
     i1 = 1
     for i in 1:length(fitprob.mevals)
