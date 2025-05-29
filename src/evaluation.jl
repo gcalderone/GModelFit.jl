@@ -51,7 +51,7 @@ If the component has no dependencies the `deps` argument should not be present.
 
 The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing either `Float64` values (to evaluate the component) or `ForwardDiff.Dual` values (to evaluate the component derivatives).
 """
-evaluate!(::AbstractComponent, ::AbstractDomain, args...) =
+evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
