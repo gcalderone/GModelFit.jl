@@ -144,7 +144,7 @@ struct ModelEval
                     ModelEvalT{Float64}(), ModelEvalT{Dual}(),
                     Vector{CompEval}())
         scan_model!(meval)
-        # Can't evaluate here because other models ina multi-model case may not yet be available
+        # Can't evaluate here because other models in a multi-model case may not yet be available
         return meval
     end
 end
@@ -271,7 +271,7 @@ end
 
 function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
     for (cname, pname) in meval.patched
-        par = getfield(meval.model[cname], pname)
+        par = getproperty(meval.model[cname], pname)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
             if isa(par.patch, Symbol)  # use same param. value from a different component
