@@ -90,7 +90,7 @@ abstract type AbstractFitStat end
 abstract type ChiSquared <: AbstractFitStat end
 
 # ====================================================================
-struct FitProblem{N, M <: AbstractMeasures, T <: AbstractFitStat}
+struct FitProblem{M <: AbstractMeasures, T <: AbstractFitStat}
     mevals::MultiModelEval
     data::Vector{M}
     bestfit::Vector{PVModel{Parameter}}
@@ -100,7 +100,7 @@ struct FitProblem{N, M <: AbstractMeasures, T <: AbstractFitStat}
 
     function FitProblem(mevals::MultiModelEval, datasets::Vector{Measures{N}}, fitstat=ChiSquared) where N
         @assert length(mevals) == length(datasets)
-        fp = new{length(mevals), Measures{N}, fitstat}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
+        fp = new{Measures{N}, fitstat}(mevals, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))))
         update_eval!(fp, fp.buffer, free_params_val(fp.mevals))
         return fp
     end
@@ -141,11 +141,11 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
 end
 
 
-# FitProblem{ChiSquared} specific methods
-dof(fitprob::FitProblem{N, M, ChiSquared}) where {N,M} = ndata(fitprob) - nfree(fitprob)
-fitstat(fitprob::FitProblem{N, M, ChiSquared}) where {N,M} = sum(abs2, fitprob.buffer) / dof(fitprob)
+# FitProblem{M, ChiSquared} specific methods
+dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob)
+fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
 
-function update_eval!(fitprob::FitProblem{N, M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {N,M,T}
+function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {M,T}
     evals = update_eval!(fitprob.mevals, pvalues)
     i1 = 1
     for i in 1:length(fitprob.mevals)
