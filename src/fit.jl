@@ -52,7 +52,7 @@ end
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
 function fit!(model::Model, data::AbstractMeasures, args...; kws...)
-    bestfit, fsumm = fit!(FitProblem(model, data), args...; kws...)
+    bestfit, fsumm = fit!(FitProblem([model], [data]), args...; kws...)
     return bestfit[1], fsumm
 end
 
