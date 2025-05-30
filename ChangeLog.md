@@ -1,4 +1,4 @@
-# Version 0.5.3
+# Version 0.5.2
 	* Fixed error in fallback `evaluate!` method;
 
 	* Fixed error in execution of patch functions when `FComp` components are involved (#6);
@@ -7,7 +7,6 @@
 
 	* The `FitProblem` internal structure is now parametrized on `{M <: AbstractMeasures, T <: AbstractFitStat}`;
 
-# Version 0.5.2
 	* Fixed a bug in reporting elapsed time after fitting.
 
 # Version 0.5.1
