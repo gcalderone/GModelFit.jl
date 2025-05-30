@@ -1,3 +1,12 @@
+# Version 0.5.3
+	* Fixed error in fallback `evaluate!` method;
+
+	* Fixed error in execution of patch functions when `FComp` components are involved (#6);
+
+	* The `MultiModelEval{N}` structure (where `N` is the number of models) is now the internal structure used for multi-model evaluation (replaces `Vector{ModelEval}`).
+
+	* The `FitProblem` internal structure is now parametrized on `{M <: AbstractMeasures, T <: AbstractFitStat}`;
+
 # Version 0.5.2
 	* Fixed a bug in reporting elapsed time after fitting.
 
