@@ -3,6 +3,8 @@
 abstract type AbstractFitStat end
 struct ChiSquared <: AbstractFitStat; end
 
+default_fitstat(::Measures) = ChiSquared()
+
 # ====================================================================
 struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
     meval::MEval
@@ -11,6 +13,7 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
     buffer::Vector{Float64}  # local buffer used to calculate fit statistic
     fitstat::FS
 
+    FitProblem(meval::MEval, datasets::Vector{<: AbstractMeasures}) = FitProblem(meval, datasets, default_fitstat(datasets[1]))
     function FitProblem(meval::MEval, datasets::Vector{M}, fitstat::FS) where {M <: AbstractMeasures, FS <: AbstractFitStat}
         @assert length(meval) == length(datasets)
         fp = new{M, FS}(meval, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))), fitstat)
@@ -19,9 +22,8 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
     end
 end
 
-
-FitProblem(models::Vector{Model}, datasets::Vector{T}) where T <: Measures =
-    FitProblem(MEval(models, getfield.(datasets, :domain)), datasets, ChiSquared())
+FitProblem(models::Vector{Model}, datasets::Vector{T}, fitstat=default_fitstat(datasets[1])) where T =
+    FitProblem(MEval(models, getfield.(datasets, :domain)), datasets, fitstat)
 
 
 free_params(fitprob::FitProblem) = free_params(fitprob.meval)

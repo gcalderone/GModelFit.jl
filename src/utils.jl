@@ -83,6 +83,7 @@ No systematic error is considered when generating mock dataset(s).
 - `seed=nothing`: seed for the `Random.MersenneTwister` generator.
 """
 function mock(::Type{Measures}, meval::MEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
+    update_eval!(meval)
     out = Vector{Measures}()
     for i in 1:length(meval)
         values = last_eval(meval, i)

@@ -345,7 +345,6 @@ struct MEval{N}
         @assert length(models) == length(domains)
         out = new{length(models)}([SingleMEval(models[i], domains[i]) for i in 1:length(models)])
         scan_model!(out)
-        update_eval!.(out.v)
         return out
     end
 end
@@ -416,6 +415,8 @@ function update_eval!(meval::MEval{N}, pvalues::AbstractVector) where N
     return update_eval_ad!.(meval.v)
 end
 
+update_eval!(meval::MEval) = update_eval!.(meval.v)
+
 
 last_eval(meval::MEval{1}) = last_eval(meval, 1)
 last_eval(meval::MEval{1}, cname::Symbol) = last_eval(meval, 1, cname)
@@ -427,6 +428,7 @@ last_eval(meval::MEval, id::Int, cname::Symbol) = last_eval(meval.v[id], cname)
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     meval = MEval(model, domain)
+    update_eval!(meval)
     isnothing(cname)  &&  (return last_eval(meval))
     return last_eval(meval, cname)
 end
