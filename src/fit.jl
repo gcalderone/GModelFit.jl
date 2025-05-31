@@ -1,9 +1,6 @@
 # ====================================================================
 # Fit statistics
 abstract type AbstractFitStat end
-struct ChiSquared <: AbstractFitStat; end
-
-default_fitstat(::Measures) = ChiSquared()
 
 # ====================================================================
 struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
@@ -61,7 +58,10 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
 end
 
 
-# FitProblem{M, ChiSquared} specific methods
+# ChiSquared fit statistic
+struct ChiSquared <: AbstractFitStat; end
+
+default_fitstat(::Measures) = ChiSquared()
 dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
 
