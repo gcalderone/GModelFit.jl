@@ -6,8 +6,6 @@ Gnuplot.recipe(data::Measures{1}) =
                        coords(domain(data)), values(data), uncerts(data),
                        "with yerr t 'Data' lc rgb 'gray'")
 
-Gnuplot.recipe(meval::ModelEval) = Gnuplot.recipe(GModelFit.ModelSnapshot(model))
-
 function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
                         keep=Symbol[], skip=Symbol[])
     @assert ndims(domain(model)) == 1

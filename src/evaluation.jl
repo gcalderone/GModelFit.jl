@@ -110,47 +110,45 @@ include("components/SumReducer.jl")
 
 
 # ====================================================================
-struct ModelEvalT{T <: Real}
+struct SingleMEvalT{T <: Real}
     pvalues::PVModel{Union{T, Float64}}
     pactual::PVModel{Union{T, Float64}}
     pvmulti::Vector{PVModel{Union{T, Float64}}}
 
-    ModelEvalT{T}() where T  <: Real =
+    SingleMEvalT{T}() where T  <: Real =
         new(PVModel{Union{T, Float64}}(),
             PVModel{Union{T, Float64}}(),
             Vector{PVModel{Union{T, Float64}}}())
 end
 
-function empty!(v::ModelEvalT)
+function empty!(v::SingleMEvalT)
     empty!(v.pvalues)
     empty!(v.pactual)
     empty!(v.pvmulti)
 end
 
 
-struct ModelEval
+struct SingleMEval
     model::Model
     domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     ifree::Vector{Int}
     patched::Vector{NTuple{2, Symbol}}
-    tpar::ModelEvalT{Float64}
-    tparad::ModelEvalT{Dual}
+    tpar::SingleMEvalT{Float64}
+    tparad::SingleMEvalT{Dual}
     seq::Vector{Symbol}
 
-    function ModelEval(model::Model, domain::AbstractDomain)
+    function SingleMEval(model::Model, domain::AbstractDomain)
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(),
                     Vector{Int}(), Vector{NTuple{2, Symbol}}(),
-                    ModelEvalT{Float64}(), ModelEvalT{Dual}(),
+                    SingleMEvalT{Float64}(), SingleMEvalT{Dual}(),
                     Vector{CompEval}())
-        scan_model!(meval)
-        # Can't evaluate here because other models in a multi-model case may not yet be available
         return meval
     end
 end
 
 
-function scan_model!(meval::ModelEval)
+function scan_model!(meval::SingleMEval)
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
             @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
@@ -229,13 +227,13 @@ function scan_model!(meval::ModelEval)
         end
     end
 
-    function compeval_sequence!(meval::ModelEval, cname::Symbol)
+    function compeval_sequence!(meval::SingleMEval, cname::Symbol)
         for d in dependencies(meval.model, cname)
             compeval_sequence!(meval, d)
         end
         push!(meval.seq, cname)
     end
-    function compeval_sequence!(meval::ModelEval)
+    function compeval_sequence!(meval::SingleMEval)
         empty!(meval.seq)
         compeval_sequence!(meval, find_maincomp(meval.model))
     end
@@ -244,7 +242,7 @@ function scan_model!(meval::ModelEval)
 end
 
 
-function free_params(meval::ModelEval)
+function free_params(meval::SingleMEval)
     out = Vector{Parameter}()
     for (cname, comp) in meval.model.comps
         for (pname, par) in getparams(comp)
@@ -253,23 +251,22 @@ function free_params(meval::ModelEval)
     end
     return out[meval.ifree]
 end
-free_params_val(meval::ModelEval) = convert(Vector{Float64}, getfield.(free_params(meval), :val))  # convert() is useful when there are no free parameters
-nfree(meval::ModelEval) = length(meval.ifree)
+nfree(meval::SingleMEval) = length(meval.ifree)
 
 
 # Set new model parameters
-function set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Float64})
+function set_pvalues!(meval::SingleMEval, pvalues::AbstractVector{Float64})
     items(meval.tpar.pvalues)[meval.ifree] .= pvalues
     items(meval.tpar.pactual)[meval.ifree] .= pvalues
 end
 
-function set_pvalues!(meval::ModelEval, pvalues::AbstractVector)
+function set_pvalues!(meval::SingleMEval, pvalues::AbstractVector)
     items(meval.tparad.pvalues)[meval.ifree] .= pvalues
     items(meval.tparad.pactual)[meval.ifree] .= pvalues
 end
 
 
-function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
+function run_patch_functs!(meval::SingleMEval, tpar::SingleMEvalT)
     for (cname, pname) in meval.patched
         par = getproperty(meval.model[cname], pname)
         if !isnothing(par.patch)
@@ -295,7 +292,7 @@ function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
 end
 
 
-function update_eval!(meval::ModelEval)
+function update_eval!(meval::SingleMEval)
     run_patch_functs!(meval, meval.tpar)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
@@ -303,7 +300,7 @@ function update_eval!(meval::ModelEval)
     return meval.cevals[meval.seq[end]].tpar.buffer
 end
 
-function update_eval_ad!(meval::ModelEval)
+function update_eval_ad!(meval::SingleMEval)
     run_patch_functs!(meval, meval.tparad)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
@@ -313,37 +310,123 @@ end
 
 
 #=
-evalcounter(meval::ModelEval, cname::Symbol)
+evalcounter(meval::SingleMEval, cname::Symbol)
 
 Return the number of times the component with name `cname` has been evaluated.
 =#
-evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.counter + meval.cevals[cname].tparad.counter
+evalcounter(meval::SingleMEval, cname::Symbol) = meval.cevals[cname].tpar.counter + meval.cevals[cname].tparad.counter
 evalcounter(model::Model, cname::Symbol) = "???"
 
 
 #=
-evalcounters(meval::ModelEval)
+evalcounters(meval::SingleMEval)
 
 Return a `OrderedDict{Symbol, Int}` with the number of times each component has been evaluated.
 =#
-evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
+evalcounters(meval::SingleMEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
 
 
 #=
-last_eval(meval::ModelEval)
-last_eval(meval::ModelEval, name::Symbol)
+last_eval(meval::SingleMEval)
+last_eval(meval::SingleMEval, name::Symbol)
 
-Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
+Return last evaluation of a component whose name is `cname` in a `SingleMEval` object.  If `cname` is not provided the evaluation of the main component is returned.
 =#
-last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
-last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
+last_eval(meval::SingleMEval) = last_eval(meval, meval.seq[end])
+last_eval(meval::SingleMEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
+
+
+# ====================================================================
+struct MEval{N}
+    v::Vector{SingleMEval}
+
+    MEval(model::Model, domain::AbstractDomain) = MEval([model], [domain])
+    function MEval(models::Vector{Model}, domains::Vector{<: AbstractDomain})
+        @assert length(models) == length(domains)
+        out = new{length(models)}([SingleMEval(models[i], domains[i]) for i in 1:length(models)])
+        scan_model!(out)
+        update_eval!.(out.v)
+        return out
+    end
+end
+length(meval::MEval) = length(meval.v)
+
+
+function free_params_indices(meval::MEval)
+    out = Vector{NTuple{3, Int}}()
+    i1 = 1
+    for id in 1:length(meval)
+        nn = length(meval.v[id].ifree)
+        if nn > 0
+            i2 = i1 + nn - 1
+            push!(out, (id, i1, i2))
+            i1 += nn
+        end
+    end
+    return out
+end
+
+
+scan_model!(meval::MEval{1}) = scan_model!(meval.v[1])
+function scan_model!(meval::MEval)
+    for i in 1:length(meval)
+        scan_model!(meval.v[i])
+    end
+    pv1 = [meval.v[i].tpar.pvalues for i in 1:length(meval)]
+    for i in 1:length(meval)
+        empty!( meval.v[i].tpar.pvmulti)
+        append!(meval.v[i].tpar.pvmulti, pv1)
+    end
+    pv2 = [meval.v[i].tparad.pvalues for i in 1:length(meval)]
+    for i in 1:length(meval)
+        empty!( meval.v[i].tparad.pvmulti)
+        append!(meval.v[i].tparad.pvmulti, pv2)
+    end
+end
+
+
+function free_params(meval::MEval)
+    out = Vector{Parameter}()
+    for id in 1:length(meval)
+        append!(out, free_params(meval.v[id]))
+    end
+    return out
+end
+free_params_val(meval::MEval) = getfield.(free_params(meval), :val)
+nfree(meval::MEval) = sum(nfree.(meval.v))
+
+
+function set_pvalues!(meval::MEval{N}, pvalues::AbstractVector) where N
+    if N == 1
+        set_pvalues!(meval.v[1], pvalues)
+    else
+        for (id, i1, i2) in free_params_indices(meval)
+            set_pvalues!(meval.v[id], pvalues[i1:i2])
+        end
+    end
+end
+
+function update_eval!(meval::MEval, pvalues::AbstractVector{Float64})
+    set_pvalues!(meval, pvalues)
+    return update_eval!.(meval.v)
+end
+
+function update_eval!(meval::MEval{N}, pvalues::AbstractVector) where N
+    set_pvalues!(meval, pvalues)
+    return update_eval_ad!.(meval.v)
+end
+
+
+last_eval(meval::MEval{1}) = last_eval(meval, 1)
+last_eval(meval::MEval{1}, cname::Symbol) = last_eval(meval, 1, cname)
+last_eval(meval::MEval, id::Int) = last_eval(meval.v[id])
+last_eval(meval::MEval, id::Int, cname::Symbol) = last_eval(meval.v[id], cname)
 
 
 # ====================================================================
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
-    meval = ModelEval(model, domain)
-    update_eval!(meval)
-    isnothing(cname)  &&  (cname = meval.seq[end])
+    meval = MEval(model, domain)
+    isnothing(cname)  &&  (return last_eval(meval))
     return last_eval(meval, cname)
 end

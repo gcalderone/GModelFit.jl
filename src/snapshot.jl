@@ -15,7 +15,7 @@ struct ModelSnapshot
     deps::OrderedDict{Symbol, Vector{Symbol}}
     evalcounters::OrderedDict{Symbol, Int}
 end
-function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
+function ModelSnapshot(meval::SingleMEval, bestfit::PVModel{Parameter})
     deps = OrderedDict{Symbol, Vector{Symbol}}()
     for cname in keys(meval.cevals)
         deps[cname] = dependencies(meval.model, cname)
