@@ -4,39 +4,39 @@ abstract type AbstractFitStat end
 
 # ====================================================================
 struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
-    meval::MEval
+    multi::MultiEval
     data::Vector{M}
     bestfit::Vector{PVModel{Parameter}}
     buffer::Vector{Float64}  # local buffer used to calculate fit statistic
     fitstat::FS
 
-    FitProblem(meval::MEval, datasets::Vector{<: AbstractMeasures}) = FitProblem(meval, datasets, default_fitstat(datasets[1]))
-    function FitProblem(meval::MEval, datasets::Vector{M}, fitstat::FS) where {M <: AbstractMeasures, FS <: AbstractFitStat}
-        @assert length(meval) == length(datasets)
-        fp = new{M, FS}(meval, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))), fitstat)
-        update_eval!(fp, fp.buffer, free_params_val(fp.meval))
+    FitProblem(multi::MultiEval, datasets::Vector{<: AbstractMeasures}) = FitProblem(multi, datasets, default_fitstat(datasets[1]))
+    function FitProblem(multi::MultiEval, datasets::Vector{M}, fitstat::FS) where {M <: AbstractMeasures, FS <: AbstractFitStat}
+        @assert length(multi) == length(datasets)
+        fp = new{M, FS}(multi, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))), fitstat)
+        # update_eval!(fp, fp.buffer, free_params_val(fp.multi))
         return fp
     end
 end
 
 FitProblem(models::Vector{Model}, datasets::Vector{T}, fitstat=default_fitstat(datasets[1])) where T =
-    FitProblem(MEval(models, getfield.(datasets, :domain)), datasets, fitstat)
+    FitProblem(MultiEval(models, getfield.(datasets, :domain)), datasets, fitstat)
 
 
-free_params(fitprob::FitProblem) = free_params(fitprob.meval)
-nfree(fitprob::FitProblem) = nfree(fitprob.meval)
+free_params(fitprob::FitProblem) = free_params(fitprob.multi)
+nfree(fitprob::FitProblem) = nfree(fitprob.multi)
 ndata(fitprob::FitProblem) = sum(length.(fitprob.data))
 
 function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
-    update_eval!(fitprob.meval, pvalues)
+    update_eval!(fitprob.multi, pvalues)
 
     empty!(fitprob.bestfit)
-    for id in 1:length(fitprob.meval)
+    for id in 1:length(fitprob.multi)
         push!(fitprob.bestfit, PVModel{Parameter}())
     end
 
-    for (id, i1, i2) in free_params_indices(fitprob.meval)
-        meval = fitprob.meval.v[id]
+    for (id, i1, i2) in free_params_indices(fitprob.multi)
+        meval = fitprob.multi.v[id]
         i = 1
         for (cname, comp) in meval.model.comps
             for (pname, _par) in getparams(comp)
@@ -66,13 +66,13 @@ dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob
 fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
 
 function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {M,T}
-    evals = update_eval!(fitprob.meval, pvalues)
+    evals = update_eval!(fitprob.multi, pvalues)
     i1 = 1
-    for i in 1:length(fitprob.meval)
+    for i in 1:length(fitprob.multi)
         nn = length(evals[i])
         if nn > 0
             i2 = i1 + nn - 1
-            output[i1:i2] .= reshape((reshape(fitprob.meval.v[i].domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            output[i1:i2] .= reshape((reshape(fitprob.multi.v[i].domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end
@@ -92,14 +92,14 @@ export cmpfit, lsqfit  # export symbols from .Solvers
 function fit(fitprob::FitProblem, solver=Solvers.lsqfit(); kws...)
     @assert nfree(fitprob) > 0 "No free parameter in the model"
     fsumm = Solvers.solve!(fitprob, solver; kws...)
-    bestfit = [ModelSnapshot(fitprob.meval.v[i], fitprob.bestfit[i]) for i in 1:length(fitprob.meval)]
+    bestfit = [ModelSnapshot(fitprob.multi.v[i], fitprob.bestfit[i]) for i in 1:length(fitprob.multi)]
     return bestfit, fsumm
 end
 
 function fit!(fitprob::FitProblem, args...; kws...)
     bestfit, fsumm = fit(fitprob, args...; kws...) # invoke non-modifying fit() function
-    for i in 1:length(fitprob.meval)
-        for (cname, comp) in fitprob.meval.v[i].model
+    for i in 1:length(fitprob.multi)
+        for (cname, comp) in fitprob.multi.v[i].model
             for (pname, par) in getparams(comp)
                 par.val = bestfit[i][cname][pname].val
                 par.unc = bestfit[i][cname][pname].unc
