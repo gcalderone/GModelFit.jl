@@ -1,3 +1,9 @@
+# Version 0.5.3
+	* Only minor and internal changes:
+		* The `MultiModelEval{N}` internal structure has been renamed to `MultiEval{N}`;
+		* The a `FitProblem` structure creator now identifies the proper fit statistic using the `default_fitstat` function depending on the typeo of data;
+
+
 # Version 0.5.2
 	* Fixed error in fallback `evaluate!` method;
 
