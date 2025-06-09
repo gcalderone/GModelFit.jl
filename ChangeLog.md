@@ -1,3 +1,6 @@
+# Version 0.5.4
+	* Fixed a bug occurring when, in a multi-model fit scenario, one of the model had no free parameters.
+
 # Version 0.5.3
 	* Only minor and internal changes:
 		* The `MultiModelEval{N}` internal structure has been renamed to `MultiEval{N}`;

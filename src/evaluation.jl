@@ -356,11 +356,10 @@ function free_params_indices(multi::MultiEval)
     i1 = 1
     for id in 1:length(multi)
         nn = length(multi.v[id].ifree)
-        if nn > 0
-            i2 = i1 + nn - 1
-            push!(out, (id, i1, i2))
-            i1 += nn
-        end
+        #(nn == 0)  && continue   This is a bug (e.g. if in multimodel one model has zero free params
+        i2 = i1 + nn - 1
+        push!(out, (id, i1, i2))
+        i1 += nn
     end
     return out
 end
