@@ -162,76 +162,50 @@ function show(io::IO, red::FunctDesc)
 end
 
 
-function tabledeps(model::Union{Model, ModelSnapshot})
-    function alldeps(model::Union{Model, GModelFit.ModelSnapshot}, cname=nothing, level=0)
-        out = Vector{Tuple}()
-        if isnothing(cname)
-            cname = GModelFit.find_maincomp(model)
-            append!(out, alldeps(model, cname, level+1))
-        else
-            push!(out, (level, cname))
-            for d in GModelFit.dependencies(model, cname)
-                append!(out, alldeps(model, d, level+1))
+
+function tree_prefix(ff::Vector{DependencyNode})
+    BRANCH = showsettings.plain  ?  "+ "  :  "├─╴"
+    BRCONT = showsettings.plain  ?  "| "  :  "│  "
+    BREND  = showsettings.plain  ?  "+ "  :  "└─╴"
+
+    function set_tree_prefix!(prefix, ff::Vector{DependencyNode}, node::DependencyNode)
+        cnames = getfield.(ff, :cname)
+        irow = findfirst(cnames .== node.cname)
+        prefix[irow, node.level] = string(node.cname)
+        if length(node.childs) > 0
+            i1 = findfirst(cnames .== node.childs[1  ].cname)
+            i2 = findfirst(cnames .== node.childs[end].cname)
+            prefix[i1:i2, node.level] .= BRCONT
+
+            for ichild in 1:length(node.childs)
+                child = node.childs[ichild]
+                i = findfirst(cnames .== child.cname)
+                if ichild < length(node.childs)
+                    prefix[i, node.level] = BRANCH
+                else
+                    prefix[i, node.level] = BREND
+                end
+
+                set_tree_prefix!(prefix, ff, child)
             end
         end
-        return out
     end
 
-    allcomps = alldeps(model)
-    maxdepth = maximum(getindex.(allcomps, 1))
-    prefix = fill("", length(allcomps), maxdepth)
-    for i in 1:length(allcomps)
-        prefix[i, allcomps[i][1]] = string(allcomps[i][2])
-    end
-
-    BRANCH = "├─╴"
-    BRCONT = "│  "
-    BREND  = "└─╴"
-    for i in 2:length(allcomps)
-        for j in 1:(maxdepth-1)
-            if prefix[i,j] == ""                    # empty cell
-                if any(prefix[1:(i-1), j] .!= "")   # ...it has a parent
-                    if prefix[i,j+1] != ""          # ...it is a branch
-                        prefix[i,j] = BRANCH        # Add a branch
-                    end
-                end
-            end
-        end
-    end
-    for i in 2:length(allcomps)
-        for j in 1:(maxdepth-1)
-            if prefix[i,j] == BRANCH                  # it is a branch
-                # Check if this is the last row for this branch
-                if all(prefix[(i+1):end,j] .== "")
-                    prefix[i,j] = BREND
-                elseif (prefix[i+1,j] != "")  &&  (prefix[i+1,j] != BRANCH)
-                    prefix[i,j] = BREND
-                end
-            end
-        end
-    end
-    # Join branches with vertical lines
-    for i in 2:length(allcomps)
-        for j in 1:(maxdepth-1)
-            if (prefix[i,j] == "")  &&  (prefix[i-1,j] in [BRANCH, BRCONT])
-                prefix[i,j] = BRCONT
-            end
-        end
-    end
+    prefix = fill("", length(ff), maximum(getfield.(ff, :level)))
+    set_tree_prefix!(prefix, ff, ff[1])
     prefix[prefix .== ""] .= " "^length(BRANCH)
+    return [string(rstrip(join(prefix[i,:]))) for i in 1:length(ff)]
+end
 
-    prefix = [string(rstrip(join(prefix[i,:]))) for i in 1:length(allcomps)]
-    if showsettings.plain
-        prefix = [replace(p,
-                          BRANCH => "+ ",
-                          BRCONT => "| ",
-                          BREND  => "+ ") for p in prefix]
-    end
+function tabledeps(model::Union{Model, ModelSnapshot})
+    tree = deptree(model)
+    allcomps = flatten(tree)
+    prefix = tree_prefix(allcomps)
 
     table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 8)
     fixed = Vector{Bool}()
     for i in 1:length(allcomps)
-        cname = allcomps[i][2]
+        cname = allcomps[i].cname
         table[i, 1] = prefix[i]
         table[i, 2] = comptype(model, cname)
         table[i, 3] = count(getproperty.(values(getparams(model[cname])), :fixed) .== false)

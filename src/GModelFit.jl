@@ -258,7 +258,24 @@ mutable struct Model
 end
 
 
-function find_maincomp(model::Model)
+struct DependencyNode
+    cname::Symbol
+    level::Int
+    parent::Union{Nothing, Symbol}
+    childs::Vector{DependencyNode}
+    DependencyNode(cname::Symbol, level::Int, parent) = new(cname, level, parent, Vector{DependencyNode}())
+end
+
+
+function deptree(model::Model)
+    function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
+        out = DependencyNode(cname, level, parent)
+        for d in dependencies(model, cname)
+            push!(out.childs, deptree(model, d, level+1, cname))
+        end
+        return out
+    end
+
     # Identify parent for all comps
     parent = OrderedDict{Symbol, Symbol}()
     for (cname, comp) in model.comps
@@ -288,21 +305,30 @@ function find_maincomp(model::Model)
         end
     end
 
-    # If multiple possibilities are stll available neglect components
-    # with no dependencies
+    # Neglect components with no parent and no dependencies
     while length(comps_with_no_parent) > 1
         if length(dependencies(model, comps_with_no_parent[1])) == 0
             deleteat!(comps_with_no_parent, 1)
         end
     end
 
-    # The above check is always performed even if an explicit maincomp
-    # has been set
+    # Main component
     if isnothing(model.maincomp)
-        return comps_with_no_parent[end]
+        maincomp = comps_with_no_parent[end]
     else
-        return model.maincomp
+        maincomp = model.maincomp
     end
+
+    return deptree(model, maincomp, 1, nothing)
+end
+
+
+function flatten(node::DependencyNode)
+    out = [node]
+    for child in node.childs
+        append!(out, flatten(child))
+    end
+    return out
 end
 
 

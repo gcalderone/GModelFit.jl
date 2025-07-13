@@ -33,7 +33,16 @@ domain(model::ModelSnapshot) = model.domain
 Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
 (model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
 (model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
-find_maincomp(model::ModelSnapshot) = model.maincomp
+function deptree(model::ModelSnapshot)
+    function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
+        out = DependencyNode(cname, level, parent)
+        for d in dependencies(model, cname)
+            push!(out.childs, deptree(model, d, level+1, cname))
+        end
+        return out
+    end
+    return deptree(model, model.maincomp, 1, nothing)
+end
 isfreezed(model::ModelSnapshot, cname::Symbol) = model.isfreezed[cname]
 dependencies(model::ModelSnapshot, cname::Symbol) = model.deps[cname]
 evalcounter(model::ModelSnapshot, cname::Symbol) = model.evalcounters[cname]

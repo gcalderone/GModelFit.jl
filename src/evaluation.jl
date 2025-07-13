@@ -197,13 +197,33 @@ function scan_model!(meval::ModelEval)
             push!(meval.tparad.pvalues, cname, pname, par.val)
             push!(meval.tparad.pactual, cname, pname, par.val)
         end
-        if !(cname in keys(meval.cevals))
-            ceval = CompEval(comp, meval.domain)
-            meval.cevals[cname] = ceval
-        end
     end
     append!(meval.ifree, findall(.! isfixed))
 
+    # Update evaluation sequence
+    tree = deptree(meval.model)
+    ftree = flatten(tree)
+    empty!(meval.seq)
+    append!(meval.seq, reverse(getfield.(ftree, :cname)))
+
+    # Walk dependency tree and create relevant CompEval structures (if
+    # not yet existing)
+    for d in ftree
+        cname = d.cname
+        if !(cname in keys(meval.cevals))
+            ceval = CompEval(meval.model.comps[cname], meval.domain)  # all components share the same domain
+            meval.cevals[cname] = ceval
+        end
+    end
+
+    # Ensure order in cevals is the same as in model.comps
+    tmp = copy(meval.cevals)
+    empty!(meval.cevals)
+    for (cname, _) in meval.model.comps
+        meval.cevals[cname] = tmp[cname]
+    end
+
+    # Update references to dependencies
     for (cname, ceval) in meval.cevals
         if length(ceval.tpar.deps) == 0
             i = 1
@@ -227,17 +247,6 @@ function scan_model!(meval::ModelEval)
         end
     end
 
-    function compeval_sequence!(meval::ModelEval, cname::Symbol)
-        for d in dependencies(meval.model, cname)
-            compeval_sequence!(meval, d)
-        end
-        push!(meval.seq, cname)
-    end
-    function compeval_sequence!(meval::ModelEval)
-        empty!(meval.seq)
-        compeval_sequence!(meval, find_maincomp(meval.model))
-    end
-    compeval_sequence!(meval)
     nothing
 end
 
