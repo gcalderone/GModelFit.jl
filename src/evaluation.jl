@@ -137,12 +137,16 @@ struct ModelEval
     tpar::ModelEvalT{Float64}
     tparad::ModelEvalT{Dual}
     seq::Vector{Symbol}
+    IR::IREval
 
-    function ModelEval(model::Model, domain::AbstractDomain)
+    function ModelEval(model::Model, data_domain::AbstractDomain)
+        ireval = IREval(model.IR, data_domain)
+        domain = ireval.model_domain
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(),
                     Vector{Int}(), Vector{NTuple{2, Symbol}}(),
                     ModelEvalT{Float64}(), ModelEvalT{Dual}(),
-                    Vector{CompEval}())
+                    Vector{Symbol}(),
+                    ireval)
         return meval
     end
 end
@@ -306,7 +310,9 @@ function update_eval!(meval::ModelEval)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
     end
-    return meval.cevals[meval.seq[end]].tpar.buffer
+    unfolded = meval.cevals[meval.seq[end]].tpar.buffer
+    apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded, meval.IR.model_domain, unfolded)
+    return meval.IR.folded
 end
 
 function update_eval_ad!(meval::ModelEval)
@@ -314,7 +320,9 @@ function update_eval_ad!(meval::ModelEval)
     for cname in meval.seq
         update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
     end
-    return meval.cevals[meval.seq[end]].tparad.buffer
+    unfolded = meval.cevals[meval.seq[end]].tparad.buffer
+    apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded_ad, meval.IR.model_domain, unfolded)
+    return meval.IR.folded_ad
 end
 
 

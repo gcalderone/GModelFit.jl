@@ -27,7 +27,7 @@ import Base.empty!
 
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @fd, SumReducer, domain, comptype, comptypes,
-    isfreezed, thaw!, freeze!, fit, fit!, fitstat, select_maincomp!
+    isfreezed, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
 
 include("PV.jl")
 using .PV
@@ -128,7 +128,6 @@ Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, n
 # of type Parameter, or have all parameters collected in a single
 # field of type OrderedDict{Symbol, Parameter}()
 abstract type AbstractComponent end
-abstract type AbstractCompWDeps end
 
 # Note: this function must mirror setparams!()
 function getparams(comp::AbstractComponent)
@@ -193,6 +192,9 @@ Default implementation returns `Symbol[]` (i.e. no dependencies).
 dependencies(comp::AbstractComponent) = Symbol[]
 
 
+include("instrument_response.jl")
+
+
 # ====================================================================
 # Model
 #
@@ -222,8 +224,9 @@ mutable struct Model
     comps::OrderedDict{Symbol, AbstractComponent}
     fixed::OrderedDict{Symbol, Bool}
     maincomp::Union{Nothing, Symbol}
+    IR::AbstractInstrumentResponse
 
-    Model() = new(OrderedDict{Symbol, AbstractComponent}(), OrderedDict{Symbol, Bool}(), nothing)
+    Model() = new(OrderedDict{Symbol, AbstractComponent}(), OrderedDict{Symbol, Bool}(), nothing, IdealInstrument())
 
     function Model(dict::AbstractDict)
         model = Model()
@@ -450,6 +453,16 @@ Force a component to be the final one for model evaluation.
 function select_maincomp!(model::Model, cname::Symbol)
     @assert haskey(model, cname) "Component $cname is not defined"
     model.maincomp = cname
+end
+
+
+"""
+    set_IR!(model::Model, IR::AbstractInstrumentResponse)
+
+Force a component to be the final one for model evaluation.
+"""
+function set_IR!(model::Model, IR::AbstractInstrumentResponse)
+    model.IR = IR
 end
 
 

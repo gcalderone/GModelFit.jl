@@ -92,7 +92,7 @@ GModelFit.serialize("my_snapshot.json", bestfit, stats, data)
 
 # Restore objects (possibly in a different Julia session)
 using GModelFit
-(bestit, stats, data) = GModelFit.deserialize("my_snapshot.json")
+(bestfit, stats, data) = GModelFit.deserialize("my_snapshot.json")
 ```
 """
 function serialize(filename::String, args...; compress=false)
@@ -190,6 +190,7 @@ _deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
                                                _deserialize(dd["params"]),
                                                _deserialize(dd["buffers"]),
                                                _deserialize(dd["maincomp"]),
+                                               _deserialize(dd["folded"]),
                                                _deserialize(dd["comptypes"]),
                                                _deserialize(dd["isfreezed"]),
                                                _deserialize(dd["deps"]),
