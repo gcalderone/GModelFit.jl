@@ -66,7 +66,8 @@ dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob
 fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
 
 function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {M,T}
-    evals = update_eval!(fitprob.multi, pvalues)
+    update_eval!(fitprob.multi, pvalues)
+    evals = [last_eval_folded(fitprob.multi, i) for i in 1:length(fitprob.multi)]
     i1 = 1
     for i in 1:length(fitprob.multi)
         nn = length(evals[i])

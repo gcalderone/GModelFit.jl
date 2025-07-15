@@ -312,7 +312,7 @@ function update_eval!(meval::ModelEval)
     end
     unfolded = meval.cevals[meval.seq[end]].tpar.buffer
     apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded, meval.IR.model_domain, unfolded)
-    return meval.IR.folded
+    return unfolded
 end
 
 function update_eval_ad!(meval::ModelEval)
@@ -322,7 +322,7 @@ function update_eval_ad!(meval::ModelEval)
     end
     unfolded = meval.cevals[meval.seq[end]].tparad.buffer
     apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded_ad, meval.IR.model_domain, unfolded)
-    return meval.IR.folded_ad
+    return unfolded
 end
 
 
@@ -351,6 +351,7 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 =#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
+last_eval_folded(meval::ModelEval) = meval.IR.folded
 
 
 # ====================================================================
@@ -438,6 +439,9 @@ last_eval(multi::MultiEval{1}) = last_eval(multi, 1)
 last_eval(multi::MultiEval{1}, cname::Symbol) = last_eval(multi, 1, cname)
 last_eval(multi::MultiEval, id::Int) = last_eval(multi.v[id])
 last_eval(multi::MultiEval, id::Int, cname::Symbol) = last_eval(multi.v[id], cname)
+
+last_eval_folded(multi::MultiEval{1}) = last_eval_folded(multi, 1)
+last_eval_folded(multi::MultiEval, id::Int) = last_eval_folded(multi.v[id])
 
 
 # ====================================================================

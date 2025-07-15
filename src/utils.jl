@@ -36,7 +36,7 @@ function mock(::Type{Measures}, multi::MultiEval; properr=0.01, rangeerr=0.05, a
     update_eval!(multi)
     out = Vector{Measures}()
     for i in 1:length(multi)
-        values = multi.v[i].IR.folded
+        values = last_eval_folded(multi, i)
         ee = extrema(values)
         range = ee[2] - ee[1]
         @assert range > 0
