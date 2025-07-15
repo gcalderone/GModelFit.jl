@@ -19,7 +19,7 @@ function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
                                             "with lines t '$(k)'"))
         end
     end
-    append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(),
+    append!(out, Gnuplot.parseSpecs(coords(folded_domain(model)), folded(model),
                                     "with lines t 'Model' lc rgb 'black' lw 2"))
     return out
 end

@@ -10,6 +10,7 @@ struct ModelSnapshot
     params::PVModel{Parameter}
     buffers::OrderedDict{Symbol, Vector{Float64}}
     maincomp::Symbol
+    folded_domain::AbstractDomain
     folded::Vector{Float64}
     comptypes::OrderedDict{Symbol, String}
     isfreezed::OrderedDict{Symbol, Bool}
@@ -25,7 +26,7 @@ function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     ModelSnapshot(deepcopy(meval.domain), deepcopy(bestfit),
                   OrderedDict([Pair(cname, ceval.tpar.buffer) for (cname, ceval) in meval.cevals]),
                   meval.seq[end],
-                  meval.IR.folded,
+                  meval.IR.data_domain, meval.IR.folded,
                   comptypes(meval.model),
                   OrderedDict([Pair(cname, isfreezed(meval.model, cname)) for cname in keys(meval.cevals)]),
                   deps, evalcounters(meval))
@@ -75,4 +76,5 @@ function getparams(comp::GModelFit.PV.PVComp{GModelFit.Parameter})
     return out
 end
 
+folded_domain(model::ModelSnapshot) = model.folded_domain
 folded(model::ModelSnapshot) = model.folded
