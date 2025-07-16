@@ -24,7 +24,6 @@ Besides the [Built-in components](@ref), the user may define any number of custo
 Optionally, the user may choose to extend also the following functions:
 - [`GModelFit.dependencies`](@ref): to specify the list of the component dependencies.  If not defined, the fallback method returns `Symbol[]`;
 - [`GModelFit.prepare!`](@ref): to pre-compute quantities depending on the evaluation domain.  If not defined, the fallback method does nothing;
-- [`GModelFit.result_length`](@ref): to specify the length of the output vector. This is used to pre-allocate the evaluation buffer.  If not defined, the fallback method returns the length of the domain.
 
 
 
@@ -32,7 +31,7 @@ The following example shows how to define a custom component and implement all o
 
 ```@example abc
 using GModelFit
-import GModelFit: prepare!, result_length, dependencies, evaluate!
+import GModelFit: prepare!, dependencies, evaluate!
 
 struct MyComponent <: GModelFit.AbstractComponent
     param1::GModelFit.Parameter
@@ -52,11 +51,6 @@ function prepare!(comp::MyComponent, domain::AbstractDomain)
     println(" -> call to prepare!()")
 end
 
-function result_length(comp::MyComponent, domain::AbstractDomain)
-    println(" -> call to result_length()")
-    return length(domain)
-end
-
 function evaluate!(comp::MyComponent, domain::AbstractDomain, output::Vector, param1)
     println(" -> call to evaluate!() with parameter value: ", param1)
     output .= param1
@@ -67,7 +61,7 @@ println() # hide
 
 
 !!! note
-    In the vast majority of cases there is no need to extend the `dependencies`, `prepare!` and `result_length` functions. The only mandatory implementaion is the one for `evaluate!`.
+    In the vast majority of cases there is no need to extend the `dependencies` and `prepare!` functions. The only mandatory implementaion is the one for `evaluate!`.
 
 
 ## Life cycle of a component
@@ -79,7 +73,6 @@ The life cycle of a component is as follows:
 1. In order to prepare the data structures for component evaluation the following functions are invoked:
    - `GModelFit.dependencies`;
    - `GModelFit.prepare!`;
-   - `GModelFit.result_length`;
 
 1. Finally the `GModelFit.evaluate!` method is invoked to actually evaluate the component.
 
@@ -119,7 +112,7 @@ model(dom)
 nothing  # hide
 ```
 
-Finally, when fitting a model the `prepare!` and `result_length` are invoked only once.  The `dependencies` function is invoked a number of times to create the internal data structures, while `evaluate!` is invoked each time the solver needs to probe the model on a specific set of parameter values:
+Finally, when fitting a model the `prepare!` is invoked only once.  The `dependencies` function is invoked a number of times to create the internal data structures, while `evaluate!` is invoked each time the solver needs to probe the model on a specific set of parameter values:
 ```@example abc
 bestfit, fsumm = fit(model, Measures(dom, [9., 9., 9., 9.], 1.))
 nothing  # hide
@@ -146,7 +139,7 @@ println() # hide
 The following example shows how to implement a component which interpolates a theoretical model onto a specific empirical domain, with the only parameter being a global scaling factor:
 ```@example abc
 using GModelFit, Interpolations
-import GModelFit: prepare!, result_length, evaluate!
+import GModelFit: prepare!, evaluate!
 
 # Define the component structure and constructor
 struct Interpolator <: GModelFit.AbstractComponent
@@ -171,8 +164,6 @@ function prepare!(comp::Interpolator, domain::AbstractDomain{1})
     append!(comp.interp_y, itp(coords(domain)))
 end
 
-result_length(comp::Interpolator, domain::AbstractDomain{1}) = length(domain)
-
 # Component evaluation (apply scaling factor)
 function evaluate!(comp::Interpolator, ::AbstractDomain{1}, output,
                    scale)
@@ -188,6 +179,6 @@ model = Model(:theory => Interpolator(theory_x, theory_y),
               :main => SumReducer(:theory, :background))
 
 data = Measures(Domain(obs_x), obs_y, 0.2)
-bestfit, stats = fit(model, data)
-show((bestfit, stats)) # hide
+bestfit, fsumm = fit(model, data)
+show((bestfit, fsumm)) # hide
 ```

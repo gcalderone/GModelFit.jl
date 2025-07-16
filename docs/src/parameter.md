@@ -72,8 +72,8 @@ We can fit the model against a mock dataset (see [Generate mock datasets](@ref))
 ```@example abc
 dom = Domain(0:0.1:5)
 data = GModelFit.mock(Measures, model, dom)
-bestfit, stats = fit(model, data)
-show((bestfit, stats)) # hide
+bestfit, fsumm = fit(model, data)
+show((bestfit, fsumm)) # hide
 ```
 and plot the results with [Gnuplot.jl](https://github.com/gcalderone/Gnuplot.jl):
 ```@example abc

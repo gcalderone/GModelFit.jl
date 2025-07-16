@@ -45,6 +45,6 @@ GModelFit.dependencies
 GModelFit.evaluate!
 GModelFit.mock
 GModelFit.prepare!
-GModelFit.result_length
 GModelFit.serialize
+GModelFit.set_IR!
 ```
