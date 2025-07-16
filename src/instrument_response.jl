@@ -1,5 +1,3 @@
-import ForwardDiff: Dual
-
 # ====================================================================
 # Instrument Response
 #
@@ -20,6 +18,21 @@ struct IREval{T <: AbstractInstrumentResponse, TDomain <: AbstractDomain}
                                Vector{Union{Dual, Float64}}(undef, length(data_domain)))
     end
 end
+
+apply_ir!(ireval::IREval, unfolded::Vector{Float64}) =
+    apply_ir!(ireval.IR, ireval.data_domain, ireval.folded   , ireval.model_domain, unfolded)
+
+apply_ir!(ireval::IREval, unfolded::Vector) =
+    apply_ir!(ireval.IR, ireval.data_domain, ireval.folded_ad, ireval.model_domain, unfolded)
+
+
+function fold_model(ireval::IREval, unfolded::Vector{Float64})
+    folded = deepcopy(ireval.folded)
+    apply_ir!(ireval.IR, ireval.data_domain, folded, ireval.model_domain, unfolded)
+    return folded
+end
+
+last_eval_folded(ireval::IREval) = ireval.folded
 
 
 # ====================================================================

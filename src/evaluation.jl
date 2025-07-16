@@ -1,5 +1,3 @@
-import ForwardDiff: Dual
-
 mutable struct CompEvalT{T <: Real}
     counter::Int
     lastparvalues::Vector{Union{T, Float64}}
@@ -32,7 +30,7 @@ mutable struct CompEval{TComp <: AbstractComponent, TDomain <: AbstractDomain}
     function CompEval(comp::AbstractComponent, domain::AbstractDomain)
         prepare!(comp, domain)
         npar = length(getparams(comp))
-        nres = result_length(comp, domain)
+        nres = length(domain)
         return new{typeof(comp), typeof(domain)}(
             comp, domain,
             CompEvalT{Float64}(npar, nres),
@@ -311,7 +309,7 @@ function update_eval!(meval::ModelEval)
         update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
     end
     unfolded = meval.cevals[meval.seq[end]].tpar.buffer
-    apply_ir!(meval.ireval.IR, meval.ireval.data_domain, meval.ireval.folded, meval.ireval.model_domain, unfolded)
+    apply_ir!(meval.ireval, unfolded)
     return unfolded
 end
 
@@ -321,7 +319,7 @@ function update_eval_ad!(meval::ModelEval)
         update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
     end
     unfolded = meval.cevals[meval.seq[end]].tparad.buffer
-    apply_ir!(meval.ireval.IR, meval.ireval.data_domain, meval.ireval.folded_ad, meval.ireval.model_domain, unfolded)
+    apply_ir!(meval.ireval, unfolded)
     return unfolded
 end
 
@@ -351,7 +349,8 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 =#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
-last_eval_folded(meval::ModelEval) = meval.ireval.folded
+last_eval_folded(meval::ModelEval) = last_eval_folded(meval.ireval)
+fold_model(meval::ModelEval, cname::Symbol) = fold_model(meval.ireval, meval.cevals[cname].tpar.buffer)
 
 
 # ====================================================================
@@ -442,6 +441,9 @@ last_eval(multi::MultiEval, id::Int, cname::Symbol) = last_eval(multi.v[id], cna
 
 last_eval_folded(multi::MultiEval{1}) = last_eval_folded(multi, 1)
 last_eval_folded(multi::MultiEval, id::Int) = last_eval_folded(multi.v[id])
+
+fold_model(multi::MultiEval{1}, cname::Symbol) = fold_model(multi, 1, cname)
+fold_model(multi::MultiEval, id::Int, cname::Symbol) = fold_model(multi.v[id], cname)
 
 
 # ====================================================================

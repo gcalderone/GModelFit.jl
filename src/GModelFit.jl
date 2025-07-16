@@ -25,6 +25,8 @@ import Base.values
 import Base.push!
 import Base.empty!
 
+import ForwardDiff: Dual
+
 export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
     Model, @fd, SumReducer, domain, comptype, comptypes,
     isfreezed, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
@@ -172,14 +174,6 @@ Allow to precompute component-specific quantities
 This function is invoked only once when the component is first evaluated hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
 """
 prepare!(comp::AbstractComponent, domain::AbstractDomain) = nothing
-
-
-"""
-    result_length(comp::AbstractComponent, domain::AbstractDomain)
-
-Return the length of the component result vector.
-"""
-result_length(comp::AbstractComponent, domain::AbstractDomain) = length(domain)
 
 
 """
