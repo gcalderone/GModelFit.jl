@@ -17,6 +17,7 @@ It provides the basic tools to define, interactively manipulate and efficiently 
 - all components results are cached so that repeated evaluations with the same parameter values do not involve further calculations (memoization);
 - model parameters can be fixed to a specific value, limited in an interval, and/or be dynamically linked (patched) to the values of other parameters (see [Parameter constraints](@ref));
 - multiple data sets can be fitted simultaneously against different models whose parameters can be patched (see [Multi-dataset fitting](@ref));
+- it supports specifying an [Instrument response](@ref) to convert model evalutions into a form suitable to be compared to empirical data;
 - it supports different solvers ([LsqFit](https://julianlsolvers.github.io/LsqFit.jl/latest/), [CMPFit](https://github.com/gcalderone/CMPFit.jl) and [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/)), all aimed to carry out [non-linear least squares](https://en.wikipedia.org/wiki/Non-linear_least_squares) minimization (see [Solvers](@ref));
 - it supports forward mode automatic differentiation (AD) of models via [ForwardDiff](https://juliadiff.org/ForwardDiff.jl/stable);
 - it provides facilities for interactive fitting and quick plotting (see [Quick plot (1D)](@ref)).

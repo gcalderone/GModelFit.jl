@@ -36,6 +36,13 @@ last_eval_folded(ireval::IREval) = ireval.folded
 
 
 # ====================================================================
+"""
+    IdealInstrument
+
+An instrument response representing an ideal instrument, for which unfolded and folded models are identical.
+
+This structure has no fields.
+"""
 struct IdealInstrument <: AbstractInstrumentResponse
 end
 

@@ -39,6 +39,7 @@ The following symbols are not exported by the **GModelFit.jl** package since the
 ```@docs
 GModelFit.FitSummary
 GModelFit.FunctDesc
+GModelFit.IdealInstrument
 GModelFit.ModelSnapshot
 GModelFit.Parameter
 GModelFit.dependencies

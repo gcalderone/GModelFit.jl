@@ -453,7 +453,9 @@ end
 """
     set_IR!(model::Model, IR::AbstractInstrumentResponse)
 
-Force a component to be the final one for model evaluation.
+Set a model to use the instrument response passed as argument.
+
+If this method is not involed the GModelFit.IdealInstrument response will be used.
 """
 function set_IR!(model::Model, IR::AbstractInstrumentResponse)
     model.IR = IR
