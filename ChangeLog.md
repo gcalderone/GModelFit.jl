@@ -1,3 +1,8 @@
+# Version 0.6.0
+	* GModelFit now allows to use an instrument response to convert a model evaluation into a form suitable to be comapred to empirical data;
+
+    * The `result_length` method is no longer available: all components must return a vector with the same length as the model domain;
+
 # Version 0.5.4
 	* Fixed a bug occurring when, in a multi-model fit scenario, one of the model had no free parameters.
 

@@ -11,7 +11,6 @@ function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
     @assert ndims(domain(model)) == 1
     out = Vector{Gnuplot.AbstractGPSpec}()
     for (k,v) in model.buffers
-        (k == model.maincomp)  &&  continue
         (k in skip)  &&  continue
         if (length(keep) == 0)  ||  (k in keep)
             #isa(v.comp, GModelFit.FComp)  ||  isa(v.comp, GModelFit.SumReducer)  ||  continue
