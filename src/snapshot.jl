@@ -26,7 +26,7 @@ function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     ModelSnapshot(deepcopy(meval.domain), deepcopy(bestfit),
                   OrderedDict([Pair(cname, ceval.tpar.buffer) for (cname, ceval) in meval.cevals]),
                   meval.seq[end],
-                  meval.ireval.data_domain, meval.ireval.folded,
+                  meval.ireval.folded_domain, meval.ireval.folded,
                   comptypes(meval.model),
                   OrderedDict([Pair(cname, isfreezed(meval.model, cname)) for cname in keys(meval.cevals)]),
                   deps, evalcounters(meval))
