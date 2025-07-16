@@ -137,7 +137,7 @@ struct ModelEval
     tpar::ModelEvalT{Float64}
     tparad::ModelEvalT{Dual}
     seq::Vector{Symbol}
-    IR::IREval
+    ireval::IREval
 
     function ModelEval(model::Model, data_domain::AbstractDomain)
         ireval = IREval(model.IR, data_domain)
@@ -311,7 +311,7 @@ function update_eval!(meval::ModelEval)
         update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
     end
     unfolded = meval.cevals[meval.seq[end]].tpar.buffer
-    apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded, meval.IR.model_domain, unfolded)
+    apply_ir!(meval.ireval.IR, meval.ireval.data_domain, meval.ireval.folded, meval.ireval.model_domain, unfolded)
     return unfolded
 end
 
@@ -321,7 +321,7 @@ function update_eval_ad!(meval::ModelEval)
         update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
     end
     unfolded = meval.cevals[meval.seq[end]].tparad.buffer
-    apply_ir!(meval.IR.IR, meval.IR.data_domain, meval.IR.folded_ad, meval.IR.model_domain, unfolded)
+    apply_ir!(meval.ireval.IR, meval.ireval.data_domain, meval.ireval.folded_ad, meval.ireval.model_domain, unfolded)
     return unfolded
 end
 
@@ -351,7 +351,7 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 =#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].tpar.buffer
-last_eval_folded(meval::ModelEval) = meval.IR.folded
+last_eval_folded(meval::ModelEval) = meval.ireval.folded
 
 
 # ====================================================================
