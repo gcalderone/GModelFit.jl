@@ -5,10 +5,6 @@
 
 `GModelFit` is a general purpose, data-driven model fitting framework for Julia.
 
-> [!WARNING]
-> Breaking changes: The code in version 0.5.0 underwent a signficant refactoring, and a few details may break your code.
-> **Please have a look at ChangeLog.md !!**
-
 ## Installation
 
 Install with:
