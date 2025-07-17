@@ -139,7 +139,7 @@ struct ModelEval
 
     function ModelEval(model::Model, data_domain::AbstractDomain)
         ireval = IREval(model.IR, data_domain)
-        domain = ireval.unfolded_domain
+        domain = unfolded_domain(ireval)
         meval = new(model, domain, OrderedDict{Symbol, CompEval}(),
                     Vector{Int}(), Vector{NTuple{2, Symbol}}(),
                     ModelEvalT{Float64}(), ModelEvalT{Dual}(),

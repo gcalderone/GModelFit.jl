@@ -42,7 +42,7 @@ function mock(::Type{Measures}, multi::MultiEval; properr=0.01, rangeerr=0.05, a
         @assert range > 0
         err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
         values .+= err .* randn(MersenneTwister(seed), size(values))
-        push!(out, Measures(multi.v[i].domain, values, err))
+        push!(out, Measures(folded_domain(multi.v[i].ireval), values, err))
     end
     return out
 end

@@ -169,9 +169,9 @@ end
 """
     prepare!(comp::AbstractComponent, domain::AbstractDomain)
 
-Allow to precompute component-specific quantities
+Invoked to precompute component-specific quantities
 
-This function is invoked only once when the component is first evaluated hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
+This method is invoked only once when the component is first evaluated hence it is the perfect place to pre-compute quantities associated to a component evaluation on a specific domain.
 """
 prepare!(comp::AbstractComponent, domain::AbstractDomain) = nothing
 
@@ -455,7 +455,7 @@ end
 
 Set a model to use the instrument response passed as argument.
 
-If this method is not involed the GModelFit.IdealInstrument response will be used.
+If this method is not invoked the GModelFit.IdealInstrument response will be used.
 """
 function set_IR!(model::Model, IR::AbstractInstrumentResponse)
     model.IR = IR
