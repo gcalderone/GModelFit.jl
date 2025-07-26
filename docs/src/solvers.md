@@ -31,14 +31,11 @@ bestfit, fsumm = fit(model, data, cmpfit())
 or
 ```@example abc
 using NonlinearSolve
-bestfit, fsumm = fit(model, data, NewtonRaphson())
+bestfit, fsumm = fit(model, data, LevenbergMarquardt())
 ```
 
-The above solvers typically provide the same results, although in some complex case the results may differ.
-
-!!! warning
-    Unlike LsqFit and CMPFIT, the solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
-
+The above solvers typically provide the same results, although in some complex case the results may differ. Generally `lsqfit` is not recommeended
+due to numerical issues in the implementation which cause squaring of the condition number and thus divergence in cases where the Jacobian is ill-conditioned
 
 ## The `cmpfit()` solver
 
