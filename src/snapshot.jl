@@ -53,7 +53,7 @@ comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
 comptypes(model::ModelSnapshot) = model.comptypes
 Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.buffers, name)
 function Base.getindex(model::ModelSnapshot, name::Symbol)
-    @assert name in keys(model.buffers)
+    @assert name in keys(model.buffers) "$name is not a key in model.buffers"
     if name in keys(model.params)
         return model.params[name]
     end

@@ -43,9 +43,11 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
                 par = deepcopy(_par)
                 par.val    = meval.tpar.pvalues[cname][pname]
                 par.actual = meval.tpar.pactual[cname][pname]
+                par.unc = NaN
                 push!(fitprob.bestfit[id], cname, pname, par)
                 if length(fitprob.bestfit[id].data) in meval.ifree
                     par.unc = puncerts[i1:i2][i]
+                    (par.unc == 0)  &&  (par.unc = NaN)
                     par.fixed = false
                     i += 1
                 else
