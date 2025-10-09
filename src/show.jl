@@ -1,32 +1,45 @@
 mutable struct ShowSettings
     plain::Bool
-    tableformat::TextFormat
+    tableborders::TextTableBorders
     floatformat::String
     showfixed::Bool
     border::Crayon
     header::Crayon
-    subheader::Crayon
     fixed::Crayon
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    ShowSettings() = new(false, tf_unicode_rounded, "%9.4g", true,
-                         crayon"light_blue", crayon"light_blue negative bold",
-                         crayon"dark_gray bold", crayon"dark_gray",
+    ShowSettings() = new(false, text_table_borders__unicode_rounded, "%9.4g", true,
+                         crayon"light_blue",
+                         crayon"light_blue negative bold", crayon"dark_gray",
                          crayon"light_red", crayon"negative", crayon"green bold")
 end
 
 const showsettings = ShowSettings()
 
-function printtable(io, table, header, args...; formatters=(), hlines=:none, kw...)
+function printtable(io, table, header; formatters=[], hlines=:none, kws...)
+    common = pairs((column_labels=header,
+                    formatters=formatters,
+                    alignment=:l,
+                    column_label_alignment=:c,
+                    limit_printing=false,
+                    compact_printing=false,
+                    fit_table_in_display_horizontally=false,
+                    fit_table_in_display_vertically=false,
+                    maximum_number_of_columns=-1,
+                    maximum_number_of_rows=-1))
     if showsettings.plain
-        pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=tf_compact, hlines=hlines,
-                     highlighters=())
+        kws = pairs((table_format=TextTableFormat(borders=text_table_borders__compact,
+                                                  horizontal_lines_at_data_rows=hlines),
+                     common...))
     else
-        pretty_table(io, table; header=header, formatters=formatters, alignment=:l, crop=:none, tf=showsettings.tableformat, hlines=hlines,
-                     border_crayon=showsettings.border, header_crayon=showsettings.header, subheader_crayon=showsettings.subheader,
-                     kw...)
+        kws = pairs((table_format=TextTableFormat(borders=showsettings.tableborders,
+                                                  horizontal_lines_at_data_rows=hlines),
+                     style=TextTableStyle(table_border=showsettings.border,
+                                          first_line_column_label=showsettings.header),
+                     common..., kws...))
     end
+    pretty_table(io, table; kws...)
 end
 
 function section(io, args...; newline=true)
@@ -41,8 +54,6 @@ end
 
 function show(io::IO, dom::AbstractDomain)
     section(io, string(typeof(dom)) * " (ndims: ", ndims(dom), ", length: ", length(dom), ")")
-    hrule = Vector{Int}()
-    push!(hrule, 0, 1, ndims(dom)+1)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
         if isa(dom, CartesianDomain)
@@ -60,15 +71,13 @@ function show(io::IO, dom::AbstractDomain)
         table[i, 3:6] = [minimum(vv), maximum(vv), minimum(steps), maximum(steps)]
     end
     printtable(io, table, ["Dim", "Length", "Min val", "Max val", "Min step", "Max step"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 3:6))
+               formatters=[fmt__printf(showsettings.floatformat, 3:6)])
 end
 
 
 function show(io::IO, data::AbstractMeasures)
     section(io, typeof(data), ": (length: ", (length(data)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
-    hrule = Vector{Int}()
-    push!(hrule, 0, 1)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
@@ -79,14 +88,13 @@ function show(io::IO, data::AbstractMeasures)
         push!(error, nan > 0)
         table = vcat(table, [data.labels[i] minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
-    push!(hrule, 0, size(table)[1]+1)
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = Highlighter((data,i,j) -> error[i], showsettings.error)
+        highlighters = [TextHighlighter((data,i,j) -> error[i], showsettings.error)]
     end
     printtable(io, table, ["", "Min", "Max", "Mean", "Median", "Std. dev.", "Nan/Inf"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 2:6),
+               formatters=[fmt__printf(showsettings.floatformat, 2:6)],
                highlighters=highlighters)
 end
 
@@ -148,11 +156,11 @@ function show(io::IO, comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = (Highlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed),
-                        Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+        highlighters = [TextHighlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed),
+                        TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error)]
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               formatters=ft_printf(showsettings.floatformat, 5:7),
+               formatters=fmt__printf(showsettings.floatformat, 5:7),
                highlighters=highlighters)
 end
 
@@ -234,17 +242,15 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = Highlighter((data,i,j) -> fixed[i], showsettings.fixed)
+        highlighters = [TextHighlighter((data,i,j) -> fixed[i], showsettings.fixed)]
     end
     if !isa(model, Model)
         printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-                   hlines=[0,1, size(table)[1]+1],
-                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   formatters=[fmt__printf(showsettings.floatformat, 5:7)],
                    highlighters=highlighters)
     else
         printtable(io, table[:, 1:3], ["Component", "Type", "#Free"],
-                   hlines=[0,1, size(table)[1]+1],
-                   formatters=ft_printf(showsettings.floatformat, 5:7),
+                   formatters=[fmt__printf(showsettings.floatformat, 5:7)],
                    highlighters=highlighters)
     end
     println(io)
@@ -256,7 +262,6 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
     fixed = Vector{Bool}()
     warns = Vector{Bool}()
     hrule = Vector{Int}()
-    push!(hrule, 0, 1)
     for cname in keys(model)
         comp = model[cname]
         (t, f, w) = preparetable(comp,
@@ -266,21 +271,21 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
         table = vcat(table, t)
         append!(fixed, f .| isfreezed(model, cname))
         append!(warns, w)
-        push!(hrule, length(fixed)+1)
+        (length(fixed) > 0)  &&  push!(hrule, length(fixed))
     end
 
     if showsettings.plain
         highlighters = nothing
     else
         if !isa(model, Model)
-            highlighters = (Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
-                            Highlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error))
+            highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                            TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error)]
         else
-            highlighters = Highlighter((data,i,j) -> (fixed[i]), showsettings.fixed)
+            highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed)]
         end
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               hlines=hrule, formatters=ft_printf(showsettings.floatformat, 5:7),
+               hlines=hrule, formatters=[fmt__printf(showsettings.floatformat, 5:7)],
                highlighters=highlighters)
 end
 
