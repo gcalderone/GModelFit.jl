@@ -1,3 +1,6 @@
+# Version 0.7.0
+	* Updated dependency versions;
+
 # Version 0.6.0
 	* GModelFit now supports the use of an instrument response to convert a model evaluation into a form suitable to be comapred to empirical data;
 
