@@ -1,7 +1,7 @@
 name = "GModelFit"
 uuid = "ac42e6ba-c0bf-4fcf-827d-deea44b16255"
 authors = ["Giorgio Calderone <giorgio.calderone@gmail.com>"]
-version = "0.6.1"
+version = "0.7.0"
 
 [deps]
 CMPFit = "a5944310-3432-5d93-8bb2-e3b5eb62a58f"
@@ -24,15 +24,15 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 CMPFit = "0.3"
-DataStructures = "0.18"
-ForwardDiff = "1.0.1"
+DataStructures = "0.19"
+ForwardDiff = "1.2"
 GZip = "0.5, 0.6"
 Gnuplot = "1.6"
-JSON = "0.21"
-LsqFit = "0.13, 0.14, 0.15"
+JSON = "1.1"
+LsqFit = "0.14, 0.15"
 MacroTools = "0.5"
 NonlinearSolve = "4.9"
 PrecompileTools = "1.2"
-PrettyTables = "2.4"
+PrettyTables = "3.1"
 ProgressMeter = "1.10"
-julia = "1.8"
+julia = "1.11"
