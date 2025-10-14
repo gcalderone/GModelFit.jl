@@ -1,6 +1,8 @@
 # Version 0.7.0
 	* Updated dependency versions;
 
+	* Changed the GModelFit.ShowSettings structure to reflects changes in PrettyTables.jl;
+
 # Version 0.6.0
 	* GModelFit now supports the use of an instrument response to convert a model evaluation into a form suitable to be comapred to empirical data;
 
