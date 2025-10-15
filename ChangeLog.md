@@ -1,3 +1,6 @@
+# Version 0.7.1
+	* Bugfix;
+
 # Version 0.7.0
 	* Updated dependency versions;
 

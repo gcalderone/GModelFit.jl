@@ -160,7 +160,7 @@ function show(io::IO, comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
                         TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error)]
     end
     printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               formatters=fmt__printf(showsettings.floatformat, 5:7),
+               formatters=[fmt__printf(showsettings.floatformat, 5:7)],
                highlighters=highlighters)
 end
 
