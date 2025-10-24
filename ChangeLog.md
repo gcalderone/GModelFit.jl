@@ -1,3 +1,6 @@
+# Version 0.7.2
+	* Bugfix;
+
 # Version 0.7.1
 	* Bugfix;
 

@@ -158,7 +158,7 @@ function solve!(fitprob::FitProblem, solver::cmpfit)
         if (solver_retval.status == 5)
             Δfitstat = (last_fitstat - solver_retval.bestnorm) / last_fitstat
             if Δfitstat > solver.ftol_after_maxiter
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(capture.ftol_after_maxiter), continue minimization...\n")
+                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(solver.ftol_after_maxiter), continue minimization...\n")
                 last_fitstat = solver_retval.bestnorm
                 guess = getfield.(Ref(solver_retval), :param)
                 continue
