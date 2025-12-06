@@ -1,3 +1,17 @@
+struct ComponentSnapshot
+    comptype::String
+    isfreezed::Bool
+    deps::Vector{Symbol}
+    evalcounter::Int
+    params::OrderedDict{Symbol, Parameter}
+    buffer::Vector{Float64}
+end
+getproperty(comp::ComponentSnapshot, name::Symbol) = getfield(comp, :params)[name]
+getindex(comp::ComponentSnapshot, name::Symbol)    = getfield(comp, :params)[name]
+propertynames(comp::ComponentSnapshot) = collect(keys(getfield(comp, :params)))
+
+getparams(comp::ComponentSnapshot) = getfield(comp, :params)
+
 """
     ModelSnapshot
 
@@ -7,35 +21,34 @@ The best fit model and parameter values returned by the `fit()` function are pro
 """
 struct ModelSnapshot
     domain::AbstractDomain
-    params::PVModel{Parameter}
-    buffers::OrderedDict{Symbol, Vector{Float64}}
+    comps::OrderedDict{Symbol, ComponentSnapshot}
     maincomp::Symbol
     folded_domain::AbstractDomain
     folded::Vector{Float64}
-    comptypes::OrderedDict{Symbol, String}
-    isfreezed::OrderedDict{Symbol, Bool}
-    deps::OrderedDict{Symbol, Vector{Symbol}}
-    evalcounters::OrderedDict{Symbol, Int}
 end
 function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
-    deps = OrderedDict{Symbol, Vector{Symbol}}()
+    comps = OrderedDict{Symbol, ComponentSnapshot}()
     for cname in keys(meval.cevals)
-        deps[cname] = dependencies(meval.model, cname)
+        params = OrderedDict{Symbol, Parameter}()
+        for (pname, par) in bestfit[cname]
+            params[pname] = par
+        end
+        comps[cname] = ComponentSnapshot(comptype(meval.model, cname),
+                                         isfreezed(meval.model, cname),
+                                         dependencies(meval.model, cname),
+                                         evalcounter(meval, cname),
+                                         params,
+                                         meval.cevals[cname].tpar.buffer)
     end
 
-    ModelSnapshot(deepcopy(meval.domain), deepcopy(bestfit),
-                  OrderedDict([Pair(cname, ceval.tpar.buffer) for (cname, ceval) in meval.cevals]),
-                  meval.seq[end],
-                  meval.ireval.folded_domain, meval.ireval.folded,
-                  comptypes(meval.model),
-                  OrderedDict([Pair(cname, isfreezed(meval.model, cname)) for cname in keys(meval.cevals)]),
-                  deps, evalcounters(meval))
+    ModelSnapshot(deepcopy(meval.domain), comps,
+                  meval.seq[end], meval.ireval.folded_domain, meval.ireval.folded)
 end
 
 domain(model::ModelSnapshot) = model.domain
-Base.keys(model::ModelSnapshot) = collect(keys(model.buffers))
-(model::ModelSnapshot)() = reshape(domain(model), model.buffers[model.maincomp])
-(model::ModelSnapshot)(name::Symbol) = reshape(domain(model), model.buffers[name])
+Base.keys(model::ModelSnapshot) = collect(keys(model.comps))
+(model::ModelSnapshot)() = model(model.maincomp)
+
 function deptree(model::ModelSnapshot)
     function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
         out = DependencyNode(cname, level, parent)
@@ -46,21 +59,14 @@ function deptree(model::ModelSnapshot)
     end
     return deptree(model, model.maincomp, 1, nothing)
 end
-isfreezed(model::ModelSnapshot, cname::Symbol) = model.isfreezed[cname]
-dependencies(model::ModelSnapshot, cname::Symbol) = model.deps[cname]
-evalcounter(model::ModelSnapshot, cname::Symbol) = model.evalcounters[cname]
-comptype(model::ModelSnapshot, cname::Symbol) = model.comptypes[cname]
-comptypes(model::ModelSnapshot) = model.comptypes
-Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.buffers, name)
+
+Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.comps, name)
 function Base.getindex(model::ModelSnapshot, name::Symbol)
-    @assert name in keys(model.buffers) "$name is not a key in model.buffers"
-    if name in keys(model.params)
-        return model.params[name]
-    end
-    return PVComp(model.params)
+    @assert name in keys(model.comps) "$name is not a component in the model"
+    return model.comps[name]
 end
 
-Base.length(model::ModelSnapshot) = length(model.buffers)
+Base.length(model::ModelSnapshot) = length(model.comps)
 
 function iterate(model::ModelSnapshot, i=1)
     k = collect(keys(model))
@@ -68,13 +74,12 @@ function iterate(model::ModelSnapshot, i=1)
     return (k[i] => model[k[i]], i+1)
 end
 
-function getparams(comp::GModelFit.PV.PVComp{GModelFit.Parameter})
-    out = OrderedDict{Symbol, Parameter}()
-    for pname in propertynames(comp)
-        out[pname] = getproperty(comp, pname)
-    end
-    return out
-end
+(model::ModelSnapshot)(cname::Symbol) = reshape(domain(model), getfield(model.comps[cname], :buffer))
+isfreezed(model::ModelSnapshot, cname::Symbol) =               getfield(model.comps[cname], :isfreezed)
+dependencies(model::ModelSnapshot, cname::Symbol) =            getfield(model.comps[cname], :deps)
+evalcounter(model::ModelSnapshot, cname::Symbol) =             getfield(model.comps[cname], :evalcounter)
+comptype(model::ModelSnapshot, cname::Symbol) =                getfield(model.comps[cname], :comptype)
+
 
 folded_domain(model::ModelSnapshot) = model.folded_domain
 folded(model::ModelSnapshot) = model.folded

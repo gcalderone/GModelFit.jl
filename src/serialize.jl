@@ -41,13 +41,12 @@ function _serialize_struct(vv; add_show=false)
     return out
 end
 
-_serialize(vv::PV.PVComp) = _serialize_struct(vv)
-_serialize(vv::PV.PVModel) = _serialize_struct(vv)
 _serialize(vv::Parameter) = _serialize_struct(vv)
 _serialize(vv::FunctDesc) = _serialize_struct(vv)
 
 drop_solver_retval(s::FitSummary) = FitSummary(s.start, s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing)
 _serialize(vv::FitSummary) = _serialize_struct(drop_solver_retval(vv), add_show=true)
+_serialize(vv::ComponentSnapshot) = _serialize_struct(vv, add_show=false)
 _serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractSolverStatus) = _serialize_struct(vv, add_show=true)
 _serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
@@ -151,17 +150,6 @@ end
 
 
 
-function _deserialize(::Val{Symbol("GModelFit.PV.PVComp")}, dd::AbstractDict)
-    @assert !isnothing(findfirst("{GModelFit.Parameter}", dd["_structtype_str"]))
-    PVComp{Parameter}(_deserialize(dd["pnames"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
-end
-
-function _deserialize(::Val{Symbol("GModelFit.PV.PVModel")}, dd::AbstractDict)
-    @assert !isnothing(findfirst("{GModelFit.Parameter}", dd["_structtype_str"]))
-    PVModel{Parameter}(_deserialize(dd["comps"]), _deserialize(dd["indices"]), _deserialize(dd["data"]))
-end
-
-
 function deserialized_function(args...)
     @warn "Can't evaluate a deserialized function"
     nothing
@@ -185,17 +173,20 @@ _deserialize(::Val{Symbol("GModelFit.Parameter")},
                            _deserialize(dd["actual"]),
                            _deserialize(dd["unc"]))
 
+_deserialize(::Val{Symbol("GModelFit.ComponentSnapshot")},
+             dd::AbstractDict) = ComponentSnapshot(_deserialize(dd["comptype"]),
+                                                   _deserialize(dd["isfreezed"]),
+                                                   _deserialize(dd["deps"]),
+                                                   _deserialize(dd["evalcounter"]),
+                                                   _deserialize(dd["params"]),
+                                                   _deserialize(dd["buffer"]))
+
 _deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
              dd::AbstractDict) = ModelSnapshot(_deserialize(dd["domain"]),
-                                               _deserialize(dd["params"]),
-                                               _deserialize(dd["buffers"]),
+                                               _deserialize(dd["comps"]),
                                                _deserialize(dd["maincomp"]),
                                                _deserialize(dd["folded_domain"]),
-                                               _deserialize(dd["folded"]),
-                                               _deserialize(dd["comptypes"]),
-                                               _deserialize(dd["isfreezed"]),
-                                               _deserialize(dd["deps"]),
-                                               _deserialize(dd["evalcounters"]))
+                                               _deserialize(dd["folded"]))
 
 _deserialize(::Val{Symbol("GModelFit.Solvers.FitSummary")},
              dd::AbstractDict) =

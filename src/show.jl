@@ -114,7 +114,7 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}};
+function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}, GModelFit.ComponentSnapshot};
                       cname::String="?", ctype="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
