@@ -1,66 +1,55 @@
-#=
-Serialization methods: output must be suitable to be stored in a file using the JSON format.
-=#
-_serialize(::Nothing) = nothing
-_serialize(::Function) = nothing
-_serialize(v::Expr) = "_TE_" * string(v)
-_serialize(v::Date) = "_TD_" * string(v)
-_serialize(v::DateTime) = "_TDT" * string(v)
-_serialize(v::String) = v
-_serialize(v::Symbol) = "_TS_" * string(v)
-_serialize(v::AbstractVector) = _serialize.(v)
-_serialize(v::Tuple) = [_serialize.(v)...]
-_serialize(v::Number) = (isnan(v)  ||  isinf(v)  ?  "_TN_" * string(v)  :  v)
+JSONDict(meta::String, obj=nothing) = Dict("meta" => meta, "obj" => obj)
 
-function _serialize(vv::AbstractDict{Symbol,T}) where {T <: Any}
-    out = OrderedDict{String, Any}()
-    for (key, val) in vv
-        out[String(key)] = _serialize(val)
-    end
-    return out
-end
-
-function _serialize_struct(vv; add_show=false)
-    out = OrderedDict{String, Any}()
-    out["_structtype"] = string(parentmodule(typeof(vv))) * "." * string(nameof(typeof(vv)))
-    out["_structtype_str"] = string(typeof(vv))
-    for field in fieldnames(typeof(vv))
-        ff = getfield(vv, field)
-        out[String(field)] = _serialize(ff)
-    end
-    if add_show
-        io = IOBuffer()
-        if showsettings.plain
-            show(io , vv)
+# Serialization methods: convert a Julia value into a type suitable to
+# be serialized using JSON.
+_serialize(::Nothing) = JSONDict("Nothing")
+_serialize(::Missing) = JSONDict("Missing")
+function _serialize(v::Number)
+    if isnan(v)
+        return JSONDict("NaN")
+    elseif isinf(v)
+        if v > 0
+            return JSONDict("+Inf")
         else
-            ctx = IOContext(io, :color => true)
-            show(ctx, vv)
+            return JSONDict("-Inf")
         end
-        out["show"] = String(take!(io))
     end
-    return out
+    return v
 end
 
-_serialize(vv::Parameter) = _serialize_struct(vv)
-_serialize(vv::FunctDesc) = _serialize_struct(vv)
+_serialize(v::Expr) = return JSONDict("Expr", string(v))
+_serialize(v::Date) = return JSONDict("Date", string(v))
+_serialize(v::DateTime) = return JSONDict("DateTime", string(v))
+_serialize(v::String) = v
+_serialize(v::Symbol) = return JSONDict("Symbol", string(v))
+_serialize(v::AbstractVector) = JSONDict("Vector", _serialize.(v))
+_serialize(v::Tuple) = JSONDict("Tuple", [_serialize.(v)...])
 
-drop_solver_retval(s::FitSummary) = FitSummary(s.start, s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing)
-_serialize(vv::FitSummary) = _serialize_struct(drop_solver_retval(vv), add_show=true)
-_serialize(vv::ComponentSnapshot) = _serialize_struct(vv, add_show=false)
-_serialize(vv::ModelSnapshot) = _serialize_struct(vv, add_show=true)
-_serialize(vv::AbstractSolverStatus) = _serialize_struct(vv, add_show=true)
-_serialize(vv::AbstractDomain) = _serialize_struct(vv, add_show=true)
-_serialize(vv::AbstractMeasures) = _serialize_struct(vv, add_show=true)
-
-
-_serialize(model::ModelSnapshot, summary::FitSummary                         ) = _serialize([model, summary])
-_serialize(model::ModelSnapshot, summary::FitSummary, data::AbstractMeasures ) = _serialize([model, summary, data])
-_serialize(multi::Vector{Model        }                                      ) = _serialize(ModelSnapshot.(multi))
-_serialize(multi::Vector{ModelSnapshot}, summary::FitSummary                 ) = _serialize([multi, summary])
-function _serialize(multi::Vector{ModelSnapshot}, summary::FitSummary, data::Vector{T}) where T <: AbstractMeasures
-    @assert length(multi) == length(data)
-    _serialize([multi, summary, data])
+function _serialize(dict::OrderedDict{Symbol,T}) where {T}
+    out = OrderedDict{String, Any}()
+    for (key, val) in dict
+        out[string(key)] = _serialize(val)
+    end
+    return JSONDict("OrderedDict{Symbol}", dict)
 end
+
+function _serialize_struct(str::T) where {T}
+    dict = OrderedDict{String, Any}()
+    for field in fieldnames(T)
+        ff = getfield(str, field)
+        dict[string(field)] = _serialize(ff)
+    end
+    return JSONDict(string(parentmodule(T)) * "." * string(nameof(T)), dict)
+end
+    
+function _serialize(str::T) where {T}
+    @assert isstructtype(T) "No _serialize() method defined for type $T"
+    return _serialize_struct(str)
+end
+
+# Can't serialize solver's status, replace it with nothing
+_serialize(s::FitSummary) =
+    _serialize_struct(FitSummary(s.start, s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing))
 
 
 """
@@ -95,7 +84,7 @@ using GModelFit
 ```
 """
 function serialize(filename::String, args...; compress=false)
-    data = _serialize(args...)
+    data = _serialize([args...])
     filename = ensure_file_extension(filename, "json")
     if compress
         filename = ensure_file_extension(filename, "gz")
@@ -103,52 +92,53 @@ function serialize(filename::String, args...; compress=false)
     else
         io = open(filename, "w")
     end
-    JSON.print(io, data)
+    JSON.json(io, data, allownan=true)
     close(io)
-
     return filename
 end
 
 
 # ====================================================================
-# Deserialization methods
-_deserialize(::Nothing) = nothing
-_deserialize(v::Number) = v
-function _deserialize(v::AbstractVector)
-    tmp = _deserialize.(v)
-    tt = unique(typeof.(tmp))
-    if length(tt) == 1
-        out = similar(tmp, tt[1])
-        out .= tmp
-    else
-        out = tmp
+# Deserialization methods: transform a JSON parsed value into its
+# original Julia value
+_deserialize(::Val{:Nothing}, obj) = nothing
+_deserialize(::Val{:Missing}, obj) = missing
+_deserialize(::Val{:NaN}, obj) = NaN
+_deserialize(::Val{Symbol("+Inf")}, obj) = +Inf
+_deserialize(::Val{Symbol("-Inf")}, obj) = -Inf
+_deserialize(::Val{:Expr}, obj) = Meta.parse(obj)
+_deserialize(::Val{:Date}, obj) = Date(obj)
+_deserialize(::Val{:DateTime}, obj) = DateTime(obj)
+_deserialize(::Val{:Symbol}, obj) = Symbol(obj)
+_deserialize(v) = v  # catch all
+
+function _deserialize(::Val{:Vector}, v)
+    out = _deserialize.(v)
+    @assert length(unique(typeof.(out))) == 1
+    return out
+end
+
+_deserialize(::Val{:Tuple}, obj) = tuple(_deserialize.(obj)...)
+
+function _deserialize(::Val{Symbol("OrderedDict{Symbol}")}, dict::OrderedDict{K,V}) where {K,V}
+    out = OrderedDict{Symbol, Any}()
+    for (key, obj) in dict
+        out[Symbol(key)] = _deserialize(obj)
     end
     return out
 end
 
-function _deserialize(v::String)
-    if length(v) > 4
-        magic = v[1:4]
-        if magic == "_TE_"
-            return Meta.parse(v)
-        elseif magic == "_TD_"
-            return Date(v[5:end])
-        elseif magic == "_TDT"
-            return DateTime(v[5:end])
-        elseif magic == "_TS_"
-            return Symbol(v[5:end])
-        elseif v == "_TN_Inf"
-            return +Inf
-        elseif v == "_TN_-Inf"
-            return -Inf
-        elseif v == "_TN_NaN"
-            return NaN
-        end
-    end
-    return v
+function _deserialize(dict::OrderedDict{String,V}) where {V}
+    @assert "meta" in keys(dict)
+    return _deserialize(Val(Symbol(dict["meta"])), dict["obj"])
 end
 
-
+_deserialize(::Val{Symbol("GModelFit.ModelSnapshot")}, dict::OrderedDict) = GModelFit.ModelSnapshot(_deserialize.(values(dict))...)
+_deserialize(::Val{Symbol("GModelFit.Domain")}, dict::OrderedDict) = Domain(_deserialize(dict["axis"])...)
+_deserialize(::Val{Symbol("GModelFit.CartesianDomain")}, dict::OrderedDict) = CartesianDomain(_deserialize(dict["axis"])..., roi=_deserialize(dict["roi"]))
+_deserialize(::Val{Symbol("GModelFit.Parameter")}, dict::OrderedDict) = GModelFit.Parameter(_deserialize.(values(dict))...)
+_deserialize(::Val{Symbol("GModelFit.ComponentSnapshot")}, dict::OrderedDict) = GModelFit.ComponentSnapshot(_deserialize.(values(dict))...)
+_deserialize(::Val{Symbol("GModelFit.Solvers.FitSummary")}, dict::OrderedDict) = GModelFit.Solvers.FitSummary(_deserialize.(values(dict))...)
 
 function deserialized_function(args...)
     @warn "Can't evaluate a deserialized function"
@@ -156,90 +146,25 @@ function deserialized_function(args...)
 end
 
 _deserialize(::Val{Symbol("GModelFit.FunctDesc")},
-             dd::AbstractDict) =
+             dict::OrderedDict) =
                  FunctDesc(deserialized_function,
-                           _deserialize(dd["display"]),
-                           _deserialize(dd["args"]),
-                           _deserialize(dd["optargs"]))
+                           _deserialize(dict["display"]),
+                           _deserialize(dict["args"]),
+                           _deserialize(dict["optargs"]))
 
-_deserialize(::Val{Symbol("GModelFit.Parameter")},
-             dd::AbstractDict) =
-                 Parameter(_deserialize(dd["val"]),
-                           _deserialize(dd["low"]),
-                           _deserialize(dd["high"]),
-                           _deserialize(dd["fixed"]),
-                           _deserialize(dd["patch"]),
-                           _deserialize(dd["mpatch"]),
-                           _deserialize(dd["actual"]),
-                           _deserialize(dd["unc"]))
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusOK")}, dict::OrderedDict) = GModelFit.Solvers.SolverStatusOK()
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusWarn")}, dict::OrderedDict) = GModelFit.Solvers.SolverStatusWarn(_deserialize.(values(dict))...)
+_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusError")}, dict::OrderedDict) = GModelFit.Solvers.SolverStatusError(_deserialize.(values(dict))...)
 
-_deserialize(::Val{Symbol("GModelFit.ComponentSnapshot")},
-             dd::AbstractDict) = ComponentSnapshot(_deserialize(dd["comptype"]),
-                                                   _deserialize(dd["isfreezed"]),
-                                                   _deserialize(dd["deps"]),
-                                                   _deserialize(dd["evalcounter"]),
-                                                   _deserialize(dd["params"]),
-                                                   _deserialize(dd["buffer"]))
-
-_deserialize(::Val{Symbol("GModelFit.ModelSnapshot")},
-             dd::AbstractDict) = ModelSnapshot(_deserialize(dd["domain"]),
-                                               _deserialize(dd["comps"]),
-                                               _deserialize(dd["maincomp"]),
-                                               _deserialize(dd["folded_domain"]),
-                                               _deserialize(dd["folded"]))
-
-_deserialize(::Val{Symbol("GModelFit.Solvers.FitSummary")},
-             dd::AbstractDict) =
-                 FitSummary(_deserialize(dd["start"]),
-                            _deserialize(dd["elapsed"]),
-                            _deserialize(dd["ndata"]),
-                            _deserialize(dd["nfree"]),
-                            _deserialize(dd["fitstat"]),
-                            _deserialize(dd["status"]),
-                            nothing)
-
-_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusOK")},
-             dd::AbstractDict) = SolverStatusOK()
-
-_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusWarn")},
-             dd::AbstractDict) = SolverStatusWarn(dd["message"])
-
-_deserialize(::Val{Symbol("GModelFit.Solvers.SolverStatusError")},
-             dd::AbstractDict) = SolverStatusError(dd["message"])
-
-function _deserialize(::Val{Symbol("GModelFit.CartesianDomain")},
-                      dd::AbstractDict)
-    axis = _deserialize(dd["axis"])
-    roi =  _deserialize(dd["roi"])
-    return CartesianDomain(axis..., roi=roi)
-end
-
-_deserialize(::Val{Symbol("GModelFit.Domain")},
-             dd::AbstractDict) =  Domain(_deserialize(dd["axis"])...)
-
-function _deserialize(::Val{Symbol("GModelFit.Measures")},
-                      dd::AbstractDict)
-    dom = _deserialize(dd["domain"])
-    tmp = _deserialize(dd["values"])
+function _deserialize(::Val{Symbol("GModelFit.Measures")}, dict::OrderedDict)
+    dom = _deserialize(dict["domain"])
+    tmp = _deserialize(dict["values"])
     if isa(dom, CartesianDomain)
         return Measures(dom, reshape(tmp[1], size(dom)), reshape(tmp[2], size(dom)))
     else
         return Measures(dom, tmp[1], tmp[2])
     end
 end
-
-function _deserialize(dd::AbstractDict)
-    if "_structtype" in keys(dd)
-        return _deserialize(Val(Symbol(dd["_structtype"])), dd)
-    else
-        out = OrderedDict{Symbol, Any}()
-        for (kk, vv) in dd
-            out[Symbol(kk)] = _deserialize(vv)
-        end
-        return out
-    end
-end
-
 
 function deserialize(filename::String)
     if filename[end-2:end] == ".gz"
