@@ -30,7 +30,7 @@ function _serialize(dict::OrderedDict{Symbol,T}) where {T}
     for (key, val) in dict
         out[string(key)] = _serialize(val)
     end
-    return JSONDict("OrderedDict{Symbol}", dict)
+    return JSONDict("OrderedDict{Symbol}", out)
 end
 
 function _serialize_struct(str::T) where {T}
@@ -41,7 +41,7 @@ function _serialize_struct(str::T) where {T}
     end
     return JSONDict(string(parentmodule(T)) * "." * string(nameof(T)), dict)
 end
-    
+
 function _serialize(str::T) where {T}
     @assert isstructtype(T) "No _serialize() method defined for type $T"
     return _serialize_struct(str)
@@ -92,7 +92,7 @@ function serialize(filename::String, args...; compress=false)
     else
         io = open(filename, "w")
     end
-    JSON.json(io, data, allownan=true)
+    JSON.json(io, data)
     close(io)
     return filename
 end
@@ -110,11 +110,12 @@ _deserialize(::Val{:Expr}, obj) = Meta.parse(obj)
 _deserialize(::Val{:Date}, obj) = Date(obj)
 _deserialize(::Val{:DateTime}, obj) = DateTime(obj)
 _deserialize(::Val{:Symbol}, obj) = Symbol(obj)
-_deserialize(v) = v  # catch all
+_deserialize(v::Number) = v
+_deserialize(v::String) = v
 
 function _deserialize(::Val{:Vector}, v)
     out = _deserialize.(v)
-    @assert length(unique(typeof.(out))) == 1
+    #@assert length(unique(typeof.(out))) == 1
     return out
 end
 
@@ -128,7 +129,7 @@ function _deserialize(::Val{Symbol("OrderedDict{Symbol}")}, dict::OrderedDict{K,
     return out
 end
 
-function _deserialize(dict::OrderedDict{String,V}) where {V}
+function _deserialize(dict::OrderedDict)
     @assert "meta" in keys(dict)
     return _deserialize(Val(Symbol(dict["meta"])), dict["obj"])
 end
