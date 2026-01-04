@@ -1,7 +1,7 @@
 name = "GModelFit"
 uuid = "ac42e6ba-c0bf-4fcf-827d-deea44b16255"
-authors = ["Giorgio Calderone <giorgio.calderone@gmail.com>"]
 version = "0.7.3"
+authors = ["Giorgio Calderone <giorgio.calderone@gmail.com>"]
 
 [deps]
 CMPFit = "a5944310-3432-5d93-8bb2-e3b5eb62a58f"
@@ -21,6 +21,7 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TypedJSON = "82102e82-2b72-4f25-ab3c-19001ac49e20"
 
 [compat]
 CMPFit = "0.3"
@@ -35,4 +36,5 @@ NonlinearSolve = "4.9"
 PrecompileTools = "1.2"
 PrettyTables = "3.1"
 ProgressMeter = "1.10"
+TypedJSON = "0.1"
 julia = "1.11"
