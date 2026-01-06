@@ -1,6 +1,6 @@
 name = "GModelFit"
 uuid = "ac42e6ba-c0bf-4fcf-827d-deea44b16255"
-version = "0.7.3"
+version = "0.7.4"
 authors = ["Giorgio Calderone <giorgio.calderone@gmail.com>"]
 
 [deps]

@@ -31,7 +31,7 @@ using GModelFit
 """
 
 using TypedJSON
-import TypedJSON: lower, reconstruct, serialize, deserialize
+import TypedJSON: lower, reconstruct
 
 # Can't serialize solver's status, replace it with nothing
 TypedJSON.lower(s::FitSummary) =
