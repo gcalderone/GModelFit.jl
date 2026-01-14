@@ -1,35 +1,3 @@
-"""
-    GModelFit.serialize(filename::String, ::ModelSnapshot[, ::FitSummary[, ::Measures]]; compress=false)
-    GModelFit.serialize(filename::String, ::Vector{ModelSnapshot}[, ::FitSummary[, ::Vector{Measures}]]; compress=false)
-
-Serialize GModelFit object(s) using a JSON format. The serializable objects are:
-- `ModelSnapshot` and `Vector{ModelSnapshot}` (mandatory argument);
-- `FitSummary` (optional);
-- `Measures` and `Vector{Measures}` (optional);
-
-If `compress=true` the resulting JSON file will be compressed using GZip.
-Objects can later be deserialized in a different Julia session with `GModelFit.deserialize`.
-
-Note: The `GModelFit.serialize` function also accepts `Model` and `Vector{Model}` but they will be internally converted to `ModelSnapshot`(s).
-
-
-## Example:
-```julia-repl
-# Create GModelFit objects
-using GModelFit
-model = Model(:linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
-data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, stats = fit(model, data)
-
-# Serialize objects and save in a file
-GModelFit.serialize("my_snapshot.json", bestfit, stats, data)
-
-# Restore objects (possibly in a different Julia session)
-using GModelFit
-(bestfit, stats, data) = GModelFit.deserialize("my_snapshot.json")
-```
-"""
-
 using TypedJSON
 import TypedJSON: lower, reconstruct
 
