@@ -1,0 +1,28 @@
+name: Paper Preview
+
+on:
+  push:
+    paths:
+      - 'paper/**'       # Only run when paper files change
+      - '**.bib'         # Or when bibliography changes
+      - '.github/workflows/paper.yml'
+
+jobs:
+  build-paper:
+    runs-on: ubuntu-latest
+    name: Generate PDF
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Paper
+        uses: openjournals/openjournals-action@master
+        with:
+          journal: joss
+          paper-path: paper/paper.md # Update if your paper is in the root (just 'paper.md')
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjournals-paper
+          path: paper/paper.pdf      # Update if your paper is in the root
