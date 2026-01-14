@@ -27,13 +27,13 @@ bestfit, fsumm = fit(model, data)
 
 ## Serialization
 
-A few structures, namely [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref), as well as `Vector`(s) of such structures can be *serialized*, i.e. stored in a file using a dedicated JSON format.  The structures can lated be *de-serialized* in a separata Julia session without the need to re-run the fitting process used to create them in the first place.
+A few structures, namely [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref), as well as `Vector`(s) of such structures can be *serialized*, i.e. stored in a JSON file using [TypedJSON.jl](https://github.com/gcalderone/TypedJSON.jl).  The structures can later be *de-serialized* in a separata Julia session without the need to re-run the fitting process used to create them in the first place.
 
 ### Example
 
 In the following we will generate a few **GModelFit.jl** objects and serialized them in a file.
 ```@example abc
-using GModelFit
+using GModelFit, TypedJSON
 
 dom = Domain(1:0.1:50)
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
@@ -41,14 +41,14 @@ data = GModelFit.mock(Measures, model, dom, seed=1)
 bestfit, fsumm = fit(model, data)
 
 # Serialize objects and save in a file
-GModelFit.serialize("save_for_future_use.json", bestfit, fsumm, data)
+TypedJSON.serialize("save_for_future_use.json", (bestfit, fsumm, data))
 println(); # hide
 ```
 
 The same objects can be de-serialized in a different Julia session:
 ```@example abc
-using GModelFit
-bestfit, fsumm, data = GModelFit.deserialize("save_for_future_use.json")
+using GModelFit, TypedJSON
+bestfit, fsumm, data = TypedJSON.deserialize("save_for_future_use.json")
 ```
 
 !!! warning
