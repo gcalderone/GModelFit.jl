@@ -1,3 +1,9 @@
+# Version 0.7.4
+	* Added `GModelFit.Solvers.dry` solver;
+
+# Version 0.7.3
+	* Use `TypedJSON` for serialization;
+
 # Version 0.7.2
 	* Bugfix;
 
@@ -21,7 +27,6 @@
 	* Only minor and internal changes:
 		* The `MultiModelEval{N}` internal structure has been renamed to `MultiEval{N}`;
 		* The a `FitProblem` structure creator now identifies the proper fit statistic using the `default_fitstat` function depending on the typeo of data;
-
 
 # Version 0.5.2
 	* Fixed error in fallback `evaluate!` method;

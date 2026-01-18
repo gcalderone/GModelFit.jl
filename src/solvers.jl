@@ -86,6 +86,18 @@ end
 
 
 # --------------------------------------------------------------------
+struct dry <: AbstractSolver end
+
+function solve!(fitprob::FitProblem, solver::dry)
+    prog, shared, funct = eval_funct(fitprob)
+    funct(shared.guess)
+    ProgressMeter.finish!(prog)
+    set_bestfit!(fitprob, shared.guess, shared.guess .* 0.)
+    return FitSummary(fitprob, SolverStatusWarn("dry solver"), shared.start, now() - shared.start, nothing)
+end
+
+
+# --------------------------------------------------------------------
 import LsqFit
 
 struct lsqfit <: AbstractSolver end
