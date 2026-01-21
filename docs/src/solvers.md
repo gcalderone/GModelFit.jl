@@ -6,12 +6,13 @@ Currently supported solvers are:
 - [CMPFit](https://github.com/gcalderone/CMPFit.jl);
 - [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/).
 
-More solvers may be added in the future.
+Additional solvers may be implemented in future releases.
 
 To choose a specific solver add a third argument to the [`fit()`](@ref) or [`fit!()`](@ref) functions, e.g. 
 ```julia
-fit(model, data)                 # use default solver: lsqfit
-fit(model, data, cmpfit())       # use CMPFIT solver
+fit(model, data)                 # use default solver (lsqfit)
+fit(model, data, lsqfit())       # use LsqFit solver
+fit(model, data, cmpfit())       # use CMPFit solver
 fit(model, data, TrustRegion())  # use NonlinearSolve.TrustRegion solver
 ```
 
@@ -43,7 +44,7 @@ The above solvers typically provide the same results, although in some complex c
 ## The `cmpfit()` solver
 
 The `cmpfit()` solver allows to specify several options to fine-tune the solver behaviour.  Specifically:
-- the `CMPFit.Config` structure allows to specify the convergence criteria, the maximum number of iterations, etc. (see the "CONFIGURING MPFIT()" section [here](https://pages.physics.wisc.edu/~craigm/idl/cmpfit.html);
+- the `CMPFit.Config` structure allows to specify the convergence criteria, the maximum number of iterations, etc. (see the "CONFIGURING MPFIT()" section [here](https://pages.physics.wisc.edu/~craigm/idl/cmpfit.html));
 - the `ftol_after_maxiter` allows to specify a threshold on the relative difference in fit statistics before and after the `mpfit()` execution.  If the latter terminates because the maximum number of iterations has been reached, and the relative difference in fit statistics is still greater than `ftol_after_maxiter` the minimization process will continue.  E.g.:
 
   ```@example abc
