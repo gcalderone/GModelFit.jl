@@ -265,18 +265,6 @@ end
 nfree(meval::ModelEval) = length(meval.ifree)
 
 
-# Set new model parameters
-function set_pvalues!(meval::ModelEval, pvalues::AbstractVector{Float64})
-    items(meval.tpar.pvalues)[meval.ifree] .= pvalues
-    items(meval.tpar.pactual)[meval.ifree] .= pvalues
-end
-
-function set_pvalues!(meval::ModelEval, pvalues::AbstractVector)
-    items(meval.tparad.pvalues)[meval.ifree] .= pvalues
-    items(meval.tparad.pactual)[meval.ifree] .= pvalues
-end
-
-
 function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
     for (cname, pname) in meval.patched
         par = getproperty(meval.model[cname], pname)
@@ -300,27 +288,6 @@ function run_patch_functs!(meval::ModelEval, tpar::ModelEvalT)
             end
         end
     end
-end
-
-
-function update_eval!(meval::ModelEval)
-    run_patch_functs!(meval, meval.tpar)
-    for cname in meval.seq
-        update_eval!(meval.cevals[cname], items(meval.tpar.pactual[cname]))
-    end
-    unfolded = meval.cevals[meval.seq[end]].tpar.buffer
-    apply_ir!(meval.ireval, unfolded)
-    return unfolded
-end
-
-function update_eval_ad!(meval::ModelEval)
-    run_patch_functs!(meval, meval.tparad)
-    for cname in meval.seq
-        update_eval!(meval.cevals[cname], items(meval.tparad.pactual[cname]))
-    end
-    unfolded = meval.cevals[meval.seq[end]].tparad.buffer
-    apply_ir!(meval.ireval, unfolded)
-    return unfolded
 end
 
 
@@ -411,27 +378,31 @@ free_params_val(multi::MultiEval) = getfield.(free_params(multi), :val)
 nfree(multi::MultiEval) = sum(nfree.(multi.v))
 
 
-function set_pvalues!(multi::MultiEval{N}, pvalues::AbstractVector) where N
-    if N == 1
-        set_pvalues!(multi.v[1], pvalues)
-    else
-        for (id, i1, i2) in free_params_indices(multi)
-            set_pvalues!(multi.v[id], pvalues[i1:i2])
-        end
+update_eval!(multi::MultiEval, pvalues::AbstractVector{Float64}) = _update_eval!(multi, :tpar, pvalues)
+update_eval!(multi::MultiEval, pvalues::AbstractVector)          = _update_eval!(multi, :tparad, pvalues)
+
+function _update_eval!(multi::MultiEval{N}, tpar_field::Symbol, pvalues::AbstractVector) where N
+    for (i, i1, i2) in free_params_indices(multi)
+        meval = multi.v[i]
+        tpar = getfield(meval, tpar_field)
+        items(tpar.pvalues)[meval.ifree] .= pvalues[i1:i2]
+        items(tpar.pactual)[meval.ifree] .= pvalues[i1:i2]
     end
+
+    for i in 1:N
+        meval = multi.v[i]
+        tpar = getfield(meval, tpar_field)
+        run_patch_functs!(meval, tpar)
+        for cname in meval.seq
+            update_eval!(meval.cevals[cname], items(tpar.pactual[cname]))
+        end
+        unfolded = getfield(meval.cevals[meval.seq[end]], tpar_field).buffer
+        apply_ir!(meval.ireval, unfolded)
+    end
+    nothing
 end
 
-function update_eval!(multi::MultiEval, pvalues::AbstractVector{Float64})
-    set_pvalues!(multi, pvalues)
-    return update_eval!.(multi.v)
-end
-
-function update_eval!(multi::MultiEval{N}, pvalues::AbstractVector) where N
-    set_pvalues!(multi, pvalues)
-    return update_eval_ad!.(multi.v)
-end
-
-update_eval!(multi::MultiEval) = update_eval!.(multi.v)
+update_eval!(multi::MultiEval) = update_eval!(multi, getfield.(free_params(multi), :val))
 
 
 last_eval(multi::MultiEval{1}) = last_eval(multi, 1)
