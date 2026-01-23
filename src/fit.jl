@@ -7,13 +7,14 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
     multi::MultiEval
     data::Vector{M}
     bestfit::Vector{PVModel{Parameter}}
-    buffer::Vector{Float64}  # local buffer used to calculate fit statistic
+    buffer::Vector  # local buffer used to calculate fit statistic
     fitstat::FS
 
     FitProblem(multi::MultiEval, datasets::Vector{<: AbstractMeasures}) = FitProblem(multi, datasets, default_fitstat(datasets[1]))
-    function FitProblem(multi::MultiEval, datasets::Vector{M}, fitstat::FS) where {M <: AbstractMeasures, FS <: AbstractFitStat}
+    function FitProblem(multi::MultiEval{N,T}, datasets::Vector{M}, fitstat::FS) where {N, T, M <: AbstractMeasures, FS <: AbstractFitStat}
         @assert length(multi) == length(datasets)
-        fp = new{M, FS}(multi, datasets, Vector{PVModel{Parameter}}(), Vector{Float64}(undef, sum(length.(datasets))), fitstat)
+        fp = new{M, FS}(multi, datasets, Vector{PVModel{Parameter}}(), Vector{T}(undef, sum(length.(datasets))), fitstat)
+        fp.buffer .= 0.
         # update_eval!(fp, fp.buffer, free_params_val(fp.multi))
         return fp
     end
