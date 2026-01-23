@@ -96,7 +96,7 @@ include("components/SumReducer.jl")
 # ====================================================================
 struct ModelEval{T <: Real}
     model::Model
-    domain::AbstractDomain
+    unfolded_domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     ifree::Vector{Int}
     patched::Vector{NTuple{2, Symbol}}
@@ -104,18 +104,19 @@ struct ModelEval{T <: Real}
     pactual::PVModel{T}
     pvmulti::Vector{PVModel{T}}
     seq::Vector{Symbol}
-    ireval::IREval
+    folded_domain::AbstractDomain
+    folded::Vector{T}
 
-    function ModelEval{T}(model::Model, data_domain::AbstractDomain) where {T <: Real}
-        ireval = IREval(model.IR, data_domain)
-        domain = unfolded_domain(ireval)
-        meval = new{T}(model, domain, OrderedDict{Symbol, CompEval}(),
+    function ModelEval{T}(model::Model, folded_domain::AbstractDomain) where {T <: Real}
+        prepare!(model.IR, folded_domain)
+        meval = new{T}(model, unfolded_domain(model.IR, folded_domain), OrderedDict{Symbol, CompEval}(),
                        Vector{Int}(), Vector{NTuple{2, Symbol}}(),
                        PVModel{T}(),
                        PVModel{T}(),
                        Vector{PVModel{T}}(),
                        Vector{Symbol}(),
-                       ireval)
+                       folded_domain,
+                       Vector{T}(undef, length(folded_domain)))
         return meval
     end
 end
@@ -188,7 +189,7 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
     for d in ftree
         cname = d.cname
         if !(cname in keys(meval.cevals))
-            ceval = CompEval{T}(meval.model.comps[cname], meval.domain)  # all components share the same domain
+            ceval = CompEval{T}(meval.model.comps[cname], meval.unfolded_domain)  # all components share the same domain
             meval.cevals[cname] = ceval
         end
     end
@@ -205,7 +206,7 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
         if length(ceval.deps) == 0
             i = 1
             for d in dependencies(meval.model, cname, select_domain=true)
-                push!(ceval.deps, DomainDep(0, coords(meval.domain, i)))
+                push!(ceval.deps, DomainDep(0, coords(meval.unfolded_domain, i)))
                 i += 1
             end
             for d in dependencies(meval.model, cname, select_domain=false)
@@ -288,8 +289,12 @@ Return last evaluation of a component whose name is `cname` in a `ModelEval` obj
 =#
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].buffer
-last_eval_folded(meval::ModelEval) = last_eval_folded(meval.ireval)
-fold_model(meval::ModelEval, cname::Symbol) = fold_model(meval.ireval, meval.cevals[cname].buffer)
+last_eval_folded(meval::ModelEval) = meval.folded
+function fold_model(meval::ModelEval{T}, cname::Symbol) where T
+    output = Vector{T}(undef, length(meval.folded_domain))
+    apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.unfolded_domain, last_eval(meval))
+    return output
+end
 
 
 # ====================================================================
@@ -359,7 +364,7 @@ function update_eval!(multi::MultiEval{N, T}, pvalues::Vector) where {N, T  <: R
             update_eval!(meval.cevals[cname], items(meval.pactual[cname]))
         end
         unfolded = meval.cevals[meval.seq[end]].buffer
-        apply_ir!(meval.ireval, unfolded)
+        apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.unfolded_domain, unfolded)
     end
     nothing
 end

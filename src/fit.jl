@@ -74,11 +74,10 @@ function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pva
         nn = length(evals[i])
         if nn > 0
             i2 = i1 + nn - 1
-            output[i1:i2] .= reshape((reshape(fitprob.multi.v[i].domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            output[i1:i2] .= reshape((reshape(fitprob.multi.v[i].folded_domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end
-
     fitprob.buffer .= output  # update local buffer
     return output
 end

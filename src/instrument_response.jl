@@ -16,37 +16,6 @@ prepare!(IR::AbstractInstrumentResponse, folded_domain::AbstractDomain) = nothin
 
 
 # ====================================================================
-struct IREval{T <: AbstractInstrumentResponse, TDomain <: AbstractDomain}
-    IR::T
-    unfolded_domain::AbstractDomain
-    folded_domain::TDomain
-    folded::Vector{Float64}
-
-    function IREval(IR::T, folded_domain::TDomain) where {T <: AbstractInstrumentResponse, TDomain <: AbstractDomain}
-        prepare!(IR, folded_domain)
-        d = unfolded_domain(IR, folded_domain)
-        return new{T, TDomain}(IR, d, folded_domain,
-                               Vector{Float64}(undef, length(folded_domain)))
-    end
-end
-
-apply_ir!(ireval::IREval, unfolded::Vector) =
-    apply_ir!(ireval.IR, ireval.folded_domain, ireval.folded, ireval.unfolded_domain, unfolded)
-
-
-unfolded_domain(ireval::IREval) = ireval.unfolded_domain
-folded_domain(ireval::IREval) = ireval.folded_domain
-
-function fold_model(ireval::IREval, unfolded::Vector{Float64})
-    folded = deepcopy(ireval.folded)
-    apply_ir!(ireval.IR, ireval.folded_domain, folded, ireval.unfolded_domain, unfolded)
-    return folded
-end
-
-last_eval_folded(ireval::IREval) = ireval.folded
-
-
-# ====================================================================
 """
     IdealInstrument
 
