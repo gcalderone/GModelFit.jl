@@ -1,3 +1,18 @@
+
+"""
+    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, param1, param2....
+    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps::AbstractVector, param1, param2....
+
+Evaluate component `comp` on the given `domain` using `deps` dependencies and `param1`, `param2, ... parameters.  Output should be stored in the `output` vector.
+
+If the component has no dependencies the `deps` argument should not be present.
+
+The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing either `Float64` values (to evaluate the component) or `ForwardDiff.Dual` values (to evaluate the component derivatives).
+"""
+evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
+    error("No evaluate method implemented for $(TComp), $(TDomain)")
+
+
 struct DomainDep
     counter::Int
     buffer::Vector{Float64}
@@ -25,20 +40,6 @@ mutable struct CompEval{T <: Real, TComp <: AbstractComponent, TDomain <: Abstra
             Vector{T}(undef, nres))
     end
 end
-
-
-"""
-    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, param1, param2....
-    evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps::AbstractVector, param1, param2....
-
-Evaluate component `comp` on the given `domain` using `deps` dependencies and `param1`, `param2, ... parameters.  Output should be stored in the `output` vector.
-
-If the component has no dependencies the `deps` argument should not be present.
-
-The `evaluate!` function is called with the `output`, `deps` and parameter arguments containing either `Float64` values (to evaluate the component) or `ForwardDiff.Dual` values (to evaluate the component derivatives).
-"""
-evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomain <: AbstractDomain} =
-    error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
 function update_eval!(ceval::CompEval{T, TComp, TDomain}, pvalues::AbstractVector{T}) where {TComp, TDomain, T}
