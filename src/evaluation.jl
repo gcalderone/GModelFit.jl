@@ -41,7 +41,7 @@ evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomai
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
-function update_eval!(ceval::CompEval{T, TComp, TDomain}, pvalues::Vector{T}) where {TComp, TDomain, T}
+function update_eval!(ceval::CompEval{T, TComp, TDomain}, pvalues::AbstractVector{T}) where {TComp, TDomain, T}
     doeval = (ceval.counter == 0)                                   ||
         any(ceval.lastparvalues   .!= pvalues)                      ||
         length(ceval.lastdepscounter) != length(ceval.deps)         ||
@@ -356,7 +356,7 @@ function update_eval!(multi::MultiEval{N, T}, pvalues::Vector) where {N, T  <: R
         meval = multi.v[i]
         run_patch_functs!(meval)
         for cname in meval.seq
-            update_eval!(meval.cevals[cname], collect(items(meval.pactual[cname])))
+            update_eval!(meval.cevals[cname], items(meval.pactual[cname]))
         end
         unfolded = meval.cevals[meval.seq[end]].buffer
         apply_ir!(meval.ireval, unfolded)
