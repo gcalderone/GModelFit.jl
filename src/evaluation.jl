@@ -1,6 +1,6 @@
 struct DomainDep
-    qcounter::Int
-    abuffer::Vector{Float64}
+    counter::Int
+    buffer::Vector{Float64}
 end
 
 mutable struct CompEval{T <: Real, TComp <: AbstractComponent, TDomain <: AbstractDomain}
