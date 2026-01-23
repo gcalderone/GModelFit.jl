@@ -14,8 +14,7 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
     function FitProblem(multi::MultiEval{N,T}, datasets::Vector{M}, fitstat::FS) where {N, T, M <: AbstractMeasures, FS <: AbstractFitStat}
         @assert length(multi) == length(datasets)
         fp = new{M, FS}(multi, datasets, Vector{PVModel{Parameter}}(), Vector{T}(undef, sum(length.(datasets))), fitstat)
-        fp.buffer .= 0.
-        # update_eval!(fp, fp.buffer, free_params_val(fp.multi))
+        fp.buffer .= 0.  # needed to avoid errors with CMPFit
         return fp
     end
 end

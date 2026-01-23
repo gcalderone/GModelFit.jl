@@ -123,15 +123,6 @@ struct ModelEval{T <: Real}
 end
 
 
-function empty!(v::ModelEval)
-    empty!(v.ifree)
-    empty!(v.patched)
-    empty!(v.pvalues)
-    empty!(v.pactual)
-    empty!(v.pvmulti)
-end
-
-
 function scan_model!(meval::ModelEval{T}) where {T <: Real}
     function isParamFixed(par::Parameter)
         if !isnothing(par.patch)
@@ -149,7 +140,11 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
         return par.fixed
     end
 
-    empty!(meval)
+    empty!(meval.ifree)
+    empty!(meval.patched)
+    empty!(meval.pvalues)
+    empty!(meval.pactual)
+    empty!(meval.pvmulti)
 
     isfixed = Vector{Bool}()
     for (cname, comp) in meval.model.comps
@@ -347,7 +342,6 @@ function free_params(multi::MultiEval)
     end
     return out
 end
-free_params_val(multi::MultiEval) = getfield.(free_params(multi), :val)
 nfree(multi::MultiEval) = sum(nfree.(multi.v))
 
 
