@@ -20,8 +20,7 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
 end
 
 FitProblem(models::Vector{Model}, datasets::Vector{T}, fitstat=default_fitstat(datasets[1])) where T =
-    FitProblem(MultiEval(models, getfield.(datasets, :domain)), datasets, fitstat)
-
+    FitProblem(MultiEval{Float64}(models, getfield.(datasets, :domain)), datasets, fitstat)
 
 free_params(fitprob::FitProblem) = free_params(fitprob.multi)
 nfree(fitprob::FitProblem) = nfree(fitprob.multi)
@@ -41,8 +40,8 @@ function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::V
         for (cname, comp) in meval.model.comps
             for (pname, _par) in getparams(comp)
                 par = deepcopy(_par)
-                par.val    = meval.tpar.pvalues[cname][pname]
-                par.actual = meval.tpar.pactual[cname][pname]
+                par.val    = meval.pvalues[cname][pname]
+                par.actual = meval.pactual[cname][pname]
                 par.unc = NaN
                 push!(fitprob.bestfit[id], cname, pname, par)
                 if length(fitprob.bestfit[id].data) in meval.ifree
@@ -80,7 +79,7 @@ function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pva
         end
     end
 
-    (T == Float64)  &&  (fitprob.buffer .= output)  # update local buffer
+    fitprob.buffer .= output  # update local buffer
     return output
 end
 

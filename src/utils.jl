@@ -48,7 +48,7 @@ function mock(::Type{Measures}, multi::MultiEval; properr=0.01, rangeerr=0.05, a
 end
 
 mock(::Type{T}, model::Model, domain::AbstractDomain; kws...) where T =
-    mock(T, MultiEval(model, domain); kws...)[1]
+    mock(T, MultiEval{Float64}(model, domain); kws...)[1]
 
 mock(::Type{T}, models::Vector{Model}, domains::Vector{<: AbstractDomain}; kws...) where T =
-    mock(T, MultiEval(models, domains); kws...)
+    mock(T, MultiEval{Float64}(models, domains); kws...)

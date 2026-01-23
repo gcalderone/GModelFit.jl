@@ -38,7 +38,7 @@ function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
                                          dependencies(meval.model, cname),
                                          evalcounter(meval, cname),
                                          params,
-                                         meval.cevals[cname].tpar.buffer)
+                                         meval.cevals[cname].buffer)
     end
 
     ModelSnapshot(deepcopy(meval.domain), comps,
