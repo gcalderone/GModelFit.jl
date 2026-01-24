@@ -68,13 +68,13 @@ fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) 
 
 function update_eval!(fitprob::FitProblem{M, ChiSquared}, pvalues::Vector{T}) where {M,T}
     update_eval!(fitprob.multi, pvalues)
-    evals = [last_eval_folded(fitprob.multi, i) for i in 1:length(fitprob.multi)]
     i1 = 1
     for i in 1:length(fitprob.multi)
-        nn = length(evals[i])
+        model = reshape(fitprob.multi.v[i].folded_domain, last_eval_folded(fitprob.multi, i))
+        nn = length(model)
         if nn > 0
             i2 = i1 + nn - 1
-            fitprob.buffer[i1:i2] .= reshape((reshape(fitprob.multi.v[i].folded_domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            fitprob.buffer[i1:i2] .= reshape((model .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end

@@ -201,7 +201,7 @@ function solve!(fitprob::FitProblem, solver::curvefit)
     ProgressMeter.finish!(prog)
 
     status = CurveFit.isconverged(solver_retval)  ?  SolverStatusOK()  :  SolverStatusError("Not converged")
-    set_bestfit!(fitprob, solver_retval.u, solver_retval.u, CurveFit.stderror(solver_retval))
+    set_bestfit!(fitprob, solver_retval.u, CurveFit.stderror(solver_retval))
     return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 
