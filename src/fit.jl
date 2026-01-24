@@ -66,7 +66,7 @@ default_fitstat(::Measures) = ChiSquared()
 dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob)
 fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
 
-function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pvalues::Vector{T}) where {M,T}
+function update_eval!(fitprob::FitProblem{M, ChiSquared}, pvalues::Vector{T}) where {M,T}
     update_eval!(fitprob.multi, pvalues)
     evals = [last_eval_folded(fitprob.multi, i) for i in 1:length(fitprob.multi)]
     i1 = 1
@@ -74,12 +74,11 @@ function update_eval!(fitprob::FitProblem{M, ChiSquared}, output::Vector{T}, pva
         nn = length(evals[i])
         if nn > 0
             i2 = i1 + nn - 1
-            output[i1:i2] .= reshape((reshape(fitprob.multi.v[i].folded_domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            fitprob.buffer[i1:i2] .= reshape((reshape(fitprob.multi.v[i].folded_domain, evals[i]) .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end
-    fitprob.buffer .= output  # update local buffer
-    return output
+    return fitprob.buffer
 end
 
 

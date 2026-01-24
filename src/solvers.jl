@@ -65,11 +65,11 @@ function eval_funct(fitprob::FitProblem)
 
     prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
 
-    shared = (fp=fitprob, start=now(), guess=guess, lowb=lowb, highb=highb, output=Vector{Float64}(undef, ndata(fitprob)))
+    shared = (fp=fitprob, start=now(), guess=guess, lowb=lowb, highb=highb)
     funct = let prog=prog, shared=shared
         pvalues -> begin
             ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-            return update_eval!(shared.fp, shared.output, pvalues)
+            return update_eval!(shared.fp, pvalues)
         end
     end
     return prog, shared, funct

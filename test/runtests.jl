@@ -181,7 +181,7 @@ models = [model1, model2]
 freeze!(models[1], :bkg);
 freeze!(models[2], :bkg);
 data = GModelFit.mock(Measures, models, [Domain(x), Domain(x)], seed=1)
-bestfit, fsumm = fit(models, data, GModelFit.cmpfit())
+bestfit, fsumm = fit(models, data, GModelFit.Solvers.cmpfit())
 
 @test abs(bestfit[1][:l1].norm.val    - 1)   / bestfit[1][:l1].norm.unc < 3
 @test abs(bestfit[1][:l1].center.val  - 2)   / bestfit[1][:l1].center.unc < 3
