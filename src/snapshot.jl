@@ -41,7 +41,7 @@ function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
                                          meval.cevals[cname].buffer)
     end
 
-    ModelSnapshot(deepcopy(meval.unfolded_domain), comps,
+    ModelSnapshot(deepcopy(meval.domain), comps,
                   meval.seq[end], meval.folded_domain, meval.folded)
 end
 

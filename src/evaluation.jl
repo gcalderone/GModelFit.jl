@@ -97,7 +97,7 @@ include("components/SumReducer.jl")
 # ====================================================================
 struct ModelEval{T <: Real}
     model::Model
-    unfolded_domain::AbstractDomain
+    domain::AbstractDomain
     cevals::OrderedDict{Symbol, CompEval}
     ifree::Vector{Int}
     patched::Vector{NTuple{2, Symbol}}
@@ -185,7 +185,7 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
     for d in ftree
         cname = d.cname
         if !(cname in keys(meval.cevals))
-            ceval = CompEval{T}(meval.model.comps[cname], meval.unfolded_domain)  # all components share the same domain
+            ceval = CompEval{T}(meval.model.comps[cname], meval.domain)  # all components share the same domain
             meval.cevals[cname] = ceval
         end
     end
@@ -202,7 +202,7 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
         if length(ceval.deps) == 0
             i = 1
             for d in dependencies(meval.model, cname, select_domain=true)
-                push!(ceval.deps, DomainDep(0, coords(meval.unfolded_domain, i)))
+                push!(ceval.deps, DomainDep(0, coords(meval.domain, i)))
                 i += 1
             end
             for d in dependencies(meval.model, cname, select_domain=false)
@@ -288,7 +288,7 @@ last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].buffer
 last_eval_folded(meval::ModelEval) = meval.folded
 function fold_model(meval::ModelEval{T}, cname::Symbol) where T
     output = Vector{T}(undef, length(meval.folded_domain))
-    apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.unfolded_domain, last_eval(meval))
+    apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.domain, last_eval(meval))
     return output
 end
 
@@ -359,7 +359,7 @@ function update_eval!(multi::MultiEval{N, T}, pvalues::Vector) where {N, T  <: R
             update_eval!(meval.cevals[cname], items(meval.pactual[cname]))
         end
         unfolded = meval.cevals[meval.seq[end]].buffer
-        apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.unfolded_domain, unfolded)
+        apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.domain, unfolded)
     end
     nothing
 end
