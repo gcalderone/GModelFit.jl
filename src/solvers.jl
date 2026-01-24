@@ -2,10 +2,10 @@ module Solvers
 
 using ProgressMeter, Dates
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, FitSummary, AbstractSolver, solve!, lsqfit, cmpfit
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, FitSummary, AbstractSolver, solve!
 
 import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, update_eval!, set_bestfit!
-import NonlinearSolve
+import ForwardDiff
 
 # --------------------------------------------------------------------
 abstract type AbstractSolverStatus end
@@ -57,7 +57,7 @@ abstract type AbstractSolver end
 
 
 # --------------------------------------------------------------------
-function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
+function eval_funct(fitprob::FitProblem)
     params = free_params(fitprob)
     guess  = getfield.(params, :val)
     lowb   = getfield.(params, :low)
@@ -66,19 +66,10 @@ function eval_funct(fitprob::FitProblem; nonlinearsolve=false)
     prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
 
     shared = (fp=fitprob, start=now(), guess=guess, lowb=lowb, highb=highb, output=Vector{Float64}(undef, ndata(fitprob)))
-    if nonlinearsolve
-        funct = let prog=prog
-            (du, pvalues, shared) -> begin
-                ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                update_eval!(shared.fp, du, pvalues)
-            end
-        end
-    else
-        funct = let prog=prog, shared=shared
-            pvalues -> begin
-                ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-                return update_eval!(shared.fp, shared.output, pvalues)
-            end
+    funct = let prog=prog, shared=shared
+        pvalues -> begin
+            ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
+            return update_eval!(shared.fp, shared.output, pvalues)
         end
     end
     return prog, shared, funct
@@ -194,19 +185,23 @@ end
 
 
 # --------------------------------------------------------------------
-function solve!(fitprob::FitProblem, solver::NonlinearSolve.NonlinearSolveBase.AbstractNonlinearSolveAlgorithm)
-    prog, shared, funct = eval_funct(fitprob, nonlinearsolve=true)
+import CurveFit
 
-    solver_retval = NonlinearSolve.solve(NonlinearSolve.NonlinearLeastSquaresProblem(
-        NonlinearSolve.NonlinearFunction(funct, resid_prototype = zeros(ndata(fitprob))),
-        shared.guess, shared), solver)
+struct curvefit <: AbstractSolver
+    alg
+    curvefit(alg=nothing) = new(alg)
+end
+
+function solve!(fitprob::FitProblem, solver::curvefit)
+    prog, shared, funct = eval_funct(fitprob)
+
+    p = CurveFit.NonlinearCurveFitProblem((pvalues, dummy) -> funct(pvalues),
+                                          shared.guess, 1.:ndata(fitprob))
+    solver_retval = isnothing(solver.alg)  ?  CurveFit.solve(p)  :  CurveFit.solve(p, solver.alg)
     ProgressMeter.finish!(prog)
 
-    set_bestfit!(fitprob, solver_retval.u, solver_retval.u .* NaN)
-    status = SolverStatusOK()
-    if !NonlinearSolve.SciMLBase.successful_retcode(solver_retval.retcode)
-        status = SolverStatusError(string(solver_retval.retcode))
-    end
+    status = CurveFit.isconverged(sol)  ?  SolverStatusOK()  :  SolverStatusError("Not converged")
+    set_bestfit!(fitprob, sol.u, CurveFit.stderror(sol))
     return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 

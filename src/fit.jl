@@ -86,7 +86,6 @@ end
 # ====================================================================
 include("solvers.jl")
 using .Solvers
-export cmpfit, lsqfit  # export symbols from .Solvers
 
 
 # ====================================================================
