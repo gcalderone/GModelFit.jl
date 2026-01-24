@@ -196,12 +196,13 @@ function solve!(fitprob::FitProblem, solver::curvefit)
     prog, shared, funct = eval_funct(fitprob)
 
     p = CurveFit.NonlinearCurveFitProblem((pvalues, dummy) -> funct(pvalues),
-                                          shared.guess, 1.:ndata(fitprob))
+                                          shared.guess, 1.:ndata(fitprob), fill(0., ndata(fitprob)))
     solver_retval = isnothing(solver.alg)  ?  CurveFit.solve(p)  :  CurveFit.solve(p, solver.alg)
     ProgressMeter.finish!(prog)
 
     status = CurveFit.isconverged(solver_retval)  ?  SolverStatusOK()  :  SolverStatusError("Not converged")
     set_bestfit!(fitprob, solver_retval.u, CurveFit.stderror(solver_retval))
+    funct(solver_retval.u) # update evaluation to best fit values (these may have been modified when invoking CurveFit.stderror)
     return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
 end
 

@@ -20,7 +20,7 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
 end
 
 FitProblem(models::Vector{Model}, datasets::Vector{T}, fitstat=default_fitstat(datasets[1])) where T =
-    FitProblem(MultiEval{Float64}(models, getfield.(datasets, :domain)), datasets, fitstat)
+    FitProblem(MultiEval{Union{Dual, Float64}}(models, getfield.(datasets, :domain)), datasets, fitstat)
 
 free_params(fitprob::FitProblem) = free_params(fitprob.multi)
 nfree(fitprob::FitProblem) = nfree(fitprob.multi)
@@ -78,7 +78,7 @@ function update_eval!(fitprob::FitProblem{M, ChiSquared}, pvalues::Vector{T}) wh
             i1 += nn
         end
     end
-    return fitprob.buffer
+    return convert(Vector{T}, fitprob.buffer)
 end
 
 
