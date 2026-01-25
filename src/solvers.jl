@@ -2,7 +2,7 @@ module Solvers
 
 using ProgressMeter, Dates
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, FitSummary, AbstractSolver, solve!
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, FitSummary, AbstractSolver, use_AD, solve!
 
 import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, update_eval!, set_bestfit!
 import ForwardDiff
@@ -78,6 +78,7 @@ end
 
 # --------------------------------------------------------------------
 struct dry <: AbstractSolver end
+use_AD(::dry) = false
 
 function solve!(fitprob::FitProblem, solver::dry)
     prog, shared, funct = eval_funct(fitprob)
@@ -92,6 +93,7 @@ end
 import LsqFit
 
 struct lsqfit <: AbstractSolver end
+use_AD(::lsqfit) = false
 
 function solve!(fitprob::FitProblem, solver::lsqfit)
     prog, shared, funct = eval_funct(fitprob)
@@ -136,6 +138,7 @@ mutable struct cmpfit <: AbstractSolver
         return out
     end
 end
+use_AD(::cmpfit) = false
 
 function solve!(fitprob::FitProblem, solver::cmpfit)
     prog, shared, funct = eval_funct(fitprob)
@@ -191,6 +194,7 @@ struct curvefit <: AbstractSolver
     alg
     curvefit(alg=nothing) = new(alg)
 end
+use_AD(::curvefit) = true
 
 function solve!(fitprob::FitProblem, solver::curvefit)
     prog, shared, funct = eval_funct(fitprob)
