@@ -288,7 +288,7 @@ last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].buffer
 last_eval_folded(meval::ModelEval) = meval.folded
 function fold_model(meval::ModelEval{T}, cname::Symbol) where T
     output = Vector{T}(undef, length(meval.folded_domain))
-    apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.domain, last_eval(meval))
+    apply_ir!(meval.model.IR, meval.folded_domain, output, meval.domain, last_eval(meval, cname))
     return output
 end
 
