@@ -114,7 +114,7 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}, GModelFit.ComponentSnapshot};
+function preparetable(comp::Union{AbstractComponent, GModelFit.ComponentSnapshot};
                       cname::String="?", ctype="?", cfixed=false)
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
@@ -150,7 +150,7 @@ function preparetable(comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelF
 end
 
 
-function show(io::IO, comp::Union{AbstractComponent, GModelFit.PV.PVComp{GModelFit.Parameter}})
+function show(io::IO, comp::Union{AbstractComponent, GModelFit.ComponentSnapshot})
     ctype = isa(comp, AbstractComponent)  ?  string(typeof(comp))  :  "?"
     (table, fixed, warns) = preparetable(comp, ctype=ctype)
     if showsettings.plain
