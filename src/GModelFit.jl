@@ -7,7 +7,6 @@ using LsqFit
 using MacroTools
 using Dates
 using Random
-using JSON, GZip
 
 import Base.show
 import Base.ndims

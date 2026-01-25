@@ -170,7 +170,6 @@ function show(io::IO, red::FunctDesc)
 end
 
 
-
 function tree_prefix(ff::Vector{DependencyNode})
     BRANCH = showsettings.plain  ?  "+ "  :  "├─╴"
     BRCONT = showsettings.plain  ?  "| "  :  "│  "
