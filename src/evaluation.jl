@@ -190,13 +190,6 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
         end
     end
 
-    # Ensure order in cevals is the same as in model.comps
-    tmp = copy(meval.cevals)
-    empty!(meval.cevals)
-    for (cname, _) in meval.model.comps
-        meval.cevals[cname] = tmp[cname]
-    end
-
     # Update references to dependencies
     for (cname, ceval) in meval.cevals
         if length(ceval.deps) == 0
@@ -205,14 +198,16 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
                 push!(ceval.deps, DomainDep(0, coords(meval.domain, i)))
                 i += 1
             end
+            nd = ndims(meval.domain)
+            @assert length(ceval.deps) in [0, nd] "Domain has $nd dimensions but only $(length(ceval.deps)) are listed as dependencies"
             for d in dependencies(meval.model, cname, select_domain=false)
                 push!(ceval.deps, meval.cevals[d])
             end
         else
             d        = dependencies(meval.model, cname, select_domain=true)
             append!(d, dependencies(meval.model, cname, select_domain=false))
-            deleteat!(d, 1:length(ceval.deps))
-            for d in d
+            deleteat!(d, 1:length(ceval.deps)) # neglect depdencies already considered
+            for d in d  # add only the new ones
                 push!(ceval.deps, meval.cevals[d])
             end
         end
@@ -382,8 +377,8 @@ fold_model(multi::MultiEval, id::Int, cname::Symbol) = fold_model(multi.v[id], c
 # ====================================================================
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
-    multi = MultiEval(model, domain)
+    multi = MultiEval{Float64}(model, domain)
     update_eval!(multi)
     isnothing(cname)  &&  (return last_eval(multi))
-    return last_eval(multi, cname)
+    return reshape(domain, last_eval(multi, cname))
 end

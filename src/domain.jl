@@ -39,8 +39,8 @@ end
 An object representing a model, or a dataset, N-dimensional cartesian domain (i.e. a grid).
 
 Available constructors:
-- `Domain(axis...)`: each argument is a vector containing the coordinates on a given axis (arguments may have different lengths);
-- `Domain(lengths...)`: returns a N-dim `CartesianDomain` object whose axis lengths are specified in the arguments.
+- `CartesianDomain(axis...)`: each argument is a vector containing the coordinates on a given axis (arguments may have different lengths);
+- `CartesianDomain(lengths...)`: returns a N-dim `CartesianDomain` object whose axis lengths are specified in the arguments.
 
 Note that a `CartesianDomain` requires at least 2 dimensions.
 
