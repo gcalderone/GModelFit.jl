@@ -379,6 +379,6 @@ fold_model(multi::MultiEval, id::Int, cname::Symbol) = fold_model(multi.v[id], c
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     multi = MultiEval{Float64}(model, domain)
     update_eval!(multi)
-    isnothing(cname)  &&  (return last_eval(multi))
-    return reshape(domain, last_eval(multi, cname))
+    isnothing(cname)  &&  (return reshape(domain, last_eval_folded(multi)))
+    return reshape(domain, fold_model(multi, cname))
 end
