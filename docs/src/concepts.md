@@ -6,8 +6,8 @@ include("setup.jl")
 In order to exploit the **GModelFit.jl** model expressiveness a few concepts need to be introduced, along with their associated data types:
 
 - *Domain*: an N-dimensional grid of points associated to empirical measures, and used to evaluate a model.  It is analogous to the independent varible $\vec{x}$ in the $f(\vec{x})$ notation. It is represented by either:
-  - a [`Domain{N}`](@ref) object for linear domains, where the coordinates for each of the N dimensions are explicitly specified for all the points;
-  - or a [`CartesianDomain{N}`](@ref) object where the coordinates are specified for each of the `N` axis and the coordinates for all points are obtained as the cartesian product of all the axes.  A cartesian domain is internally transformed into a linear one when needed;
+  - a [`Domain{N}`](@ref) object representing linear domains, where the coordinates for each of the N dimensions are explicitly specified for all the points;
+  - or a [`CartesianDomain{N}`](@ref) object representing a grid where the values are specified independently for each of the `N` axes, and the coordinates result from the cartesian product of such values.  A cartesian domain can be transformed into a linear one when needed;
   A domain object (either linear or cartesian) is required as first argument for the `Measures` constructor (see below).
 
 - *Measures*: a container for the N-dimensional empirical data and their associated $1\sigma$ Gaussian uncertainties, represented by an object of type [`Measures{N}`](@ref) (further options may be available in the future, such as Poisson counts);
@@ -27,7 +27,7 @@ In order to exploit the **GModelFit.jl** model expressiveness a few concepts nee
 - *Solver*: the **GModelFit.jl** package provides just the tools to define and manipulate a model, but the actual fitting (namely, the minimization of the residuals) is performed by an external *solver* library.  Currently available solvers are:
   - [LsqFit](https://github.com/JuliaNLSolvers/LsqFit.jl): a pure-Julia solver;
   - [CMPFit](https://github.com/gcalderone/CMPFit.jl): a C solver wrapped in a Julia package;
-  - [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/).
+  - [CurveFit](https://docs.sciml.ai/CurveFit/stable/).
   
 `LsqFit` is the default choice (unless otherwise specified in the [`fit()`](@ref) or [`fit!()`](@ref) function call).
 

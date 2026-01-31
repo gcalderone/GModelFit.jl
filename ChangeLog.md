@@ -1,3 +1,10 @@
+# Version 0.8.0
+	* The `NonlinearSolve` solvers are no longer directly available, they can be used through the new `GModelFit.Solvers.curvefit` solver (based on `CurveFit`);
+	
+	* The `lsqfit` and `cmpfit` solvers are no longer exported, hence they need to be invoked specifying the module name: `GModelFit.Solvers.lsqfit` and `GModelFit.Solvers.cmpfit`;
+
+	* Docs updated: new examples using CurveFit solver and for the 2D cases;
+
 # Version 0.7.4
 	* Added `GModelFit.Solvers.dry` solver;
 

@@ -4,16 +4,16 @@ The **GModelFit.jl** main purpose is to act as an high-level interface between t
 Currently supported solvers are:
 - [LsqFit](https://julianlsolvers.github.io/LsqFit.jl/latest/) (default);
 - [CMPFit](https://github.com/gcalderone/CMPFit.jl);
-- [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/).
+- [CurveFit](https://docs.sciml.ai/CurveFit/stable/).
 
 Additional solvers may be implemented in future releases.
 
 To choose a specific solver add a third argument to the [`fit()`](@ref) or [`fit!()`](@ref) functions, e.g. 
 ```julia
-fit(model, data)                 # use default solver (lsqfit)
-fit(model, data, lsqfit())       # use LsqFit solver
-fit(model, data, cmpfit())       # use CMPFit solver
-fit(model, data, TrustRegion())  # use NonlinearSolve.TrustRegion solver
+fit(model, data)                                # use default solver (lsqfit)
+fit(model, data, GModelFit.Solvers.lsqfit())    # use LsqFit solver
+fit(model, data, GModelFit.Solvers.cmpfit())    # use CMPFit solver
+fit(model, data, GModelFit.Solvers.curvefit())  # use CurveFit solver
 ```
 
 
@@ -23,22 +23,19 @@ fit(model, data, TrustRegion())  # use NonlinearSolve.TrustRegion solver
 using GModelFit
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 data = GModelFit.mock(Measures, model, Domain(1:0.1:50), seed=1)
-bestfit, fsumm = fit(model, data, lsqfit())
+bestfit, fsumm = fit(model, data, GModelFit.Solvers.lsqfit())
 ```
 or
 ```@example abc
-bestfit, fsumm = fit(model, data, cmpfit())
+bestfit, fsumm = fit(model, data, GModelFit.Solvers.cmpfit())
 ```
 or
 ```@example abc
 using NonlinearSolve
-bestfit, fsumm = fit(model, data, NewtonRaphson())
+bestfit, fsumm = fit(model, data, GModelFit.Solvers.curvefit())
 ```
 
 The above solvers typically provide the same results, although in some complex case the results may differ.
-
-!!! warning
-    Unlike LsqFit and CMPFIT, the solvers from [NonlinearSolve](https://docs.sciml.ai/NonlinearSolve/stable/) do not provide best fit parameter uncertainties.
 
 
 ## The `cmpfit()` solver
@@ -54,7 +51,7 @@ The `cmpfit()` solver allows to specify several options to fine-tune the solver 
   data = GModelFit.mock(Measures, model, dom, seed=1)
   
   # Set solver options
-  solver = GModelFit.cmpfit()
+  solver = GModelFit.Solvers.cmpfit()
   solver.config.maxiter = 1
   solver.ftol_after_maxiter = 1e-8
   
