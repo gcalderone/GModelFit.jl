@@ -3,6 +3,8 @@
 	
 	* The `lsqfit` and `cmpfit` solvers are no longer exported, hence they need to be invoked specifying the module name: `GModelFit.Solvers.lsqfit` and `GModelFit.Solvers.cmpfit`;
 
+	* The `axis` methods had been renamed to `axes` (following similar methods defined in Base);
+
 	* Docs updated: new examples using CurveFit solver and for the 2D cases;
 
 # Version 0.7.4

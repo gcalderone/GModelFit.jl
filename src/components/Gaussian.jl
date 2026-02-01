@@ -53,15 +53,15 @@ end
 
 # ====================================================================
 # Evaluate component
-function evaluate!(::Gaussian_1D, domain::Domain{1}, output,
+function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
                    norm, center, sigma)
     X = coords(domain)
-    @. (output = exp( ((X - center) / sigma)^2. / (-2.)) /
-        2.5066282746310002 / sigma * norm) # sqrt(2pi) = 2.5066282746310002
+    output .= @. exp( ((X - center) / sigma)^2. / (-2.)) /
+        2.5066282746310002 / sigma * norm # sqrt(2pi) = 2.5066282746310002
 end
 
 
-function evaluate!(::Gaussian_2D, domain::AbstractDomain{2}, output,
+function evaluate!(::Gaussian_2D, domain::Domain{2}, output::Vector,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -71,12 +71,31 @@ function evaluate!(::Gaussian_2D, domain::AbstractDomain{2}, output,
     x = coords(domain, 1)
     y = coords(domain, 2)
 
-    @. (output = norm *
-        exp(
-            -(
+    output .= @. norm *
+        exp(-(
+            a * (x - centerX)^2. +
+            b * (x - centerX) * (y - centerY) +
+            c *                 (y - centerY)^2.
+            )) / 6.283185307179586 / sigmaX / sigmaY # 2pi = 6.283185307179586
+end
+
+
+function evaluate!(::Gaussian_2D, domain::CartesianDomain{2}, output::Matrix,
+                   norm, centerX, centerY, sigmaX, sigmaY, angle)
+    angle *= -pi / 180.
+    a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
+    b = -sin(2angle) / sigmaX^2  / 2  +  sin(2angle) / sigmaY^2  / 2
+    c =  (sin(angle) / sigmaX)^2 / 2  +  (cos(angle) / sigmaY)^2 / 2
+
+    x = axes(domain, 1)
+    y = axes(domain, 2)
+
+    for i in 1:length(y)
+        output[:, i] .= @. norm *
+            exp(-(
                 a * (x - centerX)^2. +
-                b * (x - centerX) * (y - centerY) +
-                c *                 (y - centerY)^2.
-            )
-        ) / 6.283185307179586 / sigmaX / sigmaY) # 2pi = 6.283185307179586
+                b * (x - centerX) * (y[i] - centerY) +
+                c *                 (y[i] - centerY)^2.
+                )) / 6.283185307179586 / sigmaX / sigmaY # 2pi = 6.283185307179586
+    end
 end

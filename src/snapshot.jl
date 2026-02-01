@@ -4,7 +4,7 @@ struct ComponentSnapshot
     deps::Vector{Symbol}
     evalcounter::Int
     params::OrderedDict{Symbol, Parameter}
-    buffer::Vector{Float64}
+    buffer::Array{Float64}
 end
 getproperty(comp::ComponentSnapshot, name::Symbol) = getfield(comp, :params)[name]
 getindex(comp::ComponentSnapshot, name::Symbol)    = getfield(comp, :params)[name]
@@ -24,7 +24,7 @@ struct ModelSnapshot
     comps::OrderedDict{Symbol, ComponentSnapshot}
     maincomp::Symbol
     folded_domain::AbstractDomain
-    folded::Vector{Float64}
+    folded::Array{Float64}
 end
 function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     comps = OrderedDict{Symbol, ComponentSnapshot}()
@@ -74,11 +74,11 @@ function iterate(model::ModelSnapshot, i=1)
     return (k[i] => model[k[i]], i+1)
 end
 
-(model::ModelSnapshot)(cname::Symbol) = reshape(domain(model), getfield(model.comps[cname], :buffer))
-isfreezed(model::ModelSnapshot, cname::Symbol) =               getfield(model.comps[cname], :isfreezed)
-dependencies(model::ModelSnapshot, cname::Symbol) =            getfield(model.comps[cname], :deps)
-evalcounter(model::ModelSnapshot, cname::Symbol) =             getfield(model.comps[cname], :evalcounter)
-comptype(model::ModelSnapshot, cname::Symbol) =                getfield(model.comps[cname], :comptype)
+(model::ModelSnapshot)(cname::Symbol) =             getfield(model.comps[cname], :buffer)
+isfreezed(model::ModelSnapshot, cname::Symbol) =    getfield(model.comps[cname], :isfreezed)
+dependencies(model::ModelSnapshot, cname::Symbol) = getfield(model.comps[cname], :deps)
+evalcounter(model::ModelSnapshot, cname::Symbol) =  getfield(model.comps[cname], :evalcounter)
+comptype(model::ModelSnapshot, cname::Symbol) =     getfield(model.comps[cname], :comptype)
 
 
 folded_domain(model::ModelSnapshot) = model.folded_domain

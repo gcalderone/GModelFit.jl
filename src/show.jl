@@ -57,7 +57,7 @@ function show(io::IO, dom::AbstractDomain)
     table = Matrix{Union{Int,Float64}}(undef, ndims(dom), 6)
     for i in 1:ndims(dom)
         if isa(dom, CartesianDomain)
-            vv = axis(dom, i)
+            vv = axes(dom, i)
         else
             vv = coords(dom, i)
         end
@@ -75,19 +75,20 @@ function show(io::IO, dom::AbstractDomain)
 end
 
 
-function show(io::IO, data::AbstractMeasures)
+function show(io::IO, data::Measures)
     section(io, typeof(data), ": (length: ", (length(data)), ")")
     table = Matrix{Union{String,Float64}}(undef, 0, 7)
 
     names = fieldnames(typeof(data))
     error = Vector{Bool}()
-    for i in 1:length(data.labels)
-        vv = data.values[i]
+    for vv in [values(data), uncerts(data)]
         nan = length(findall(isnan.(vv))) + length(findall(isinf.(vv)))
         vv = vv[findall(isfinite.(vv))]
         push!(error, nan > 0)
-        table = vcat(table, [data.labels[i] minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
+        table = vcat(table, ["" minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
+    table[:, 1] .= ["values", "uncerts"]
+               
     if showsettings.plain
         highlighters = nothing
     else

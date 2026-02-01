@@ -13,10 +13,9 @@ evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomai
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
-struct DomainDep
-    counter::Int
-    buffer::Vector{Float64}
-end
+domain2buffer(T::DataType, domain::Domain) = Array{T, 1}(undef, length(domain))
+domain2buffer(T::DataType, domain::CartesianDomain{N}) where N = Array{T, N}(undef, size(domain))
+
 
 mutable struct CompEval{T <: Real, TComp <: AbstractComponent, TDomain <: AbstractDomain}
     comp::TComp
@@ -24,20 +23,18 @@ mutable struct CompEval{T <: Real, TComp <: AbstractComponent, TDomain <: Abstra
     counter::Int
     lastparvalues::Vector{T}
     lastdepscounter::Vector{Int}
-    deps::Vector{Union{CompEval, DomainDep}}
-    buffer::Vector{T}
+    deps::Vector{CompEval}
+    buffer::Array{T}
 
     function CompEval{T}(comp::AbstractComponent, domain::AbstractDomain) where {T <: Real}
         prepare!(comp, domain)
-        npar = length(getparams(comp))
-        nres = length(domain)
         return new{T, typeof(comp), typeof(domain)}(
             comp, domain,
             0,
-            Vector{T}( undef, npar),
+            Vector{T}( undef, length(getparams(comp))),
             Vector{Int}(),
             Vector{CompEval}(),
-            Vector{T}(undef, nres))
+            domain2buffer(T, domain))
     end
 end
 
@@ -106,18 +103,19 @@ struct ModelEval{T <: Real}
     pvmulti::Vector{PVModel{T}}
     seq::Vector{Symbol}
     folded_domain::AbstractDomain
-    folded::Vector{T}
+    folded::Array{T}
 
     function ModelEval{T}(model::Model, folded_domain::AbstractDomain) where {T <: Real}
         prepare!(model.IR, folded_domain)
-        meval = new{T}(model, unfolded_domain(model.IR, folded_domain), OrderedDict{Symbol, CompEval}(),
+        meval = new{T}(model, unfolded_domain(model.IR, folded_domain),
+                       OrderedDict{Symbol, CompEval}(),
                        Vector{Int}(), Vector{NTuple{2, Symbol}}(),
                        PVModel{T}(),
                        PVModel{T}(),
                        Vector{PVModel{T}}(),
                        Vector{Symbol}(),
                        folded_domain,
-                       Vector{T}(undef, length(folded_domain)))
+                       domain2buffer(T, folded_domain))
         return meval
     end
 end
@@ -192,24 +190,25 @@ function scan_model!(meval::ModelEval{T}) where {T <: Real}
 
     # Update references to dependencies
     for (cname, ceval) in meval.cevals
-        if length(ceval.deps) == 0
-            i = 1
-            for d in dependencies(meval.model, cname, select_domain=true)
-                push!(ceval.deps, DomainDep(0, coords(meval.domain, i)))
-                i += 1
+        empty!(ceval.deps)
+        deps = dependencies(ceval.comp)
+        if isa(ceval.comp, FComp)
+            _domdeps = Vector{Symbol}()
+            _compdeps = Vector{Symbol}()
+            for d in deps
+                if haskey(meval.cevals, d)  # dependency with known name
+                    push!(_compdeps, d)
+                else # dependency with unknown name is intended as a domain dimension
+                    @assert length(_compdeps) == 0 "Domain dependencies for component $cname must be listed before other component name(s)"
+                    push!(_domdeps, d)
+                end
             end
-            nd = ndims(meval.domain)
-            @assert length(ceval.deps) in [0, nd] "Domain has $nd dimensions but only $(length(ceval.deps)) are listed as dependencies"
-            for d in dependencies(meval.model, cname, select_domain=false)
-                push!(ceval.deps, meval.cevals[d])
-            end
-        else
-            d        = dependencies(meval.model, cname, select_domain=true)
-            append!(d, dependencies(meval.model, cname, select_domain=false))
-            deleteat!(d, 1:length(ceval.deps)) # neglect depdencies already considered
-            for d in d  # add only the new ones
-                push!(ceval.deps, meval.cevals[d])
-            end
+            @assert length(_domdeps) == ndims(meval.domain) "Domain has $(ndims(meval.domain)) dimensions but component $cname accepts $(length(_domdeps)) domain arguments: " * join(string.(_domdeps), ", ")
+            deps = _compdeps
+        end
+        for d in deps
+            @assert haskey(meval.cevals, d)  "No component has name $d"
+            push!(ceval.deps, meval.cevals[d])
         end
     end
 
@@ -282,7 +281,7 @@ last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].buffer
 last_eval_folded(meval::ModelEval) = meval.folded
 function fold_model(meval::ModelEval{T}, cname::Symbol) where T
-    output = Vector{T}(undef, length(meval.folded_domain))
+    output = domain2buffer(T, meval.folded_domain)
     apply_ir!(meval.model.IR, meval.folded_domain, output, meval.domain, last_eval(meval, cname))
     return output
 end
@@ -379,6 +378,6 @@ fold_model(multi::MultiEval, id::Int, cname::Symbol) = fold_model(multi.v[id], c
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
     multi = MultiEval{Float64}(model, domain)
     update_eval!(multi)
-    isnothing(cname)  &&  (return reshape(domain, last_eval_folded(multi)))
-    return reshape(domain, fold_model(multi, cname))
+    isnothing(cname)  &&  (return last_eval_folded(multi))
+    return fold_model(multi, cname)
 end

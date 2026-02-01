@@ -77,7 +77,7 @@ function update_eval!(fitprob::FitProblem{M, ChiSquared}, pvalues::Vector{T}) wh
         nn = length(model)
         if nn > 0
             i2 = i1 + nn - 1
-            fitprob.buffer[i1:i2] .= (model .- view(values(fitprob.data[i]), :)) ./ view(uncerts(fitprob.data[i]), :)
+            fitprob.buffer[i1:i2] .= view((model .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
             i1 += nn
         end
     end

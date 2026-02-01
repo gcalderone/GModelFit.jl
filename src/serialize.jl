@@ -5,8 +5,8 @@ import TypedJSON: lower, reconstruct
 TypedJSON.lower(s::FitSummary) =
     TypedJSON.JSONDict(FitSummary(s.start, s.elapsed, s.ndata, s.nfree, s.fitstat, s.status, nothing))
 
-TypedJSON.reconstruct(::Val{Symbol("GModelFit.Domain")}, dict) = Domain(dict[:axis]...)
-TypedJSON.reconstruct(::Val{Symbol("GModelFit.CartesianDomain")}, dict) = CartesianDomain(dict[:axis]..., roi=dict[:roi])
+TypedJSON.reconstruct(::Val{Symbol("GModelFit.Domain")}, dict) = Domain(dict[:axes]...)
+TypedJSON.reconstruct(::Val{Symbol("GModelFit.CartesianDomain")}, dict) = CartesianDomain(dict[:axes]..., roi=dict[:roi])
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.Parameter")}, dict) = GModelFit.Parameter(values(dict)...)
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.ComponentSnapshot")}, dict) = GModelFit.ComponentSnapshot(values(dict)...)
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.ModelSnapshot")}, dict) = GModelFit.ModelSnapshot(values(dict)...)
@@ -21,11 +21,5 @@ TypedJSON.reconstruct(::Val{Symbol("GModelFit.Solvers.SolverStatusWarn")}, dict)
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.Solvers.SolverStatusError")}, dict) = GModelFit.Solvers.SolverStatusError(values(dict)...)
 
 function TypedJSON.reconstruct(::Val{Symbol("GModelFit.Measures")}, dict)
-    dom = dict[:domain]
-    tmp = dict[:values]
-    if isa(dom, CartesianDomain)
-        return Measures(dom, reshape(tmp[1], size(dom)), reshape(tmp[2], size(dom)))
-    else
-        return Measures(dom, tmp[1], tmp[2])
-    end
+    Measures(dict[:domain], dict[:values], dict[:uncerts])
 end

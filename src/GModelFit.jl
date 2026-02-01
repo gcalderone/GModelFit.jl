@@ -11,6 +11,7 @@ using Random
 import Base.show
 import Base.ndims
 import Base.size
+import Base.axes
 import Base.length
 import Base.haskey
 import Base.keys
@@ -26,7 +27,7 @@ import Base.empty!
 
 import ForwardDiff: Dual
 
-export AbstractDomain, Domain, CartesianDomain, coords, axis, Measures, uncerts,
+export AbstractDomain, Domain, CartesianDomain, coords, Measures, uncerts,
     Model, @fd, SumReducer, domain, comptype, comptypes,
     isfreezed, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
 
@@ -240,8 +241,6 @@ mutable struct Model
                 model[arg[1]] = arg[2]
             elseif isa(arg[2], FunctDesc)
                 model[arg[1]] = FComp(arg[2])
-                # elseif isa(arg[2], Number)
-                #     out[arg[1]] = SimplePar(arg[2])
             else
                 error("Unsupported data type: " * string(typeof(arg[2])) *
                     ".  (accepted types ar T <: AbstractComponent or FunctDesc.")
@@ -328,18 +327,14 @@ function flatten(node::DependencyNode)
 end
 
 
-function dependencies(model::Model, cname::Symbol; select_domain=false)
-    domdeps = Vector{Symbol}()
-    compdeps = Vector{Symbol}()
-    for d in dependencies(model.comps[cname])
-        if haskey(model.comps, d)  # dependency with known name
-            push!(compdeps, d)
-        else # dependency with unknown name is intended as a domain dimension
-            @assert length(compdeps) == 0 "Domain dependencies must be listed first"
-            push!(domdeps, d)
-        end
+function dependencies(model::Model, cname::Symbol)
+    output = Vector{Symbol}()
+    comp = model.comps[cname]
+    for d in dependencies(comp)
+        @assert haskey(model.comps, d)  ||  isa(comp, FComp)  "No component has name $d"
+        haskey(model.comps, d)  &&  push!(output, d)
     end
-    return (select_domain  ?  domdeps  :  compdeps)
+    return output
 end
 
 

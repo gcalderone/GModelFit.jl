@@ -28,5 +28,5 @@ end
 
 unfolded_domain(IR::IdealInstrument, folded_domain::AbstractDomain) = folded_domain
 apply_ir!(IR::IdealInstrument,
-          folded_domain::AbstractDomain  , folded::Vector,
-          unfolded_domain::AbstractDomain, unfolded::Vector) = folded .= unfolded
+          folded_domain::AbstractDomain  , folded::Array,
+          unfolded_domain::AbstractDomain, unfolded::Array) = folded .= unfolded

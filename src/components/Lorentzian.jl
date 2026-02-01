@@ -45,24 +45,32 @@ Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, 
 
 # ====================================================================
 # Evaluate component 
-function evaluate!(::Lorentzian_1D, domain::AbstractDomain{1}, output,
+function evaluate!(::Lorentzian_1D, domain::Domain{1}, output::Vector,
                    norm, center, fwhm)
     X = coords(domain)
-    @. (output = norm /
-        (1. +
-         ((X - center) / fwhm)^2.
-        ))
+    output .= @. norm / (1. + ((X - center) / fwhm)^2.)
 end
 
 
-function evaluate!(::Lorentzian_2D, domain::AbstractDomain{2}, output,
+function evaluate!(::Lorentzian_2D, domain::Domain{2}, output::Vector,
                    norm, centerX, centerY, fwhmX, fwhmY)
     x = coords(domain, 1)
     y = coords(domain, 2)
-
-    @. (output = norm /
+    output .= @. norm /
         (1. +
-         ((x - centerX) / fwhmX)^2. +
-         ((y - centerY) / fwhmY)^2.
-         ))
+        ((x - centerX) / fwhmX)^2. +
+        ((y - centerY) / fwhmY)^2.)
+end
+
+
+function evaluate!(::Lorentzian_2D, domain::CartesianDomain{2}, output::Matrix,
+                   norm, centerX, centerY, fwhmX, fwhmY)
+    x = axes(domain, 1)
+    y = axes(domain, 2)
+    for i in 1:length(y)
+        output[:, i] .= @. norm /
+            (1. +
+            ((x    - centerX) / fwhmX)^2. +
+            ((y[i] - centerY) / fwhmY)^2.)
+    end
 end

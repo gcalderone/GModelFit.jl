@@ -13,7 +13,7 @@ Domain{N}
 Measures{N}
 Model
 @fd
-axis
+axes
 comptype
 comptypes
 coords
