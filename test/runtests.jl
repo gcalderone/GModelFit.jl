@@ -107,6 +107,42 @@ bestfit, fsumm = fit(model, data)
 
 
 # ====================================================================
+dom = Domain(-5:0.1:5)
+model = Model(:main => @fd (x, cx=0.) -> @. x-cx)
+data = GModelFit.mock(Measures, model, dom)
+bestfit, fsumm = fit(model, data)
+
+dom = CartesianDomain(-5:0.1:5, -5:0.1:5)
+for dom in [dom, Domain(dom)]
+	local model = Model(:main => @fd (x, y, cx=0., cy=0.) -> @. sqrt((x-cx)^2 + (y-cy)^2))
+	local data = GModelFit.mock(Measures, model, dom)
+	local bestfit, fsumm = fit(model, data)
+	@test fsumm.fitstat < 1.5
+
+	local model = Model(:bkg => GModelFit.OffsetSlope(0, 0, 0, 1, 1),
+	                    :main => @fd (x, y, bkg, cx=0., cy=0.) -> @. bkg + sqrt((x-cx)^2 + (y-cy)^2))
+	local data = GModelFit.mock(Measures, model, dom)
+	local bestfit, fsumm = fit(model, data)
+	@test fsumm.fitstat < 1.5
+end
+
+
+dom = CartesianDomain(-5:0.1:5, -5:0.1:5, -5:0.1:5)
+for dom in [dom, Domain(dom)]
+	local model = Model(:main => @fd (x, y, z, cx=0., cy=0., cz=0.) -> @. sqrt((x-cx)^2 + (y-cy)^2 + (z-cz)^2))
+	local data = GModelFit.mock(Measures, model, dom)
+	local bestfit, fsumm = fit(model, data)
+	@test fsumm.fitstat < 1.5
+
+	local model = Model(:bkg => GModelFit.OffsetSlope(0, 0, 0, 0, 1, 1, 1),
+                        :main => @fd (x, y, z, bkg, cx=0., cy=0., cz=0.) -> @. bkg + sqrt((x-cx)^2 + (y-cy)^2 + (z-cz)^2))
+	local data = GModelFit.mock(Measures, model, dom)
+	local bestfit, fsumm = fit(model, data)
+	@test fsumm.fitstat < 1.5
+end
+
+
+# ====================================================================
 x = 0:0.05:6
 model = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
               :l2  => GModelFit.Gaussian(1, 3, 0.5),

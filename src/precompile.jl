@@ -1,21 +1,14 @@
-#=
-
-Note: I can't compile ModelSnapshot since it involves a show()
-call, which in turn involve PrettyTables, which is not currently
-possible to precompile (an error is raised).
-
-=#
-
 using PrecompileTools
 @compile_workload begin
     let
+        io = IOBuffer()
+
         x = [0.1, 1.1, 2.1, 3.1, 4.1]
         domain = Domain(x)
         model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
         data = GModelFit.mock(Measures, model, domain, seed=1)
         bestfit, stats = fit(model, data)
 
-        
         x = 0:0.05:6
         model = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
                       :l2  => GModelFit.Gaussian(1, 3, 0.5),
@@ -25,7 +18,8 @@ using PrecompileTools
         model[:l2].norm.patch = @fd (m, v) -> v + m[:l1].norm
         data = GModelFit.mock(Measures, model, Domain(x), seed=1)
         bestfit, stats = fit(model, data, GModelFit.Solvers.cmpfit())
-
+        show(io, bestfit)
+        show(io, stat)
 
         x = 0:0.05:6
         model1 = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
@@ -50,5 +44,7 @@ using PrecompileTools
 
         data = GModelFit.mock(Measures, model, [Domain(x), Domain(x)], seed=1)
         bestfit, stats = fit(model, data)
+        show(io, bestfit)
+        show(io, stat)
     end
 end

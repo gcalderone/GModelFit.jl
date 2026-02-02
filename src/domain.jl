@@ -79,13 +79,24 @@ coords(d::Domain, dim::Integer) = d.axes[dim]
 
 
 # Iterate through domain dimensions returning coordinates
-function iterate(d::Union{Domain, CartesianDomain}, ii=1)
+function iterate(d::Domain, ii=1)
     (ii > ndims(d))  &&  (return nothing)
     return (coords(d, ii), ii+1)
 end
 
+function iterate(d::CartesianDomain, ii=1)
+    (ii > ndims(d))  &&  (return nothing)
+    return (axes(d, ii), ii+1)
+end
+
 # Cartesian-only methods
 size(d::CartesianDomain) = tuple([length(v) for v in d.axes]...)
+
+function Domain(d::CartesianDomain{N}) where N
+    v = reshape(collect(Iterators.product(d.axes...)), :)
+    return Domain([getindex.(v, i) for i in 1:N]...)
+end
+
 
 """
     axes(d::CartesianDomain, dim::Integer)

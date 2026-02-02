@@ -34,15 +34,15 @@ propertynames(comp::FComp) = collect(keys(getfield(comp, :params)))
 getproperty(comp::FComp, key::Symbol) = getfield(comp, :params)[key]
 dependencies(comp::FComp) = getfield(comp, :deps)
 
-function evaluate!(comp::FComp, domain::Domain, output::Vector, deps::Vector, params...)
-    f = getfield(comp, :func)
-    output .= f(domain.axes..., deps..., params...)
-end
-
 
 function evaluate!(comp::FComp, domain::Domain, output::Vector, params...)
     f = getfield(comp, :func)
     output .= f(domain.axes..., params...)
+end
+
+function evaluate!(comp::FComp, domain::Domain, output::Vector, deps::Vector, params...)
+    f = getfield(comp, :func)
+    output .= f(domain.axes..., deps..., params...)
 end
 
 function evaluate!(comp::FComp, domain::CartesianDomain, output::Array, params...)
@@ -57,7 +57,7 @@ function evaluate!(comp::FComp, domain::CartesianDomain, output::Array, deps::Ve
     f = getfield(comp, :func)
     for I in CartesianIndices(tuple(length.(domain.axes[2:end])...))
         X = getindex.(domain.axes[2:end], Tuple(I))
-        d = [view(deps[i], :, X) for i in 1:length(deps)]
+        d = [view(deps[i], :, I) for i in 1:length(deps)]
         output[:, I] .= f(domain.axes[1], X..., d..., params...)
     end
 end
