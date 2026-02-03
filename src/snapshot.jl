@@ -28,7 +28,7 @@ struct ModelSnapshot
 end
 function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     comps = OrderedDict{Symbol, ComponentSnapshot}()
-    for cname in keys(meval.cevals)
+    for cname in keys(meval.model.comps)
         params = OrderedDict{Symbol, Parameter}()
         for (pname, par) in bestfit[cname]
             params[pname] = par
