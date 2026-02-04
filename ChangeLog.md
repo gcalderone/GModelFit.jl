@@ -7,7 +7,7 @@
 
 	* The `axis` methods had been renamed to `axes` (following similar methods defined in Base);
 
-	* Docs updated: new examples using CurveFit solver and for the 2D cases;
+	* Docs updated: new examples using `CurveFit` solver and the 2D cases;
 
 # Version 0.7.4
 	* Added `GModelFit.Solvers.dry` solver;
