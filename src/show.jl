@@ -88,7 +88,7 @@ function show(io::IO, data::Measures)
         table = vcat(table, ["" minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
     table[:, 1] .= ["values", "uncerts"]
-               
+
     if showsettings.plain
         highlighters = nothing
     else
