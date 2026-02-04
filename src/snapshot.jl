@@ -29,6 +29,7 @@ end
 function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
     comps = OrderedDict{Symbol, ComponentSnapshot}()
     for cname in keys(meval.model.comps)
+        (cname in keys(meval.cevals))  ||  continue
         params = OrderedDict{Symbol, Parameter}()
         for (pname, par) in bestfit[cname]
             params[pname] = par
