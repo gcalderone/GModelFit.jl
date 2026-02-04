@@ -42,7 +42,7 @@ include("setup.jl")
   # Add two Gaussian components, and a third one representing their sum
   model[:comp1] = GModelFit.Gaussian(1, 3, 1)
   model[:comp2] = GModelFit.Gaussian(0.5, 4, 0.3)
-  model[:sum] = @fd (comp1, comp2) -> comp1 .+ comp2
+  model[:sum] = @fd (x, comp1, comp2) -> comp1 .+ comp2
   
   # Modify a parameter value:
   model[:comp1].center.val = 5

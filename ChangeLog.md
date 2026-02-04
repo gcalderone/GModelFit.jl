@@ -1,4 +1,6 @@
 # Version 0.8.0
+	* The `FComp` component now requires a number of arguments which is at least equal to the number of domain dimensions;
+
 	* The `NonlinearSolve` solvers are no longer directly available, they can be used through the new `GModelFit.Solvers.curvefit` solver (based on `CurveFit`);
 	
 	* The `lsqfit` and `cmpfit` solvers are no longer exported, hence they need to be invoked specifying the module name: `GModelFit.Solvers.lsqfit` and `GModelFit.Solvers.cmpfit`;

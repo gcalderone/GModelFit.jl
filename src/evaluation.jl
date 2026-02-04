@@ -13,8 +13,8 @@ evaluate!(::TComp, ::TDomain, args...) where {TComp <: AbstractComponent, TDomai
     error("No evaluate method implemented for $(TComp), $(TDomain)")
 
 
-domain2buffer(T::DataType, domain::Domain) = Array{T, 1}(undef, length(domain))
-domain2buffer(T::DataType, domain::CartesianDomain{N}) where N = Array{T, N}(undef, size(domain))
+domain2buffer(T, domain::Domain) = Array{T, 1}(undef, length(domain))
+domain2buffer(T, domain::CartesianDomain{N}) where N = Array{T, N}(undef, size(domain))
 
 
 mutable struct CompEval{T <: Real, TComp <: AbstractComponent, TDomain <: AbstractDomain}
