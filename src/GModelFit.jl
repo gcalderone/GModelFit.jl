@@ -459,6 +459,7 @@ include("fit.jl")
 include("serialize.jl")
 include("show.jl")
 include("utils.jl")
+include("ppl.jl")
 include("gnuplot_recipe.jl")
 include("precompile.jl")
 

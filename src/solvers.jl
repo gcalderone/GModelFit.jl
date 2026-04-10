@@ -98,8 +98,9 @@ use_AD(::lsqfit) = false
 function solve!(fitprob::FitProblem, solver::lsqfit)
     prog, shared, funct = eval_funct(fitprob)
     solver_retval = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
-                              1.:ndata(fitprob), fill(0., ndata(fitprob)),
-                              shared.guess, lower=shared.lowb, upper=shared.highb)
+                                     1.:ndata(fitprob), fill(0., ndata(fitprob)),
+                                     shared.guess, lower=shared.lowb, upper=shared.highb,
+                                     autodiff=:finiteforward)
     ProgressMeter.finish!(prog)
 
     status = SolverStatusOK()
