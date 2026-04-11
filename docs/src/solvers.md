@@ -22,17 +22,17 @@ fit(model, data, GModelFit.Solvers.curvefit())  # use CurveFit solver
 ```@example abc
 using GModelFit
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
-data = GModelFit.mock(Measures, model, Domain(1:0.1:50), seed=1)
-bestfit, fsumm = fit(model, data, GModelFit.Solvers.lsqfit())
+data = GModelFit.mock(Domain(1:0.1:50), model, seed=1)
+bestfit, fsumm = fit(data, model, solver=GModelFit.Solvers.lsqfit())
 ```
 or
 ```@example abc
-bestfit, fsumm = fit(model, data, GModelFit.Solvers.cmpfit())
+bestfit, fsumm = fit(data, model, solver=GModelFit.Solvers.cmpfit())
 ```
 or
 ```@example abc
 using NonlinearSolve
-bestfit, fsumm = fit(model, data, GModelFit.Solvers.curvefit())
+bestfit, fsumm = fit(data, model, solver=GModelFit.Solvers.curvefit())
 ```
 
 The above solvers typically provide the same results, although in some complex case the results may differ.
@@ -48,7 +48,7 @@ The `cmpfit()` solver allows to specify several options to fine-tune the solver 
   using GModelFit
   dom = Domain(1:0.1:50)
   model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
-  data = GModelFit.mock(Measures, model, dom, seed=1)
+  data = GModelFit.mock(dom, model, seed=1)
   
   # Set solver options
   solver = GModelFit.Solvers.cmpfit()
@@ -56,7 +56,7 @@ The `cmpfit()` solver allows to specify several options to fine-tune the solver 
   solver.ftol_after_maxiter = 1e-8
   
   # Run the fit
-  model[:main].T.val = 10  # guess value, purposely far from true one
-  bestfit, fsumm = fit(model, data, solver)
+  model[:main, :T].val = 10  # guess value, purposely far from true one
+  bestfit, fsumm = fit(data, model, solver=solver)
   println(); # hide
   ```

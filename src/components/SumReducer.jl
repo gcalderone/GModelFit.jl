@@ -7,7 +7,7 @@ struct SumReducer <: AbstractComponent
 end
 
 dependencies(comp::SumReducer) = comp.list
-
+add_dep!(comp::SumReducer, cname::Symbol) = push!(comp.list, cname)
 
 function evaluate!(::SumReducer, ::AbstractDomain, output, deps)
     output .= deps[1]

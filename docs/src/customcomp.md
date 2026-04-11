@@ -107,14 +107,14 @@ nothing  # hide
 
 It is possible to modify the `param1` and re-evaluate with:
 ```@example abc
-model[:mycomp].param1.val = 4.5
+model[:mycomp, :param1].val = 4.5
 model(dom)
 nothing  # hide
 ```
 
 Finally, when fitting a model the `prepare!` is invoked only once.  The `dependencies` function is invoked a number of times to create the internal data structures, while `evaluate!` is invoked each time the solver needs to probe the model on a specific set of parameter values:
 ```@example abc
-bestfit, fsumm = fit(model, Measures(dom, [9., 9., 9., 9.], 1.))
+bestfit, fsumm = fit(Measures(dom, [9., 9., 9., 9.], 1.), model)
 nothing  # hide
 ```
 
@@ -179,6 +179,6 @@ model = Model(:theory => Interpolator(theory_x, theory_y),
               :main => SumReducer(:theory, :background))
 
 data = Measures(Domain(obs_x), obs_y, 0.2)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```

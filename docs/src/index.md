@@ -62,12 +62,12 @@ unc  = [1.1, 1.1, 1.1, 1.2, 1.2]
 dom  = Domain(x)
 data = Measures(dom, meas, unc)
 
-# Create a model using an explicit mathematical expression, and provide the
-# initial guess values:
+# Create a model using an explicit mathematical expression, provide the domain
+# for evaluation and the guess parameter values:
 model = Model(@fd (x, a2=1, a1=1, a0=5) -> (a2 .* x.^2  .+  a1 .* x  .+  a0))
 
 # Fit model to the data
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 nothing # hide
 ```
 
@@ -79,8 +79,8 @@ showing the best fit parameter values and the associated uncertaintites, as well
 
 If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
 ```@example abc
-model[:main].a0.val = 5
-bestfit, fsumm = fit(model, data)
+model[:main, :a0].val = 5
+bestfit, fsumm = fit(data, model)
 nothing # hide
 ```
 
@@ -95,10 +95,10 @@ saveas("simple_example"); # hide
 
 Also, you can easily access the numerical results for further analysis, e.g.:
 ```@example abc
-println("Best fit value for the offset parameter: ", 
-	bestfit[:main].a0.val, " ± ", 
-	bestfit[:main].a0.unc, "\n",
-	"Reduced χ^2: ", fsumm.fitstat)
+println("Best fit value for the offset parameter: ",
+         bestfit[:main, :a0].val, " ± ",
+         bestfit[:main, :a0].unc, "\n",
+         "Reduced χ^2: ", gofstat(bestfit) / dof(bestfit))
 ```
 
 The above example is definitely a simple one, but more complex ones follow essentially the same workflow.

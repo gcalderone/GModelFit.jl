@@ -2,23 +2,35 @@ module Solvers
 
 using ProgressMeter, Dates
 
-export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, FitSummary, AbstractSolver, use_AD, solve!
+export AbstractSolverStatus, SolverStatusOK, SolverStatusWarn, SolverStatusError, AbstractSolver, need_autodiff, maximize!
 
-import ..GModelFit: FitProblem, free_params, nfree, ndata, fitstat, update_eval!, set_bestfit!
+import ..GModelFit: AbstractData, Likelihood, getfreepars, nfree, ndata, gofstat, evaluate_resid!, _set_bestfit!
 import ForwardDiff
 
 # --------------------------------------------------------------------
-abstract type AbstractSolverStatus end
+abstract type AbstractSolverStatus{T} end
 
-struct SolverStatusOK <: AbstractSolverStatus
+struct SolverStatusOK{T} <: AbstractSolverStatus{T}
+    tstart::DateTime
+    elapsed::Float64
+    status::T
+    SolverStatusOK(shared, status::T) where T = new{typeof(status)}(shared.tstart, Dates.value(convert(Millisecond, now() - shared.tstart)) / 1000., status)
 end
 
-struct SolverStatusWarn <: AbstractSolverStatus
+struct SolverStatusWarn{T} <: AbstractSolverStatus{T}
+    tstart::DateTime
+    elapsed::Float64
+    status::T
     message::String
+    SolverStatusWarn(shared, message::String, status::T) where T = new{typeof(status)}(shared.tstart, Dates.value(convert(Millisecond, now() - shared.tstart)) / 1000., status, message)
 end
 
-struct SolverStatusError <: AbstractSolverStatus
+struct SolverStatusError{T} <: AbstractSolverStatus{T}
+    tstart::DateTime
+    elapsed::Float64
+    status::T
     message::String
+    SolverStatusError(shared, message::String, status::T) where T = new{typeof(status)}(shared.tstart, Dates.value(convert(Millisecond, now() - shared.tstart)) / 1000., status, message)
 end
 
 # --------------------------------------------------------------------
@@ -28,48 +40,33 @@ end
 A structure summarizing the results of a fitting process.
 
 # Fields:
-- `start::DateTime`: timestamp at the beginning of the fitting process;
+- `tstart::DateTime`: timestamp at the beginning of the fitting process;
 - `elapsed::Float64`: elapsed time (in seconds);
-- `ndata::Int`: number of data empirical points;
-- `nfree::Int`: number of free parameters;
-- `fitstat::Float64`: fit statistics (equivalent ro reduced χ^2 for `Measures` objects);
 - `status`: minimization process status (tells whether convergence criterion has been satisfied, or if an error has occurred during fitting);
 - `solver_retval`: solver return value.
 
 Note: the `solver_retval` field can not be serialized, will contain `nothing` when deserialized.
 """
-struct FitSummary
-    start::DateTime
-    elapsed::Float64
-    ndata::Int
-    nfree::Int
-    fitstat::Float64
-    status::AbstractSolverStatus
-    solver_retval
-end
-
-FitSummary(fitprob::FitProblem, status::AbstractSolverStatus, start::DateTime, elapsed::TimePeriod, solver_retval=nothing) =
-    FitSummary(start, Dates.value(convert(Millisecond, elapsed)) / 1000., ndata(fitprob), nfree(fitprob), fitstat(fitprob), status, solver_retval)
-
 
 # --------------------------------------------------------------------
 abstract type AbstractSolver end
 
-
 # --------------------------------------------------------------------
-function eval_funct(fitprob::FitProblem)
-    params = free_params(fitprob)
+function eval_funct(lh::Likelihood)
+    params = collect(values(getfreepars(lh)))
     guess  = getfield.(params, :val)
     lowb   = getfield.(params, :low)
     highb  = getfield.(params, :high)
 
-    prog = ProgressUnknown(desc="Nfree=$(nfree(fitprob)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
+    prog = ProgressUnknown(desc="Nfree=$(nfree(lh)), evaluations:", dt=0.5, showspeed=true, color=:light_black)
 
-    shared = (fp=fitprob, start=now(), guess=guess, lowb=lowb, highb=highb)
+    shared = (lh=lh, tstart=now(), guess=guess, lowb=lowb, highb=highb)
     funct = let prog=prog, shared=shared
         pvalues -> begin
-            ProgressMeter.next!(prog; showvalues=() -> [(:fitstat, fitstat(shared.fp))])
-            return update_eval!(shared.fp, pvalues)
+            ProgressMeter.next!(prog; showvalues=() -> begin
+                                    return [(:gofstat, ForwardDiff.value(gofstat(shared.lh)))]
+                                end)
+            return evaluate_resid!(shared.lh, pvalues)
         end
     end
     return prog, shared, funct
@@ -78,14 +75,14 @@ end
 
 # --------------------------------------------------------------------
 struct dry <: AbstractSolver end
-use_AD(::dry) = false
+need_autodiff(::dry) = false
 
-function solve!(fitprob::FitProblem, solver::dry)
-    prog, shared, funct = eval_funct(fitprob)
+function maximize!(lh::Likelihood, solver::dry)
+    prog, shared, funct = eval_funct(lh)
     funct(shared.guess)
     ProgressMeter.finish!(prog)
-    set_bestfit!(fitprob, shared.guess, shared.guess .* 0.)
-    return FitSummary(fitprob, SolverStatusWarn("dry solver"), shared.start, now() - shared.start, nothing)
+    _set_bestfit!(lh, shared.guess, shared.guess .* 0.)
+    return SolverStatusWarn(shared, "dry solver", nothing)
 end
 
 
@@ -93,23 +90,22 @@ end
 import LsqFit
 
 struct lsqfit <: AbstractSolver end
-use_AD(::lsqfit) = false
+need_autodiff(::lsqfit) = false
 
-function solve!(fitprob::FitProblem, solver::lsqfit)
-    prog, shared, funct = eval_funct(fitprob)
+function maximize!(lh::Likelihood, solver::lsqfit)
+    prog, shared, funct = eval_funct(lh)
     solver_retval = LsqFit.curve_fit((dummy, pvalues) -> funct(pvalues),
-                                     1.:ndata(fitprob), fill(0., ndata(fitprob)),
+                                     1.:ndata(lh), fill(0., ndata(lh)),
                                      shared.guess, lower=shared.lowb, upper=shared.highb,
-                                     autodiff=:finiteforward)
+                                     autodiff=LsqFit.AutoFiniteDiff())
     ProgressMeter.finish!(prog)
-
-    status = SolverStatusOK()
-    if !solver_retval.converged
-        status = SolverStatusError("Not converged")
+    if solver_retval.converged
+        status = SolverStatusOK(shared, solver_retval)
+    else
+        status = SolverStatusError(shared, "Not converged", solver_retval)
     end
-
-    set_bestfit!(fitprob, getfield.(Ref(solver_retval), :param), LsqFit.stderror(solver_retval))
-    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
+    _set_bestfit!(lh, getfield.(Ref(solver_retval), :param), LsqFit.stderror(solver_retval))
+    return status
 end
 
 
@@ -139,10 +135,10 @@ mutable struct cmpfit <: AbstractSolver
         return out
     end
 end
-use_AD(::cmpfit) = false
+need_autodiff(::cmpfit) = false
 
-function solve!(fitprob::FitProblem, solver::cmpfit)
-    prog, shared, funct = eval_funct(fitprob)
+function maximize!(lh::Likelihood, solver::cmpfit)
+    prog, shared, funct = eval_funct(lh)
     parinfo = CMPFit.Parinfo(length(shared.guess))
     for i in 1:length(shared.guess)
         llow  = isfinite(shared.lowb[i])   ?  1  :  0
@@ -151,22 +147,18 @@ function solve!(fitprob::FitProblem, solver::cmpfit)
         parinfo[i].limits  = (shared.lowb[i], shared.highb[i])
     end
 
-    last_fitstat = fitstat(fitprob)
+    last_gofstat = gofstat(lh)
     guess = shared.guess
     solver_retval = nothing
-    status = SolverStatusOK()
     while true
         solver_retval = CMPFit.cmpfit(funct, guess, parinfo=parinfo, config=solver.config)
-        if solver_retval.status <= 0
-            status = SolverStatusError("CMPFit status = $(solver_retval.status)")
-            break
-        end
+        (solver_retval.status <= 0)  &&  break
 
         if (solver_retval.status == 5)
-            Δfitstat = (last_fitstat - solver_retval.bestnorm) / last_fitstat
-            if Δfitstat > solver.ftol_after_maxiter
-                println("Reached max. number of iteration but relative Δfitstat = $(Δfitstat) > $(solver.ftol_after_maxiter), continue minimization...\n")
-                last_fitstat = solver_retval.bestnorm
+            Δgofstat = (last_gofstat - solver_retval.bestnorm) / last_gofstat
+            if Δgofstat > solver.ftol_after_maxiter
+                println("Reached max. number of iteration but relative Δgofstat = $(Δgofstat) > $(solver.ftol_after_maxiter), continue minimization...\n")
+                last_gofstat = solver_retval.bestnorm
                 guess = getfield.(Ref(solver_retval), :param)
                 continue
             end
@@ -175,16 +167,18 @@ function solve!(fitprob::FitProblem, solver::cmpfit)
     end
     ProgressMeter.finish!(prog)
 
-    set_bestfit!(fitprob,
-                 getfield.(Ref(solver_retval), :param),
-                 getfield.(Ref(solver_retval), :perror))
+    _set_bestfit!(lh,
+                  getfield.(Ref(solver_retval), :param),
+                  getfield.(Ref(solver_retval), :perror))
 
-    if solver_retval.status == 2
-        status = SolverStatusWarn("CMPFit status = 2 may imply one (or more) guess values are too far from optimum")
+    if solver_retval.status <= 0
+        return SolverStatusError(shared, "CMPFit status = $(solver_retval.status)", solver_retval)
+    elseif solver_retval.status == 2
+        return SolverStatusWarn(shared, "CMPFit status = 2 may imply one (or more) guess values are too far from optimum", solver_retval)
     elseif solver_retval.status == 5
-        status = SolverStatusWarn("CMPFit status = 5, reached maximum allowed number of iteration.")
+        return SolverStatusWarn(shared, "CMPFit status = 5, reached maximum allowed number of iteration.", solver_retval)
     end
-    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
+    return SolverStatusOK(shared, solver_retval)
 end
 
 
@@ -195,20 +189,22 @@ struct curvefit <: AbstractSolver
     alg
     curvefit(alg=nothing) = new(alg)
 end
-use_AD(::curvefit) = true
+need_autodiff(::curvefit) = true
 
-function solve!(fitprob::FitProblem, solver::curvefit)
-    prog, shared, funct = eval_funct(fitprob)
+function maximize!(lh::Likelihood, solver::curvefit)
+    prog, shared, funct = eval_funct(lh)
 
     p = CurveFit.NonlinearCurveFitProblem((pvalues, dummy) -> funct(pvalues),
-                                          shared.guess, 1.:ndata(fitprob), fill(0., ndata(fitprob)))
+                                          shared.guess, 1.:ndata(lh), fill(0., ndata(lh)))
     solver_retval = isnothing(solver.alg)  ?  CurveFit.solve(p)  :  CurveFit.solve(p, solver.alg)
     ProgressMeter.finish!(prog)
 
-    status = CurveFit.isconverged(solver_retval)  ?  SolverStatusOK()  :  SolverStatusError("Not converged")
-    set_bestfit!(fitprob, solver_retval.u, CurveFit.stderror(solver_retval))
+    _set_bestfit!(lh, solver_retval.u, CurveFit.stderror(solver_retval))
     funct(solver_retval.u) # update evaluation to best fit values (these may have been modified when invoking CurveFit.stderror)
-    return FitSummary(fitprob, status, shared.start, now() - shared.start, solver_retval)
+    if CurveFit.isconverged(solver_retval)
+        return SolverStatusOK(shared, solver_retval)
+    end
+    return SolverStatusError(shared, "Not converged", solver_retval)
 end
 
 end

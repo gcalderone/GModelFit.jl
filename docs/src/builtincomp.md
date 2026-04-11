@@ -39,15 +39,15 @@ model = Model(:linear => GModelFit.OffsetSlope(2, 0, 0.5))
 
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
 The best fit parameter values can be retrieved with:
 ```@example abc
 println("Best fit values:")
-println("b:  ", bestfit[:linear].offset.val, " ± ", bestfit[:linear].offset.unc)
-println("m:  ", bestfit[:linear].slope.val , " ± ", bestfit[:linear].slope.unc)
+println("b:  ", bestfit[:linear, :offset].val, " ± ", bestfit[:linear, :offset].unc)
+println("m:  ", bestfit[:linear, :slope].val , " ± ", bestfit[:linear, :slope].unc)
 ```
 
 A similar example in 2D is as follows:
@@ -64,10 +64,9 @@ data = Measures(dom, [ 3.08403  3.46719  4.07612  4.25611  5.04716
                        3.80219  4.90894  5.24232  5.06982  6.29545
                        4.34554  4.68698  5.51505  5.69245  6.35409
                        4.643    5.91825  6.18011  6.67073  7.01467], 0.25)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
-
 
 
 ## Polynomial
@@ -90,14 +89,14 @@ model = Model(GModelFit.Polynomial(2, 0.5))
 
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
 Note that the numerical results are identical to the previous example involving the `OffsetSlope` component.  Also note that the default name for a component (if none is provided) is `:main`.  To use a 2nd degree polynomial we can simply replace the `:main` component with a new one:
 ```@example abc
 model[:main] = GModelFit.Polynomial(2, 0.5, 1)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -129,8 +128,6 @@ The parameters are:
   - `sigmaY::Parameter`: the width the Gaussian along the Y direction (when `angle=0`);
   - `angle::Parameter`: the rotation angle (in degrees) of the Gaussian.
 
-
-
 #### Example
 ```@example abc
 using GModelFit
@@ -140,7 +137,7 @@ model = Model(GModelFit.Gaussian(1, 3, 0.5))
 
 # Fit model against data
 data = Measures([0, 0.3, 6.2, 25.4, 37.6, 23., 7.1, 0.4, 0], 0.6)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -156,7 +153,7 @@ hh = hist(randn(10000), bs=0.25)
 dom = Domain(hist_bins(hh, side=:center, pad=false))
 data = Measures(dom, hist_weights(hh, pad=false), 1.)
 model = Model(GModelFit.Gaussian(1e3, 0, 1))
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -180,7 +177,7 @@ hh = hist(1 .+ randn(10000), 2 .* randn(10000))
 dom = CartesianDomain(hist_bins(hh, 1), hist_bins(hh, 2))
 data = Measures(dom, hist_weights(hh) .* 1., 1.)
 model = Model(GModelFit.Gaussian(1e3, 0, 0, 1, 1, 0))
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -204,11 +201,11 @@ myfunc(x, b, m) = b .+ x .* m
 
 # Define a model with a `FComp` wrapping the previously defined function.
 # Also specify the initial guess parameters.
-model = Model(:linear => GModelFit.FComp(myfunc, [:x], b=2, m=0.5))
+model = Model(:linear => @fd (x, b=2, m=0.5) -> myfunc(x, b, m))
 
 # Fit model against a data set
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -231,7 +228,7 @@ model = Model(:linear => @fd (x, b=2, m=0.5) -> (b .+ x .* m))
 
 # Fit model against data
 data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 Note that a `FComp` component can be added to a model without explicitly invoking its constructor when the [`@fd`](@ref) macro is used.
@@ -240,17 +237,17 @@ Note that a `FComp` component can be added to a model without explicitly invokin
 
 The evaluation of a `FComp` component may also involve the outcomes from other components. Continuing from previous example, whose fit was clearly a poor one, we may add a quadratic term to the previously defined `linear` component:
 ```@example abc
-model[:quadratic] = @fd (x, linear, p2=1) -> (linear .+ p2 .* x.^2)
-bestfit, fsumm = fit(model, data)
+model[:quadratic] = @fd (x, linear=[], p2=1) -> (linear .+ p2 .* x.^2)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
 The keywords given when defining the function are interpreted as component parameters, hence their properties can be retrieved with:
 ```@example abc
 println("Best fit values:")
-println("b:  ", bestfit[:linear].b.val    , " ± ", bestfit[:linear].b.unc)
-println("m:  ", bestfit[:linear].m.val    , " ± ", bestfit[:linear].m.unc)
-println("p2: ", bestfit[:quadratic].p2.val, " ± ", bestfit[:quadratic].p2.unc)
+println("b:  ", bestfit[:linear, :b].val    , " ± ", bestfit[:linear, :b].unc)
+println("m:  ", bestfit[:linear, :m].val    , " ± ", bestfit[:linear, :m].unc)
+println("p2: ", bestfit[:quadratic, :p2].val, " ± ", bestfit[:quadratic, :p2].unc)
 ```
 
 ## SumReducer
@@ -283,6 +280,6 @@ model[:main] = SumReducer(:linear, :quadratic)
 # Fit model against data
 dom = Domain(1:5)
 data = Measures(dom, [4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```

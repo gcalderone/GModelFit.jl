@@ -17,10 +17,10 @@ model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
 
 # Generate a mock dataset on a specific domain
 dom = Domain(1:0.1:50)
-data = GModelFit.mock(Measures, model, dom, seed=1)
+data = GModelFit.mock(dom, model, seed=1)
 
 # Fit model against the mock dataset
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 ```
 
 
@@ -37,18 +37,18 @@ using GModelFit, TypedJSON
 
 dom = Domain(1:0.1:50)
 model = Model(:main => @fd (x, T=3.14) -> sin.(x ./ T) ./ (x ./ T))
-data = GModelFit.mock(Measures, model, dom, seed=1)
-bestfit, fsumm = fit(model, data)
+data = GModelFit.mock(dom, model, seed=1)
+bestfit, fsumm = fit(data, model)
 
 # Serialize objects and save in a file
-TypedJSON.serialize("save_for_future_use.json", (bestfit, fsumm, data))
+TypedJSON.serialize("save_for_future_use.json", snapshot(bestfit))
 println(); # hide
 ```
 
 The same objects can be de-serialized in a different Julia session:
 ```@example abc
 using GModelFit, TypedJSON
-bestfit, fsumm, data = TypedJSON.deserialize("save_for_future_use.json")
+bestfit = TypedJSON.deserialize("save_for_future_use.json")
 ```
 
 !!! warning
@@ -70,8 +70,8 @@ model = Model(:bkg => GModelFit.OffsetSlope(1, 1, 0.1),
               :l1 => GModelFit.Gaussian(1, 2, 0.2),
               :l2 => GModelFit.Gaussian(1, 3, 0.4),
               :main => SumReducer(:bkg, :l1, :l2))
-data = GModelFit.mock(Measures, model, dom)
-bestfit, fsumm = fit(model, data)
+data = GModelFit.mock(dom, model)
+bestfit, fsumm = fit(data, model)
 println(); # hide
 ```
 

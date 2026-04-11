@@ -1,16 +1,12 @@
-struct ComponentSnapshot
-    comptype::String
-    isfreezed::Bool
-    deps::Vector{Symbol}
-    evalcounter::Int
-    params::OrderedDict{Symbol, Parameter}
-    buffer::Array{Float64}
+struct RespSnapshot <: AbstractResponse
+    type::String
+    unfolded_domain::AbstractDomain
+    folded_domain::AbstractDomain
 end
-getproperty(comp::ComponentSnapshot, name::Symbol) = getfield(comp, :params)[name]
-getindex(comp::ComponentSnapshot, name::Symbol)    = getfield(comp, :params)[name]
-propertynames(comp::ComponentSnapshot) = collect(keys(getfield(comp, :params)))
-
-getparams(comp::ComponentSnapshot) = getfield(comp, :params)
+RespSnapshot(   resp::AbstractResponse) = RespSnapshot(stype(resp), folded_domain(resp), unfolded_domain(resp))
+folded_domain(  resp::RespSnapshot) = resp.folded_domain
+unfolded_domain(resp::RespSnapshot) = resp.unfolded_domain
+fold_model!(    resp::RespSnapshot, unfolded::Array, folded::Array) = error("Can't fold model using a RespSnapshot object")
 
 """
     ModelSnapshot
@@ -19,68 +15,163 @@ A structure containing a *snapshot* (i.e. a "*frozen*" state) of a `Model`.  A s
 
 The best fit model and parameter values returned by the `fit()` function are provided as a `ModelSnapshot` object .
 """
-struct ModelSnapshot
+struct ModelSnapshot{GT, CT, PT} <: AbstractModelEval{GT, CT, PT}
+    dt::DictTree
+    ifree::Vector{Int}
+
+    function ModelSnapshot{GT, CT, PT}() where {GT, CT, PT}
+        dt = DictTree()
+        add_layer!(dt, SDTree{GT, GroupSnapshot}(on_delete=forbid_delete), label=:groups)
+        add_layer!(dt, SDTree{CT, CompSnapshot}( on_delete=forbid_delete), label=:comps)
+        add_layer!(dt, SDTree{PT, ParameterEval}(on_delete=forbid_delete), label=:params)
+        return new{GT, CT, PT}(dt, Vector{Int}())
+    end
+end
+
+function ModelSnapshot(dt::DictTree)   # deserialization method
+    T = fill(Tuple{}, 3)
+    for l in keys(getlabels(dt))
+        if l == :groups
+            T[1] = StaticDictTrees.getKT(get_layer(dt, l))
+        elseif l == :comps
+            T[2] = StaticDictTrees.getKT(get_layer(dt, l))
+        else
+            @assert l == :params
+            T[3] = StaticDictTrees.getKT(get_layer(dt, l))
+        end
+    end
+    out = ModelSnapshot{T...}()
+    i = 1
+    for (k, v) in dt
+        if isa(v, GroupSnapshot)
+            out.dt[k] = GroupSnapshot(out, k, [getfield(v, f) for f in fieldnames(typeof(v))[3:end]]...)
+        elseif isa(v, CompSnapshot)
+            out.dt[k] =  CompSnapshot(out, k, [getfield(v, f) for f in fieldnames(typeof(v))[3:end]]...)
+        else
+            @assert isa(v, ParameterEval)
+            out.dt[k] = v
+            !v.fixed  &&  !v.actually_fixed  &&  push!(out.ifree, i)
+            i += 1
+        end
+    end
+    return out
+end
+
+function snapshot(model::ModelEval{T, GT, CT, PT}) where {T, GT, CT, PT}
+    out = ModelSnapshot{GT, CT, PT}()
+    for (gkey, group) in getgroups(model)
+        out.dt[gkey] = GroupSnapshot(out, gkey, group)
+    end
+    for (ckey, comp) in getcomps(model)
+        out.dt[ckey] = CompSnapshot(out, ckey, comp)
+    end
+    for (pkey, par) in getparams(model)
+        out.dt[pkey] = deepcopy(par)
+    end
+    return out
+end
+
+struct LikelihoodSnapshot{GT, CT, PT} <: AbstractModelEval{GT, CT, PT}
+    dt::DictTree
+    ifree::Vector{Int}
+    evalbuf::Array{Float64}
+    loglh::Float64
+    gofstat::Float64
+
+    function LikelihoodSnapshot{GT, CT, PT}(args...) where {GT, CT, PT}
+        dt = DictTree()
+        add_layer!(dt, SDTree{GT, GroupLHSnapshot}(on_delete=forbid_delete), label=:groups)
+        add_layer!(dt, SDTree{CT, CompSnapshot}(   on_delete=forbid_delete), label=:comps)
+        add_layer!(dt, SDTree{PT, ParameterEval}(  on_delete=forbid_delete), label=:params)
+        return new{GT, CT, PT}(dt, Vector{Int}(), args...)
+    end
+end
+
+function LikelihoodSnapshot(dt::DictTree, args...)   # deserialization method
+    T = fill(Tuple{}, 3)
+    for l in keys(getlabels(dt))
+        if l == :groups
+            T[1] = StaticDictTrees.getKT(get_layer(dt, l))
+        elseif l == :comps
+            T[2] = StaticDictTrees.getKT(get_layer(dt, l))
+        else
+            @assert l == :params
+            T[3] = StaticDictTrees.getKT(get_layer(dt, l))
+        end
+    end
+    out = LikelihoodSnapshot{T...}(args...)
+    i = 1
+    for (k, v) in dt
+        if isa(v, GroupLHSnapshot)
+            out.dt[k] = GroupLHSnapshot(out, k, [getfield(v, f) for f in fieldnames(typeof(v))[3:end]]...)
+        elseif isa(v, CompSnapshot)
+            out.dt[k] =    CompSnapshot(out, k, [getfield(v, f) for f in fieldnames(typeof(v))[3:end]]...)
+        else
+            @assert isa(v, ParameterEval)
+            out.dt[k] = v
+            !v.fixed  &&  !v.actually_fixed  &&  push!(out.ifree, i)
+            i += 1
+        end
+    end
+    return out
+end
+
+function snapshot(lh::Likelihood{Float64, GT, CT, PT}) where {GT, CT, PT}
+    out = LikelihoodSnapshot{GT, CT, PT}(lh.evalbuf, loglh(lh), gofstat(lh))
+    for (gkey, group) in getgroups(lh)
+        out.dt[gkey] = GroupLHSnapshot(out, gkey, group)
+    end
+    for (ckey, comp) in getcomps(lh)
+        out.dt[ckey] = CompSnapshot(out, ckey, comp)
+    end
+    for (pkey, par) in getparams(lh)
+        out.dt[pkey] = deepcopy(par)
+    end
+    return out
+end
+
+struct CompSnapshot <: AbstractCompSlotEval
+    rootmodel::Union{Nothing, ModelSnapshot, LikelihoodSnapshot}
+    key::Tuple
+    stype::String
+    frozen::Bool
     domain::AbstractDomain
-    comps::OrderedDict{Symbol, ComponentSnapshot}
-    maincomp::Symbol
-    folded_domain::AbstractDomain
-    folded::Array{Float64}
-end
-function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
-    comps = OrderedDict{Symbol, ComponentSnapshot}()
-    for cname in keys(meval.model.comps)
-        (cname in keys(meval.cevals))  ||  continue
-        params = OrderedDict{Symbol, Parameter}()
-        for (pname, par) in bestfit[cname]
-            params[pname] = par
-        end
-        comps[cname] = ComponentSnapshot(comptype(meval.model, cname),
-                                         isfreezed(meval.model, cname),
-                                         dependencies(meval.model, cname),
-                                         evalcounter(meval, cname),
-                                         params,
-                                         meval.cevals[cname].buffer)
-    end
-
-    ModelSnapshot(deepcopy(meval.domain), comps,
-                  meval.seq[end], meval.folded_domain, meval.folded)
+    counter::Int
+    deps::Vector{Symbol}
+    evalbuf::Array{Float64}
 end
 
-domain(model::ModelSnapshot) = model.domain
-Base.keys(model::ModelSnapshot) = collect(keys(model.comps))
-(model::ModelSnapshot)() = model(model.maincomp)
+CompSnapshot(root::Union{ModelSnapshot, LikelihoodSnapshot}, key::Tuple, comp::CompSlotEval{Float64}) =
+    CompSnapshot(root, key, stype(getcomp(comp)), comp.frozen, deepcopy(comp.domain),
+                 comp.counter, deepcopy(dependencies(getcomp(comp))), deepcopy(comp.evalbuf))
 
-function deptree(model::ModelSnapshot)
-    function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
-        out = DependencyNode(cname, level, parent)
-        for d in dependencies(model, cname)
-            push!(out.childs, deptree(model, d, level+1, cname))
-        end
-        return out
-    end
-    return deptree(model, model.maincomp, 1, nothing)
+struct GroupSnapshot <: AbstractGroupEval
+    rootmodel::Union{Nothing, ModelSnapshot}
+    key::Tuple
+    domain::AbstractDomain
+    seq::Vector{Symbol}
+    evalbuf::Array{Float64}
 end
 
-Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.comps, name)
-function Base.getindex(model::ModelSnapshot, name::Symbol)
-    @assert name in keys(model.comps) "$name is not a component in the model"
-    return model.comps[name]
+GroupSnapshot(root::ModelSnapshot, key::Tuple, group::GroupEval) =
+    GroupSnapshot(root, key, deepcopy(folded_domain(getresp(group))),
+                  deepcopy(group.seq), deepcopy(group.evalbuf))
+
+struct GroupLHSnapshot <: AbstractGroupLH
+    rootmodel::Union{Nothing, LikelihoodSnapshot}
+    key::Tuple
+    domain::AbstractDomain
+    seq::Vector{Symbol}
+    evalbuf::Array{Float64}
+    data::AbstractData
+    residuals::Vector{Float64}
+    loglh::Float64
+    gofstat::Float64
+    gofstat_name::String
 end
 
-Base.length(model::ModelSnapshot) = length(model.comps)
-
-function iterate(model::ModelSnapshot, i=1)
-    k = collect(keys(model))
-    (i > length(k))  &&  return nothing
-    return (k[i] => model[k[i]], i+1)
-end
-
-(model::ModelSnapshot)(cname::Symbol) =             getfield(model.comps[cname], :buffer)
-isfreezed(model::ModelSnapshot, cname::Symbol) =    getfield(model.comps[cname], :isfreezed)
-dependencies(model::ModelSnapshot, cname::Symbol) = getfield(model.comps[cname], :deps)
-evalcounter(model::ModelSnapshot, cname::Symbol) =  getfield(model.comps[cname], :evalcounter)
-comptype(model::ModelSnapshot, cname::Symbol) =     getfield(model.comps[cname], :comptype)
-
-
-folded_domain(model::ModelSnapshot) = model.folded_domain
-folded(model::ModelSnapshot) = model.folded
+GroupLHSnapshot(root::LikelihoodSnapshot, key::Tuple, group::GroupLH{Float64}) =
+    GroupLHSnapshot(root, key, deepcopy(folded_domain(getresp(group))),
+                    deepcopy(group.seq), deepcopy(group.evalbuf),
+                    deepcopy(group.data), deepcopy(group.residuals),
+                    loglh(group), gofstat(group), gofstat_name(group))

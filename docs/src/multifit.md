@@ -15,26 +15,28 @@ To perform a multi-dataset fitting we should create one `Model` for each dataset
 ```@example abc
 using GModelFit
 
-# Create individual models and the Vector{Model} container
-model1 = Model(GModelFit.Gaussian(1, 0., 1.))
-model2 = Model(GModelFit.Gaussian(1, 0., 1.))
-multi = [model1, model2]
+# Create model with a group selector
+model = Model{Tuple{Symbol}}()
+model[:first , :main] = GModelFit.Gaussian(1, 0., 1.)
+model[:second, :main] = GModelFit.Gaussian(1, 0., 1.)
+
 
 # Patch parameters
-multi[2][:main].norm.mpatch   = @fd m -> m[1][:main].norm
-multi[2][:main].center.mpatch = @fd m -> m[1][:main].center
+model[:second, :main, :norm].patch   = @fd m -> m[:first, :main, :norm]
+model[:second, :main, :center].patch = @fd m -> m[:first, :main, :center]
 
 # Create datasets and fit
 dom = Domain(-5.:5)
-data1 = Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04)
-data2 = Measures(dom, [-0.072, -0.033, -0.070,  0.108,  0.168,  0.765,  0.113, -0.054,  0.032,  0.013,  0.015], 0.04)
-bestfit, fsumm = fit(multi, [data1, data2])
+data = Dict(
+	(:first,)  => Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04),
+	(:second,) => Measures(dom, [-0.072, -0.033, -0.070,  0.108,  0.168,  0.765,  0.113, -0.054,  0.032,  0.013,  0.015], 0.04))
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
 The best fit models and values are returned as a `Vector{ModelSnapshot}` in `bestfit`, i.e.:
 ```@example abc
-println("Width of Gaussian 1: ", bestfit[1][:main].sigma.val, " ± ", bestfit[1][:main].sigma.unc)
-println("Width of Gaussian 2: ", bestfit[2][:main].sigma.val, " ± ", bestfit[2][:main].sigma.unc)
-println("Reduced χ^2: ", fsumm.fitstat)
+println("Width of Gaussian 1: ", bestfit[:first , :main, :sigma].val, " ± ", bestfit[:first , :main, :sigma].unc)
+println("Width of Gaussian 2: ", bestfit[:second, :main, :sigma].val, " ± ", bestfit[:second, :main, :sigma].unc)
+println("Reduced χ^2: ", gofstat(bestfit) / dof(bestfit))
 ```

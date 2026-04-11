@@ -1,24 +1,21 @@
 import Gnuplot
 import Gnuplot.recipe
 
-Gnuplot.recipe(data::Measures{1}) =
+Gnuplot.recipe(data::GaussianData{1}) =
     Gnuplot.parseSpecs("set bars 0",
                        coords(domain(data)), values(data), uncerts(data),
                        "with yerr t 'Data' lc rgb 'gray'")
 
-function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
-                        keep=Symbol[], skip=Symbol[])
+function Gnuplot.recipe(model::AbstractModelEval; keep=Symbol[], skip=Symbol[])
     @assert ndims(domain(model)) == 1
     out = Vector{Gnuplot.AbstractGPSpec}()
-    for (cname, comp) in model
+    for (ckey, comp) in getcomps(model)
+        cname = comp_name(model, ckey)
         (cname in skip)  &&  continue
         if (length(keep) == 0)  ||  (cname in keep)
-            #isa(v.comp, GModelFit.FComp)  ||  isa(v.comp, GModelFit.SumReducer)  ||  continue
-            append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(cname),
-                                            "with lines t '$(cname)'"))
+            append!(out, Gnuplot.parseSpecs(coords(unfolded_domain(getresp(model[()]))), model[cname](), "with lines t '$(cname)'"))
         end
     end
-    append!(out, Gnuplot.parseSpecs(coords(folded_domain(model)), folded(model),
-                                    "with lines t 'Model' lc rgb 'black' lw 2"))
+    append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(), "with lines t 'Model' lc rgb 'black' lw 2"))
     return out
 end

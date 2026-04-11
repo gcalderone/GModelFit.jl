@@ -1,295 +1,290 @@
-using Random, Test, GModelFit, GModelFit.PV, TypedJSON
+using Test
+using GModelFit
+using GModelFit.Solvers
+using Random
+using DataFrames
+using Statistics
 
-# Test Model
-mm = PVModel{Float64}()
-@test typeof(mm) == PVModel{Float64}
+@testset "GModelFit.jl Full Test Suite" begin
 
-mm[:comp]  # empty component
-push!(mm, :comp3, :par, 3.1)
-push!(mm, :comp1, :par, 1.1)
-push!(mm, :comp1, :alt, 1.2)
-mm[:comp3][:par] = 99
+    @testset "1. Domains, GaussianData & Response API" begin
+        # --- AbstractDomain, Domain, CartesianDomain ---
+        x1 = [0.1, 1.1, 2.1, 3.1]
+        dom1 = Domain(x1)
+        @test dom1 isa AbstractDomain
+        @test ndims(dom1) == 1
+        @test length(dom1) == 4
+        @test coords(dom1, 1) == x1
 
-@test getfield(mm, :data) == [99, 1.1, 1.2]
+        x2, y2 = 1:5, 1:10
+        dom2 = CartesianDomain(x2, y2)
+        @test dom2 isa AbstractDomain
+        @test ndims(dom2) == 2
+        @test size(dom2) == (5, 10)
+        @test gridcoords(dom2, 1) == collect(x2)
+        @test coords(Domain(dom2), 1) == repeat(collect(float.(x2)), 10) # Testing the fallback cast
 
-@test mm[:comp1].par == 1.1
-@test mm[:comp1].alt == 1.2
-@test mm[:comp3].par == 99
+        # --- GaussianData, uncerts, domain, response ---
+        vals = rand(4)
+        uncs = fill(0.1, 4)
+        meas = GaussianData(dom1, vals, uncs)
 
-@test keys(mm) == [:comp, :comp3, :comp1]
+        @test values(meas) == vals
+        @test uncerts(meas) == uncs
+        @test length(meas) == 4
+        @test domain(meas) === dom1
+        @test getresp(meas) isa GModelFit.AbstractResponse
+    end
 
-@test propertynames(mm[:comp])  == Symbol[]
-@test propertynames(mm[:comp1]) == [:par, :alt]
-@test propertynames(mm[:comp3]) == [:par]
+    @testset "2. Components, @fd, & Dependencies" begin
+        # --- @fd, FunctDesc ---
+        f = @fd (x, a=1, b=2) -> a .* x .+ b
+        @test f(10.0, 2.0, 5.0) == 25.0
 
-@test items(mm) == [99, 1.1, 1.2]
-@test items(mm[:comp]) == Float64[]
-@test items(mm[:comp1]) == [1.1, 1.2]
-@test items(mm[:comp3]) == [99]
+        # --- SumReducer, stype, dependencies ---
+        m_dep = Model{Tuple{}}()
+        m_dep[:compA] = GModelFit.FComp(@fd (x, a=1) -> a)
+        m_dep[:compB] = GModelFit.FComp(@fd (x, b=1) -> b)
+        m_dep[:main]  = SumReducer(:compA, :compB)
 
-for (cname, comp) in mm
-    println(cname)
-    for (pname, par) in comp
-        println("  ", pname, ": ", par)
-        @test getproperty(mm[cname], pname) == par
+        compA = getcomps(m_dep)[(:compA,)]
+        main_comp = getcomps(m_dep)[(:main,)]
+
+        # stype and getcomp
+        @test getcomp(compA) isa GModelFit.FComp
+        @test typeof(stype(compA)) == String
+        @test stype(main_comp) == "SumReducer"
+
+        # dependencies
+        @test :compA in dependencies(main_comp)
+        @test :compB in dependencies(main_comp)
+        @test isempty(dependencies(compA))
+    end
+
+    @testset "3. Model Structure & Accessors" begin
+        # --- Model construction ---
+        m = Model(@fd (x, slope=2, int=1) -> slope .* x .+ int)
+        m[:bkg] = GModelFit.FComp(@fd (x, bg=0.1) -> bg)
+
+        # --- getgroups, getcomps, getparams, getfreepars ---
+        @test length(getgroups(m)) == 1
+        @test length(getcomps(m)) == 2
+        @test length(getparams(m)) == 3
+
+        meval = ModelEval(Domain(1:5), m)
+        @test length(getfreepars(meval)) == 3 # slope, int, bg are all free by default
+
+        # --- flattenkeys ---
+        d = Dict((:group1, :comp1) => 42)
+        flat = flattenkeys(d, "_")
+        @test flat[:group1_comp1] == 42
+    end
+
+    @testset "4. Model Manipulation (Freeze/Thaw)" begin
+        m = Model(@fd (x, slope=2, int=1) -> slope .* x .+ int)
+        comp = getcomps(m)[(:main,)]
+
+        # --- isfrozen, freeze!, thaw! ---
+        @test !isfrozen(comp)
+        freeze!(comp)
+        @test isfrozen(comp)
+
+        meval = ModelEval(Domain(1:5), m)
+        @test length(getfreepars(meval)) == 0 # Everything frozen at component level
+
+        thaw!(comp)
+        @test !isfrozen(comp)
+        meval2 = ModelEval(Domain(1:5), m)
+        @test length(getfreepars(meval2)) == 2 # Thawed, parameters are free again
+    end
+
+    @testset "5. Likelihood, Stats & Fitting Routines" begin
+        # Generate Ground Truth & Mock Data
+        x = 1.0:1.0:10.0
+        dom = Domain(x)
+        truth = Model(@fd (x, slope=2.0, int=5.0) -> slope .* x .+ int)
+        data = GModelFit.mock(GaussianData, dom, truth, seed=42, properr=0.01)
+
+        # --- Likelihood ---
+        guess = Model(@fd (x, slope=1.0, int=1.0) -> slope .* x .+ int)
+        lh = Likelihood(data, guess)
+
+        # --- loglh, gofstat, dof ---
+        initial_loglh = loglh(lh)
+        initial_gof = gofstat(lh)
+
+        @test initial_loglh < 0 # log-likelihood is negative
+        @test initial_gof > 0   # Chi-squared is positive
+        @test dof(lh) == 10 - 2 # 10 data points, 2 free parameters
+
+        # --- fit vs fit! ---
+        # fit returns a new likelihood, fit! modifies in place
+        bestfit_lh, fsumm = fit(data, guess)
+        @test gofstat(bestfit_lh) < initial_gof # Fit should improve statistic
+
+        # Test fit! directly on the likelihood
+        fsumm_inplace = fit!(lh)
+        @test isapprox(gofstat(lh), gofstat(bestfit_lh), rtol=1e-3)
+    end
+
+    @testset "6. Solvers Integration" begin
+        x = 1.0:1.0:10.0
+        dom = Domain(x)
+        truth = Model(@fd (x, slope=2.0) -> slope .* x)
+        data = GModelFit.mock(GaussianData, dom, truth, seed=1)
+
+        function get_fresh_lh()
+            guess = Model(@fd (x, slope=1.0) -> slope .* x)
+            return Likelihood(data, guess, autodiff=true)
+        end
+
+        # --- lsqfit (Default) ---
+        lh_lsq = get_fresh_lh()
+        stat_lsq = maximize!(lh_lsq, Solvers.lsqfit())
+        @test stat_lsq isa SolverStatusOK
+        @test isapprox(getparams(lh_lsq)[(:main, :slope)].val, 2.0, atol=0.1)
+
+        # --- cmpfit ---
+        lh_cmp = get_fresh_lh()
+        stat_cmp = maximize!(lh_cmp, Solvers.cmpfit())
+        # Depending on tolerances, it might return OK or Warn(Status 5/2), both valid fit states
+        @test stat_cmp isa SolverStatusOK || stat_cmp isa SolverStatusWarn
+        @test isapprox(getparams(lh_cmp)[(:main, :slope)].val, 2.0, atol=0.1)
+
+        # --- curvefit ---
+        lh_curv = get_fresh_lh()
+        stat_curv = maximize!(lh_curv, Solvers.curvefit())
+        @test stat_curv isa SolverStatusOK
+        @test isapprox(getparams(lh_curv)[(:main, :slope)].val, 2.0, atol=0.1)
+
+        # --- dry solver ---
+        lh_dry = get_fresh_lh()
+        stat_dry = maximize!(lh_dry, Solvers.dry())
+        @test stat_dry isa SolverStatusWarn # Dry always warns
+        @test getparams(lh_dry)[(:main, :slope)].val == 1.0 # Values should not change
+    end
+
+    @testset "7. Snapshots & DataFrame Exports" begin
+        # --- snapshot ---
+        m = ModelEval(Domain(1:5), Model(@fd (x, a=1.0) -> a .* x))
+        snap = snapshot(m)
+        @test snap isa GModelFit.ModelSnapshot
+        @test getcomps(snap)[(:main,)].evalbuf == [1.0, 2.0, 3.0, 4.0, 5.0]
+
+        # Verify detachment (modifying original shouldn't modify snapshot)
+        getparams(m)[(:main, :a)].val = 99.0
+        @test getparams(snap)[(:main, :a)].val == 1.0
+
+        # --- DataFrame Exports ---
+        truth = Model(@fd (x, slope=2.0) -> slope .* x)
+        data = GModelFit.mock(GaussianData, Domain(1.0:5.0), truth, seed=1)
+        lh = Likelihood(data, truth)
+
+        df_params = export_params(lh)
+        @test df_params isa DataFrame
+        @test nrow(df_params) == 1
+        @test df_params.pname[1] == "(:main, :slope)"
+
+        df_data = GModelFit.export_data(data)
+        @test df_data isa DataFrame
+        @test :data_vals in propertynames(df_data)
+
+        df_folded = export_folded_eval(lh)
+        @test df_folded isa DataFrame
+        @test :model in propertynames(df_folded)
+        @test :resid in propertynames(df_folded)
+
+        df_unfolded = export_unfolded_eval(lh)
+        @test df_unfolded isa DataFrame
+        @test :main in propertynames(df_unfolded)
     end
 end
 
+@testset "PoissonCounts and Mock Data" begin
+    @testset "Constructor and Type Handling" begin
+        # Test that the constructor correctly handles Arrays of Integers
+        # and safely converts them to Float64 internally.
+        counts_int = [10, 0, 5, 2]
+        dom = Domain(1:4)
 
+        data = PoissonCounts(dom, counts_int)
 
-# ====================================================================
-x = 0:0.1:5
-model = Model(:main => @fd (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-# @gp x model(Domain(x)) "w l t 'True model'" x values(data) uncerts(data) "w yerr t 'Data'" x bestfit() "w l t 'Best fit'"
-@test isapprox(bestfit[:main].a2.val, 1, atol=0.2)
-@test isapprox(bestfit[:main].a1.val, 1, atol=0.2)
-@test isapprox(bestfit[:main].a0.val, 5, atol=0.4)
-@test fsumm.ndata == 51
-@test fsumm.nfree == 3
-@test isapprox(fsumm.fitstat, 1.7, atol=0.2)
+        @test data isa PoissonCounts
+        @test values(data) isa Vector{Float64}
+        @test values(data) == [10.0, 0.0, 5.0, 2.0]
+    end
 
+    @testset "Mock Data Generation" begin
+        dom = Domain(1:500)
+        # Flat model predicting exactly 20.0 counts everywhere
+        truth_model = Model(:main => @fd((x, bg=20.0) -> bg))
+        meval = ModelEval(dom, truth_model)
 
-# ====================================================================
-f = @fd (x, p1=1, p2=1.e-3, p3=1e-6, p4=4, p5=5) ->
-    @. (p1 + p2 * x + p3 * x^2 + p4 * sin(p5 * x))  *  cos(x)
-x = 1.:50:10000
-model = Model(f)
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:main].p1.val - 1)    / bestfit[:main].p1.unc < 3
-@test abs(bestfit[:main].p2.val - 1e-3) / bestfit[:main].p2.unc < 3
-@test abs(bestfit[:main].p3.val - 1e-6) / bestfit[:main].p3.unc < 3
-@test abs(bestfit[:main].p4.val - 4   ) / bestfit[:main].p4.unc < 3
-@test abs(bestfit[:main].p5.val - 5   ) / bestfit[:main].p5.unc < 3
-@test fsumm.ndata == 200
-@test fsumm.nfree == 5
-@test isapprox(fsumm.fitstat, 1, atol=0.2)
+        # Generate mock data
+        data = GModelFit.mock(PoissonCounts, meval; seed=123)
 
+        @test data isa PoissonCounts
+        @test length(values(data)) == 500
 
-# ====================================================================
-f1 = @fd (x, p1=1, p2=1e-3, p3=1e-6) -> @.  p1  +  p2 * x  +  p3 * x^2
-f2 = @fd (x, p4=4, p5=5) -> @. p4 * sin(p5 * x)
-f3 = @fd (x) -> cos.(x)
+        # Check that generated values are mathematically integers (even if typed as Float64)
+        @test all(isinteger.(values(data)))
 
-x = 1.:50:10000
-model = Model(:f1 => f1,
-              :f2 => f2,
-              :f3 => f3,
-              :main => @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3)
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:f1].p1.val - 1)    / bestfit[:f1].p1.unc < 3
-@test abs(bestfit[:f1].p2.val - 1e-3) / bestfit[:f1].p2.unc < 3
-@test abs(bestfit[:f1].p3.val - 1e-6) / bestfit[:f1].p3.unc < 3
-@test abs(bestfit[:f2].p4.val - 4   ) / bestfit[:f2].p4.unc < 3
-@test abs(bestfit[:f2].p5.val - 5   ) / bestfit[:f2].p5.unc < 3
-@test fsumm.ndata == 200
-@test fsumm.nfree == 5
-@test isapprox(fsumm.fitstat, 1, atol=0.2)
+        # For a Poisson distribution with lambda = 20, the mean and variance should both be ~20.
+        # We test with a generous tolerance to avoid random test failures (flakiness).
+        v = values(data)
+        @test isapprox(Statistics.mean(v), 20.0, atol=1.0)
+        @test isapprox(var(v), 20.0, atol=2.5)
+    end
 
-# Same results with
-model = Model(:f1 => f1)
-model[:f2] = f2
-model[:f3] = f3
-model[:main] = @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3
-GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:f1].p1.val - 1)    / bestfit[:f1].p1.unc < 3
-@test abs(bestfit[:f1].p2.val - 1e-3) / bestfit[:f1].p2.unc < 3
-@test abs(bestfit[:f1].p3.val - 1e-6) / bestfit[:f1].p3.unc < 3
-@test abs(bestfit[:f2].p4.val - 4   ) / bestfit[:f2].p4.unc < 3
-@test abs(bestfit[:f2].p5.val - 5   ) / bestfit[:f2].p5.unc < 3
-@test fsumm.ndata == 200
-@test fsumm.nfree == 5
-@test isapprox(fsumm.fitstat, 1, atol=0.2)
+    @testset "Cash Statistic (C-stat) and Log-Likelihood" begin
+        # We will test against analytically known C-stat values.
+        # Formula: C_i = 2 * (M_i - D_i + D_i * ln(D_i / M_i)) (if D_i > 0)
+        #          C_i = 2 * M_i                               (if D_i == 0)
 
+        # Model evaluates to M = [1.0, 2.0, 0.5]
+        model = Model(:main => @fd((x) -> x))
+        dom = Domain([1.0, 2.0, 0.5])
 
-# ====================================================================
-dom = Domain(-5:0.1:5)
-model = Model(:main => @fd (x, cx=0.) -> @. x-cx)
-data = GModelFit.mock(Measures, model, dom)
-bestfit, fsumm = fit(model, data)
+        # Data observed is D = [0, 2, 1]
+        data = PoissonCounts(dom, [0, 2, 1])
+        lh = Likelihood(data, model)
 
-dom = CartesianDomain(-5:0.1:5, -5:0.1:5)
-for dom in [dom, Domain(dom)]
-	local model = Model(:main => @fd (x, y, cx=0., cy=0.) -> @. sqrt((x-cx)^2 + (y-cy)^2))
-	local data = GModelFit.mock(Measures, model, dom)
-	local bestfit, fsumm = fit(model, data)
-	@test fsumm.fitstat < 1.5
+        # Analytical calculation:
+        # Bin 1 (D=0, M=1.0): C_1 = 2 * (1.0) = 2.0
+        # Bin 2 (D=2, M=2.0): C_2 = 2 * (2.0 - 2.0 + 2.0 * ln(2.0/2.0)) = 0.0
+        # Bin 3 (D=1, M=0.5): C_3 = 2 * (0.5 - 1.0 + 1.0 * ln(1.0/0.5)) = 2 * (-0.5 + 0.693147) ≈ 0.386294
+        # Total C-stat ≈ 2.386294
 
-	local model = Model(:bkg => GModelFit.OffsetSlope(0, 0, 0, 1, 1),
-	                    :main => @fd (x, y, bkg, cx=0., cy=0.) -> @. bkg + sqrt((x-cx)^2 + (y-cy)^2))
-	local data = GModelFit.mock(Measures, model, dom)
-	local bestfit, fsumm = fit(model, data)
-	@test fsumm.fitstat < 1.5
-end
+        expected_cstat = 2.0 + 0.0 + 2.0 * (-0.5 + log(1.0 / 0.5))
 
+        @test gofstat(lh) ≈ expected_cstat
 
-dom = CartesianDomain(-5:0.1:5, -5:0.1:5, -5:0.1:5)
-for dom in [dom, Domain(dom)]
-	local model = Model(:main => @fd (x, y, z, cx=0., cy=0., cz=0.) -> @. sqrt((x-cx)^2 + (y-cy)^2 + (z-cz)^2))
-	local data = GModelFit.mock(Measures, model, dom)
-	local bestfit, fsumm = fit(model, data)
-	@test fsumm.fitstat < 1.5
+        # Log-likelihood should exactly map to -0.5 * gofstat
+        @test loglh(lh) ≈ -0.5 * expected_cstat
+    end
 
-	local model = Model(:bkg => GModelFit.OffsetSlope(0, 0, 0, 0, 1, 1, 1),
-                        :main => @fd (x, y, z, bkg, cx=0., cy=0., cz=0.) -> @. bkg + sqrt((x-cx)^2 + (y-cy)^2 + (z-cz)^2))
-	local data = GModelFit.mock(Measures, model, dom)
-	local bestfit, fsumm = fit(model, data)
-	@test fsumm.fitstat < 1.5
-end
+    @testset "Anscombe Residuals" begin
+        # Re-using the analytical setup from above
+        model = Model(:main => @fd((x) -> x))
+        dom = Domain([1.0, 2.0, 0.5])
+        data = PoissonCounts(dom, [0, 2, 1])
+        lh = Likelihood(data, model)
 
+        # Manually trigger the residual evaluation on the group
+        group = lh[()]
+        GModelFit.evaluate_resid!(group)
+        res = group.residuals
 
-# ====================================================================
-x = 0:0.05:6
-model = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
-              :l2  => GModelFit.Gaussian(1, 3, 0.5),
-              :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
-              :main => SumReducer(:l1, :l2, :bkg));
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:l1].norm.val    - 1)   / bestfit[:l1].norm.unc < 3
-@test abs(bestfit[:l1].center.val  - 2)   / bestfit[:l1].center.unc < 3
-@test abs(bestfit[:l1].sigma.val   - 0.2) / bestfit[:l1].sigma.unc < 3
-@test abs(bestfit[:l2].norm.val    - 1)   / bestfit[:l2].norm.unc < 3
-@test abs(bestfit[:l2].center.val  - 3)   / bestfit[:l2].center.unc < 3
-@test abs(bestfit[:l2].sigma.val   - 0.5) / bestfit[:l2].sigma.unc < 3
-@test abs(bestfit[:bkg].offset.val - 0.5) / bestfit[:bkg].offset.unc < 3
-@test abs(bestfit[:bkg].slope.val  - 0.1) / bestfit[:bkg].slope.unc < 3
-@test isnan(bestfit[:bkg].x0.unc)
-@test fsumm.ndata == 121
-@test fsumm.nfree == 8
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
+        # Residual formula: sign(D - M) * sqrt(C_i)
 
+        # Bin 1 (D=0, M=1.0): C_1 = 2.0. sign(0 - 1.0) = -1.0. Res = -sqrt(2.0)
+        @test res[1] ≈ -sqrt(2.0)
 
-# Tie two parameters
-model[:l2].norm.patch = :l1
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:l1].norm.val    - 1)   / bestfit[:l1].norm.unc < 3
-@test abs(bestfit[:l1].center.val  - 2)   / bestfit[:l1].center.unc < 3
-@test abs(bestfit[:l1].sigma.val   - 0.2) / bestfit[:l1].sigma.unc < 3
-@test isnan(bestfit[:l2].norm.unc)
-@test abs(bestfit[:l2].center.val  - 3)   / bestfit[:l2].center.unc < 3
-@test abs(bestfit[:l2].sigma.val   - 0.5) / bestfit[:l2].sigma.unc < 3
-@test abs(bestfit[:bkg].offset.val - 0.5) / bestfit[:bkg].offset.unc < 3
-@test abs(bestfit[:bkg].slope.val  - 0.1) / bestfit[:bkg].slope.unc < 3
-@test isnan(bestfit[:bkg].x0.unc)
-@test fsumm.ndata == 121
-@test fsumm.nfree == 7
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
+        # Bin 2 (D=2, M=2.0): C_2 = 0.0. sign(2 - 2.0) = 0.0. Res = 0.0
+        @test res[2] ≈ 0.0
 
-
-# Patch one parameter to another via a λ function
-model[:l2].norm.patch = @fd (m, v) -> v + m[:l1].norm
-data = GModelFit.mock(Measures, model, Domain(x), seed=1)
-bestfit, fsumm = fit(model, data)
-@test abs(bestfit[:l1].norm.val    - 1)   / bestfit[:l1].norm.unc < 3
-@test abs(bestfit[:l1].center.val  - 2)   / bestfit[:l1].center.unc < 3
-@test abs(bestfit[:l1].sigma.val   - 0.2) / bestfit[:l1].sigma.unc < 3
-@test abs(bestfit[:l2].norm.actual - 2)   < 0.2
-@test abs(bestfit[:l2].center.val  - 3)   / bestfit[:l2].center.unc < 3
-@test abs(bestfit[:l2].sigma.val   - 0.5) / bestfit[:l2].sigma.unc < 3
-@test abs(bestfit[:bkg].offset.val - 0.5) / bestfit[:bkg].offset.unc < 3
-@test abs(bestfit[:bkg].slope.val  - 0.1) / bestfit[:bkg].slope.unc < 3
-@test isnan(bestfit[:bkg].x0.unc)
-@test fsumm.ndata == 121
-@test fsumm.nfree == 8
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
-
-
-
-# ====================================================================
-x = 0:0.05:6
-model1 = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
-               :l2  => GModelFit.Gaussian(1, 3, 0.5),
-               :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
-               :main => SumReducer(:l1, :l2, :bkg));
-
-model2 = Model(:l1  => GModelFit.Gaussian(0.8, 2.1, 0.1),
-               :l2  => GModelFit.Gaussian(1.2, 2.5, 0.4),
-               :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
-               :main => SumReducer(:l1, :l2, :bkg));
-
-models = [model1, model2]
-freeze!(models[1], :bkg);
-freeze!(models[2], :bkg);
-data = GModelFit.mock(Measures, models, [Domain(x), Domain(x)], seed=1)
-bestfit, fsumm = fit(models, data, GModelFit.Solvers.cmpfit())
-
-@test abs(bestfit[1][:l1].norm.val    - 1)   / bestfit[1][:l1].norm.unc < 3
-@test abs(bestfit[1][:l1].center.val  - 2)   / bestfit[1][:l1].center.unc < 3
-@test abs(bestfit[1][:l1].sigma.val   - 0.2) / bestfit[1][:l1].sigma.unc < 3
-@test abs(bestfit[1][:l2].norm.val    - 1)   / bestfit[1][:l2].norm.unc < 3
-@test abs(bestfit[1][:l2].center.val  - 3)   / bestfit[1][:l2].center.unc < 3
-@test abs(bestfit[1][:l2].sigma.val   - 0.5) / bestfit[1][:l2].sigma.unc < 3
-@test isnan(bestfit[1][:bkg].offset.unc)
-@test isnan(bestfit[1][:bkg].x0.unc)
-@test isnan(bestfit[1][:bkg].slope.unc)
-@test abs(bestfit[2][:l1].norm.val    - 0.8) / bestfit[2][:l1].norm.unc < 3
-@test abs(bestfit[2][:l1].center.val  - 2.1) / bestfit[2][:l1].center.unc < 3
-@test abs(bestfit[2][:l1].sigma.val   - 0.1) / bestfit[2][:l1].sigma.unc < 3
-@test abs(bestfit[2][:l2].norm.val    - 1.2) / bestfit[2][:l2].norm.unc < 3
-@test abs(bestfit[2][:l2].center.val  - 2.5) / bestfit[2][:l2].center.unc < 3
-@test abs(bestfit[2][:l2].sigma.val   - 0.4) / bestfit[2][:l2].sigma.unc < 3
-@test isnan(bestfit[2][:bkg].offset.unc)
-@test isnan(bestfit[2][:bkg].x0.unc)
-@test isnan(bestfit[2][:bkg].slope.unc)
-@test fsumm.ndata == 242
-@test fsumm.nfree == 12
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
-
-
-thaw!(models[1], :bkg);
-thaw!(models[2], :bkg);
-models[2][:bkg].offset.mpatch = @fd m -> m[1][:bkg].offset
-models[2][:bkg].slope.mpatch  = @fd m -> m[1][:bkg].slope
-models[1][:l2].center.mpatch = @fd m -> m[2][:l2].center
-data = GModelFit.mock(Measures, models, [Domain(x), Domain(x)], seed=1)
-bestfit, fsumm = fit(models, data)
-
-@test abs(bestfit[1][:l1].norm.val    - 1)   / bestfit[1][:l1].norm.unc < 3
-@test abs(bestfit[1][:l1].center.val  - 2)   / bestfit[1][:l1].center.unc < 3
-@test abs(bestfit[1][:l1].sigma.val   - 0.2) / bestfit[1][:l1].sigma.unc < 3
-@test abs(bestfit[1][:l2].norm.val    - 1)   / bestfit[1][:l2].norm.unc < 3
-@test isnan(bestfit[1][:l2].center.unc)
-@test abs(bestfit[1][:l2].sigma.val   - 0.5) / bestfit[1][:l2].sigma.unc < 3
-@test abs(bestfit[1][:bkg].offset.val - 0.5) / bestfit[1][:bkg].offset.unc < 3
-@test isnan(bestfit[1][:bkg].x0.unc)
-@test abs(bestfit[1][:bkg].slope.val  - 0.1) / bestfit[1][:bkg].slope.unc < 3
-@test abs(bestfit[2][:l1].norm.val    - 0.8) / bestfit[2][:l1].norm.unc < 3
-@test abs(bestfit[2][:l1].center.val  - 2.1) / bestfit[2][:l1].center.unc < 3
-@test abs(bestfit[2][:l1].sigma.val   - 0.1) / bestfit[2][:l1].sigma.unc < 3
-@test abs(bestfit[2][:l2].norm.val    - 1.2) / bestfit[2][:l2].norm.unc < 3
-#@test abs(bestfit[2][:l2].center.val  - 2.5) / bestfit[2][:l2].center.unc < 3
-@test abs(bestfit[2][:l2].sigma.val   - 0.4) / bestfit[2][:l2].sigma.unc < 3
-@test abs(bestfit[2][:bkg].offset.actual - 0.5) < 0.2
-@test isnan(bestfit[2][:bkg].offset.unc)
-@test isnan(bestfit[2][:bkg].x0.unc)
-@test abs(bestfit[2][:bkg].slope.actual - 0.1) < 0.2
-@test isnan(bestfit[2][:bkg].slope.unc)
-@test fsumm.ndata == 242
-@test fsumm.nfree == 13
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
-
-
-
-
-TypedJSON.serialize("test.json", (bestfit, fsumm, data))
-bestfit2, fsumm2, data2 = TypedJSON.deserialize("test.json")
-
-
-for f in fieldnames(typeof(fsumm))
-    (f == :solver_retval)  &&  continue
-    @test getfield(fsumm, f) == getfield(fsumm2, f)
-end
-
-for iset in [1,2]
-    for (cname, comp) in bestfit[iset]
-        for pname in propertynames(comp)
-            @assert isapprox(bestfit[iset][cname][pname].val, bestfit2[iset][cname][pname].val)
-        end
+        # Bin 3 (D=1, M=0.5): C_3 ≈ 0.386. sign(1 - 0.5) = +1.0. Res = +sqrt(C_3)
+        c_3 = 2.0 * (0.5 - 1.0 + 1.0 * log(1.0 / 0.5))
+        @test res[3] ≈ sqrt(c_3)
     end
 end

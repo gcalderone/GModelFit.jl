@@ -15,7 +15,6 @@ Model
 @fd
 axes
 comptype
-comptypes
 coords
 domain
 fit
@@ -24,8 +23,7 @@ fitstat
 freeze!
 getindex
 haskey
-isfreezed
-length
+isfrozen
 select_maincomp!
 thaw!
 uncerts

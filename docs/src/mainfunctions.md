@@ -42,23 +42,23 @@ include("setup.jl")
   # Add two Gaussian components, and a third one representing their sum
   model[:comp1] = GModelFit.Gaussian(1, 3, 1)
   model[:comp2] = GModelFit.Gaussian(0.5, 4, 0.3)
-  model[:sum] = @fd (x, comp1, comp2) -> comp1 .+ comp2
+  model[:sum] = @fd (x, comp1=[], comp2=[]) -> comp1 .+ comp2
   
   # Modify a parameter value:
-  model[:comp1].center.val = 5
+  model[:comp1, :center].val = 5
   
   # Evaluate the model on a user defined domain
   dom = Domain(0:0.1:10)
   model(dom)
   
   # Evaluate the model, but retrieve the outcome of the :comp2 component
-  model(dom, :comp2)
+  ModelEval(dom, model)[:comp2]()
   println() # hide
   ```
 
 - *Mock data*: the [`GModelFit.mock()`](@ref) function allows to generate mock data set(s) using a (multi-)model as ground truth, and add a random noise to simulate the measurement process.  An example using the previously defined model and domain is as follows:
   ```@example abc
-  data = GModelFit.mock(Measures, model, dom)
+  data = GModelFit.mock(dom, model)
   println() # hide
   ```
   This functionality is used in the examples of the next sections to generate the mock datasets.
@@ -69,7 +69,7 @@ include("setup.jl")
 
   The following code shows how to fit the previously generated mock data set to the above model:
   ```@example abc
-  bestfit, fsumm = fit(model, data)
+  bestfit, fsumm = fit(data, model)
   ```
 
   The [`fit`](@ref) function returns a tuple with:
@@ -81,12 +81,12 @@ include("setup.jl")
 - *Serialization*: a few structures (such as  [`GModelFit.ModelSnapshot`](@ref), [`GModelFit.FitSummary`](@ref) and [`Measures{N}`](@ref)) can be *serialized* through [TypedJSON.jl](https://github.com/gcalderone/TypedJSON.jl), i.e. stored in a file, and later *de-serialized* in a separata Julia session.  This is useful when the best fit model and associated informations must be saved for a later use, without the need to re-run the fitting.  The best fit model, fit statistics and mock dataset used above can be serialized with:
   ```@example abc
   using TypedJSON
-  TypedJSON.serialize("my_snapshot.json", (bestfit, fsumm, data))
+  TypedJSON.serialize("my_snapshot.json", snapshot(bestfit))
   println() # hide
   ```
   In a separate Julia session, you can obtain a copy of exactly the same data with
   ```@example abc
   using GModelFit, TypedJSON
-  bestit, fsumm, data = TypedJSON.deserialize("my_snapshot.json")
+  bestfit = TypedJSON.deserialize("my_snapshot.json")
   println() # hide
   ```

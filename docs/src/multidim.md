@@ -16,9 +16,9 @@ model = Model(:background => GModelFit.OffsetSlope(0, 0, 0., 0.5, 1.),
 			  :main => SumReducer(:background, :psf))
 
 dom = CartesianDomain(-5:0.25:5, -4:0.25:4)
-data = GModelFit.mock(Measures, model, dom)
+data = GModelFit.mock(dom, model)
 
-bestfit, fsumm = fit(model, data)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -27,10 +27,10 @@ the results can be displayed with [Gnuplot.jl](https://github.com/gcalderone/Gnu
 using Gnuplot
 
 # Plot the model...
-@gsp "set palette" axes(dom, 1) axes(dom, 2) model(dom) "w pm3d notit"
+@gsp "set palette" gridcoords(dom, 1) gridcoords(dom, 2) model(dom) "w pm3d notit"
 
 # ... and the data
-@gsp :- axes(dom, 1) axes(dom, 2) values(data) "w dots notit lc rgb 'gray'"
+@gsp :- gridcoords(dom, 1) gridcoords(dom, 2) values(data) "w dots notit lc rgb 'gray'"
 saveas("ex2d") # hide
 ```
 ![](assets/ex2d.png)
@@ -44,8 +44,8 @@ using GModelFit
 
 dom = CartesianDomain(-5:0.1:5, -5:0.1:5, -5:0.1:5)
 model = Model(:source => @fd (x, y, z, cx=0., cy=0., cz=0.) -> @. sqrt((x-cx)^2 + (y-cy)^2 + (z-cz)^2))
-data = GModelFit.mock(Measures, model, dom)
-bestfit, fsumm = fit(model, data)
+data = GModelFit.mock(dom, model)
+bestfit, fsumm = fit(data, model)
 show((bestfit, fsumm)) # hide
 ```
 
@@ -56,7 +56,7 @@ using Gnuplot
 m = bestfit()
 @gp "set autoscale fix" "set key out" "set size ratio -1" xlab="X" ylab="Y" :-
 for i in 1:size(m)[3]
-	@gp :- i m[i, :, :] "w image t 'Z=$(string(axes(dom, 3)[i]))'" cbr=extrema(m) :-
+	@gp :- i m[i, :, :] "w image t 'Z=$(string(gridcoords(dom, 3)[i]))'" cbr=extrema(m) :-
 end
 @gp
 Gnuplot.save("assets/animation.gif", term="gif animate size 600, 360 delay 5") # hide
