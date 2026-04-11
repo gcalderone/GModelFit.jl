@@ -1,4 +1,4 @@
-
+# ====================================================================
 """
     evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, param1, param2....
     evaluate!(comp::AbstractComponent, domain::AbstractDomain, output::Abstractvector, deps::AbstractVector, param1, param2....
@@ -94,161 +94,153 @@ include("components/SumReducer.jl")
 # ====================================================================
 struct ModelEval{T <: Real}
     model::Model
-    domain::AbstractDomain
-    cevals::OrderedDict{Symbol, CompEval}
-    ifree::Vector{Int}
-    patched::Vector{NTuple{2, Symbol}}
     pvalues::PVModel{T}
     pactual::PVModel{T}
-    pvmulti::Vector{PVModel{T}}
+    patched::OrderedDict{NTuple{2, Symbol}, Parameter}
+    domain::AbstractDomain
+    cevals::OrderedDict{Symbol, CompEval}
     seq::Vector{Symbol}
     folded_domain::AbstractDomain
     folded::Array{T}
 
-    function ModelEval{T}(model::Model, folded_domain::AbstractDomain) where {T <: Real}
+    function ModelEval{T}(model::Model, folded_domain::AbstractDomain,
+                          pvalues::PVModel{T}, pactual::PVModel{T}) where {T <: Real}
         prepare!(model.IR, folded_domain)
-        meval = new{T}(model, unfolded_domain(model.IR, folded_domain),
+        meval = new{T}(model, pvalues, pactual,
+                       OrderedDict{NTuple{2, Symbol}, Parameter}(),
+                       unfolded_domain(model.IR, folded_domain),
                        OrderedDict{Symbol, CompEval}(),
-                       Vector{Int}(), Vector{NTuple{2, Symbol}}(),
-                       PVModel{T}(),
-                       PVModel{T}(),
-                       Vector{PVModel{T}}(),
                        Vector{Symbol}(),
                        folded_domain,
                        domain2buffer(T, folded_domain))
+
+        for (key, par) in getparams(model)
+            if !isnothing(par.patch)  ||  !isnothing(par.cast)
+                meval.patched[(key[1], key[2])] = par
+            end
+        end
+
+        # Update evaluation sequence
+        ftree = flatten(deptree(model))
+        append!(meval.seq, reverse(getfield.(ftree, :cname)))
+
+        # Walk dependency tree and create relevant CompEval structures (if
+        # not yet existing)
+        for d in ftree
+            cname = d.cname
+            if !(cname in keys(meval.cevals))
+                meval.cevals[cname] = CompEval{T}(model.comps[cname], meval.domain)  # all components share the same domain
+            end
+        end
+
+        # Update references to dependencies
+        for (cname, ceval) in meval.cevals
+            deps = dependencies(ceval.comp)
+            if isa(ceval.comp, FComp)
+                _domdeps = Vector{Symbol}()
+                _compdeps = Vector{Symbol}()
+                for d in deps
+                    if haskey(meval.cevals, d)  # dependency with known name
+                        push!(_compdeps, d)
+                    else # dependency with unknown name is intended as a domain dimension
+                        @assert length(_compdeps) == 0 "Domain dependencies for component $cname must be listed before other component name(s)"
+                        push!(_domdeps, d)
+                    end
+                end
+                @assert length(_domdeps) == ndims(meval.domain) "Domain has $(ndims(meval.domain)) dimensions but component $cname accepts $(length(_domdeps)) domain arguments: " * join(string.(_domdeps), ", ")
+                deps = _compdeps
+            end
+            for d in deps
+                @assert haskey(meval.cevals, d) "No component has name $d"
+                push!(ceval.deps, meval.cevals[d])
+            end
+        end
         return meval
     end
 end
 
 
-function scan_model!(meval::ModelEval{T}) where {T <: Real}
-    function isParamFixed(par::Parameter)
-        if !isnothing(par.patch)
-            @assert isnothing(par.mpatch) "Parameter [$cname].$pname has both patch and mpatch fields set, while only one is allowed"
-            if isa(par.patch, Symbol)  # use same param. value from a different component
-                return true
-            else                       # invoke a patch function
-                @assert length(par.patch.args) in [1,2]
-                return  length(par.patch.args) == 1
+struct ModelSetEval{T <: Real}
+    ms::ModelSet
+    dict::OrderedDict{Symbol, ModelEval{T}}
+    vec::Vector{ModelEval{T}}
+    params::OrderedDict{NTuple{3, Symbol}, Parameter}
+    pvalues::PVSet{T}
+    pactual::PVSet{T}
+    ifree::Vector{Int}
+
+    function ModelSetEval{T}(ms::ModelSet, domains::Vector{<: AbstractDomain}) where {T <: Real}
+        N = length(ms)
+        @assert N == length(domains)
+        out = new{T}(ms, OrderedDict{Symbol, ModelEval{T}}(),
+                     Vector{ModelEval{T}}(),
+                     OrderedDict{NTuple{3, Symbol}, Parameter}(),
+                     PVSet{T}(),
+                     PVSet{T}(allow_overwrite=true),
+                     Vector{Int}())
+        for (key, par) in getparams(ms)
+            out.params[ key]    = deepcopy(par) # local copy, these will contain best fit nd uncertainties
+            out.pvalues[key...] = par.val
+            out.pactual[key...] = par.val
+            if !par.actually_fixed
+                push!(out.ifree, length(out.params))
             end
-        elseif !isnothing(par.mpatch)
-            @assert length(par.mpatch.args) in [1,2]
-            return  length(par.mpatch.args) == 1
         end
-        return par.fixed
+        for (mname, model) in ms
+            out.dict[mname] = ModelEval{T}(model, domains[length(out.vec) + 1],
+                                        PVModel(mname, out.pvalues),
+                                        PVModel(mname, out.pactual))
+            push!(out.vec, out.dict[mname])
+        end
+        return out
     end
-
-    empty!(meval.ifree)
-    empty!(meval.patched)
-    empty!(meval.pvalues)
-    empty!(meval.pactual)
-    empty!(meval.pvmulti)
-
-    isfixed = Vector{Bool}()
-    for (cname, comp) in meval.model.comps
-        for (pname, par) in getparams(comp)
-            # Some solvers do not handle parameter limits, ensure values are in the allowed range
-            if par.val < par.low
-                s = string(par) * "[$(cname)].$(pname) value outside allowed range, using lower limit"
-                @warn s
-                par.val = par.low
-            elseif par.val > par.high
-                s = string(par) * "[$(cname)].$(pname) value outside allowed range, using upper limit"
-                par.val = par.high
-            end
-            if isnan(par.low)  ||  isnan(par.high)  ||  isnan(par.val)
-                s = "NaN value detected for param [$(cname)].$(pname):\n" * string(par)
-                error(s)
-            end
-
-            push!(isfixed, isParamFixed(par)  ||  meval.model.fixed[cname])
-            if !isnothing(par.patch)  ||  !isnothing(par.mpatch)
-                push!(meval.patched, (cname, pname))
-            end
-
-            push!(meval.pvalues, cname, pname, par.val)
-            push!(meval.pactual, cname, pname, par.val)
-        end
-    end
-    append!(meval.ifree, findall(.! isfixed))
-
-    # Update evaluation sequence
-    tree = deptree(meval.model)
-    ftree = flatten(tree)
-    empty!(meval.seq)
-    append!(meval.seq, reverse(getfield.(ftree, :cname)))
-
-    # Walk dependency tree and create relevant CompEval structures (if
-    # not yet existing)
-    for d in ftree
-        cname = d.cname
-        if !(cname in keys(meval.cevals))
-            ceval = CompEval{T}(meval.model.comps[cname], meval.domain)  # all components share the same domain
-            meval.cevals[cname] = ceval
-        end
-    end
-
-    # Update references to dependencies
-    for (cname, ceval) in meval.cevals
-        empty!(ceval.deps)
-        deps = dependencies(ceval.comp)
-        if isa(ceval.comp, FComp)
-            _domdeps = Vector{Symbol}()
-            _compdeps = Vector{Symbol}()
-            for d in deps
-                if haskey(meval.cevals, d)  # dependency with known name
-                    push!(_compdeps, d)
-                else # dependency with unknown name is intended as a domain dimension
-                    @assert length(_compdeps) == 0 "Domain dependencies for component $cname must be listed before other component name(s)"
-                    push!(_domdeps, d)
-                end
-            end
-            @assert length(_domdeps) == ndims(meval.domain) "Domain has $(ndims(meval.domain)) dimensions but component $cname accepts $(length(_domdeps)) domain arguments: " * join(string.(_domdeps), ", ")
-            deps = _compdeps
-        end
-        for d in deps
-            @assert haskey(meval.cevals, d)  "No component has name $d"
-            push!(ceval.deps, meval.cevals[d])
-        end
-    end
-
-    nothing
 end
 
 
-function free_params(meval::ModelEval)
-    out = Vector{Parameter}()
-    for (cname, comp) in meval.model.comps
-        for (pname, par) in getparams(comp)
-            push!(out, par)
+function update_eval!(meval::ModelEval)
+    for (key, par) in meval.patched
+        if !isnothing(par.patch)
+            if isa(par.patch, Symbol)  # use same param. value from a different component
+                meval.pactual[key...] = meval.pvalues[par.patch, key[2]]
+            else                       # invoke a patch function
+                meval.pactual[key...] = par.patch(meval.pvalues)
+            end
+        else
+            meval.pactual[key...] = par.cast(meval.pvalues, meval.pvalues[key...])
         end
     end
-    return out[meval.ifree]
+    for cname in meval.seq
+        update_eval!(meval.cevals[cname], meval.pactual[cname])
+    end
+    unfolded = meval.cevals[meval.seq[end]].buffer
+    apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.domain, unfolded)
 end
-nfree(meval::ModelEval) = length(meval.ifree)
 
+function update_eval!(mseval::ModelSetEval, pvalues::Vector)
+    i = mseval.ifree
+    mseval.pvalues.vec[i] .= pvalues
+    mseval.pactual.vec[i] .= pvalues
+    update_eval!.(mseval.vec)
+end
 
-function run_patch_functs!(meval::ModelEval)
-    for (cname, pname) in meval.patched
-        par = getproperty(meval.model[cname], pname)
-        if !isnothing(par.patch)
-            @assert isnothing(par.mpatch) "Parameter [:$(cname)].$pname has both patch and mpatch fields set, while only one is allowed"
-            if isa(par.patch, Symbol)  # use same param. value from a different component
-                meval.pactual[cname][pname] = meval.pvalues[par.patch][pname]
-            else                       # invoke a patch function
-                if length(par.patch.args) == 1
-                    meval.pactual[cname][pname] = par.patch(meval.pvalues)
-                else
-                    meval.pactual[cname][pname] = par.patch(meval.pvalues, meval.pvalues[cname][pname])
-                end
-            end
-        elseif !isnothing(par.mpatch)
-            @assert length(meval.pvmulti) > 0 "Parameter [:$(cname)].$pname has the mpatch field set but no other Model is being considered"
-            if length(par.mpatch.args) == 1
-                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti)
-            else
-                meval.pactual[cname][pname] = par.mpatch(meval.pvmulti, meval.pvalues[cname][pname])
-            end
+function update_eval!(mseval::ModelSetEval)
+    mseval.pactual.vec .= mseval.pvalues.vec
+    update_eval!.(mseval.vec)
+end
+
+getparams(mseval::ModelSetEval) = mseval.params
+nfree(mseval::ModelSetEval) = length(mseval.ifree)
+
+function set_bestfit!(mseval::ModelSetEval, pvalues::Vector{Float64}, puncerts::Vector{Float64})
+    update_eval!(mseval, pvalues)
+    i = 0
+    for (key, par) in mseval.params
+        par.val    = mseval.pvalues[key...]
+        par.actual = mseval.pactual[key...]
+        if !par.actually_fixed
+            i += 1
+            @assert par.val == pvalues[i]
+            par.unc = puncerts[i]
         end
     end
 end
@@ -260,7 +252,7 @@ evalcounter(meval::ModelEval, cname::Symbol)
 Return the number of times the component with name `cname` has been evaluated.
 =#
 evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].counter
-evalcounter(model::Model, cname::Symbol) = "???"
+# TODO is this needed? evalcounter(model::Model, cname::Symbol) = "???"
 
 
 #=
@@ -286,98 +278,23 @@ function fold_model(meval::ModelEval{T}, cname::Symbol) where T
     return output
 end
 
+#last_eval(multi::ModelSetEval{1}) = last_eval(multi, 1)
+#last_eval(multi::ModelSetEval{1}, cname::Symbol) = last_eval(multi, 1, cname)
+last_eval(mseval::ModelSetEval, mname::Symbol) = last_eval(mseval.dict[mname])
+last_eval(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = last_eval(mseval.dict[mname], cname)
 
-# ====================================================================
-struct MultiEval{N, T <: Real}
-    v::Vector{ModelEval{T}}
+#last_eval_folded(multi::ModelSetEval{1}) = last_eval_folded(multi, 1)
+last_eval_folded(mseval::ModelSetEval, mname::Symbol) = last_eval_folded(mseval.dict[mname])
 
-    MultiEval{T}(model::Model, domain::AbstractDomain) where {T <: Real} = MultiEval{T}([model], [domain])
-    function MultiEval{T}(models::Vector{Model}, domains::Vector{<: AbstractDomain}) where {T <: Real}
-        @assert length(models) == length(domains)
-        out = new{length(models), T}([ModelEval{T}(models[i], domains[i]) for i in 1:length(models)])
-        scan_model!(out)
-        return out
-    end
-end
-length(multi::MultiEval) = length(multi.v)
-
-
-function free_params_indices(multi::MultiEval)
-    out = Vector{NTuple{3, Int}}()
-    i1 = 1
-    for id in 1:length(multi)
-        nn = length(multi.v[id].ifree)
-        #(nn == 0)  && continue   This is a bug (e.g. if in multimodel one model has zero free params
-        i2 = i1 + nn - 1
-        push!(out, (id, i1, i2))
-        i1 += nn
-    end
-    return out
-end
-
-
-scan_model!(multi::MultiEval{1,T}) where {T <: Real} = scan_model!(multi.v[1])
-function scan_model!(multi::MultiEval)
-    for i in 1:length(multi)
-        scan_model!(multi.v[i])
-    end
-    pv = [multi.v[i].pvalues for i in 1:length(multi)]
-    for i in 1:length(multi)
-        empty!( multi.v[i].pvmulti)
-        append!(multi.v[i].pvmulti, pv)
-    end
-end
-
-
-function free_params(multi::MultiEval)
-    out = Vector{Parameter}()
-    for id in 1:length(multi)
-        append!(out, free_params(multi.v[id]))
-    end
-    return out
-end
-nfree(multi::MultiEval) = sum(nfree.(multi.v))
-
-
-function update_eval!(multi::MultiEval{N, T}, pvalues::Vector) where {N, T  <: Real}
-    for (i, i1, i2) in free_params_indices(multi)
-        meval = multi.v[i]
-        items(meval.pvalues)[meval.ifree] .= pvalues[i1:i2]
-        items(meval.pactual)[meval.ifree] .= pvalues[i1:i2]
-    end
-
-    for i in 1:N
-        meval = multi.v[i]
-        run_patch_functs!(meval)
-        for cname in meval.seq
-            update_eval!(meval.cevals[cname], items(meval.pactual[cname]))
-        end
-        unfolded = meval.cevals[meval.seq[end]].buffer
-        apply_ir!(meval.model.IR, meval.folded_domain, meval.folded, meval.domain, unfolded)
-    end
-    nothing
-end
-
-update_eval!(multi::MultiEval) = update_eval!(multi, getfield.(free_params(multi), :val))
-
-
-last_eval(multi::MultiEval{1}) = last_eval(multi, 1)
-last_eval(multi::MultiEval{1}, cname::Symbol) = last_eval(multi, 1, cname)
-last_eval(multi::MultiEval, id::Int) = last_eval(multi.v[id])
-last_eval(multi::MultiEval, id::Int, cname::Symbol) = last_eval(multi.v[id], cname)
-
-last_eval_folded(multi::MultiEval{1}) = last_eval_folded(multi, 1)
-last_eval_folded(multi::MultiEval, id::Int) = last_eval_folded(multi.v[id])
-
-fold_model(multi::MultiEval{1}, cname::Symbol) = fold_model(multi, 1, cname)
-fold_model(multi::MultiEval, id::Int, cname::Symbol) = fold_model(multi.v[id], cname)
+#fold_model(multi::ModelSetEval{1}, cname::Symbol) = fold_model(multi, 1, cname)
+fold_model(multi::ModelSetEval, mname::Symbol, cname::Symbol) = fold_model(mseval.dict[mname], cname)
 
 
 # ====================================================================
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
-    multi = MultiEval{Float64}(model, domain)
-    update_eval!(multi)
-    isnothing(cname)  &&  (return last_eval_folded(multi))
-    return fold_model(multi, cname)
+    mseval = ModelSetEval{Float64}(ModelSet(:_ => model), [domain])
+    update_eval!(mseval)
+    isnothing(cname)  &&  (return last_eval_folded(mseval, :_))
+    return fold_model(mseval, cname)
 end

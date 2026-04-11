@@ -1,58 +1,46 @@
-# ====================================================================
-# Component structure
-#
-mutable struct Lorentzian_1D <: AbstractComponent
-    norm::Parameter
-    center::Parameter
-    fwhm::Parameter
+struct Lorentzian <: AbstractComponent
+    params::OrderedDict{Symbol, Parameter}
 
-    function Lorentzian_1D(norm::Number, center::Number, fwhm::Number)
+    function Lorentzian(norm::Real, center::Real, fwhm::Real)
         @assert norm  > 0
         @assert fwhm > 0
-        
-        out = new(Parameter(norm), Parameter(center), Parameter(fwhm))
-        out.norm.low = 0
-        out.fwhm.low = 0
-        return out
+        p = OrderedDict{Symbol, Parameter}(
+            :norm   => Parameter(norm),
+            :center => Parameter(center),
+            :fwhm   => Parameter(fwhm))
+        p[:norm].low  = 0
+        p[:fwhm].low = 0
+        return new(p)
     end
-end
 
-
-mutable struct Lorentzian_2D <: AbstractComponent
-    norm::Parameter
-    centerX::Parameter
-    centerY::Parameter
-    fwhmX::Parameter
-    fwhmY::Parameter
-
-    function Lorentzian_2D(norm::Number, centerX::Number, centerY::Number, fwhmX::Number, fwhmY::Number)
-        @assert norm   > 0
+    function Lorentzian(norm::Real, centerX::Real, centerY::Real, fwhmX::Real, fwhmY::Real)
+        @assert norm  > 0
         @assert fwhmX > 0
         @assert fwhmY > 0
-
-        out = new(Parameter(norm), Parameter(centerX), Parameter(centerY), Parameter(fwhmX), Parameter(fwhmY))
-        out.norm.low = 0
-        out.fwhmX.low = 0
-        out.fwhmY.low = 0
-
-        return out
+        p = OrderedDict{Symbol, Parameter}(
+            :norm    => Parameter(norm),
+            :centerX => Parameter(centerX),
+            :centerY => Parameter(centerY),
+            :fwhmX   => Parameter(fwhmX),
+            :fwhmY   => Parameter(fwhmY))
+        p[:norm].low  = 0
+        p[:fwhmX].low = 0
+        p[:fwhmY].low = 0
+        return new(p)
     end
 end
 
-Lorentzian(norm, center, fwhm) = Lorentzian_1D(norm, center, fwhm)
-Lorentzian(norm, centerX, centerY, fwhmX, fwhmY) = Lorentzian_2D(norm, centerX, centerY, fwhmX, fwhmY)
-
+getparams(comp::Lorentzian) = comp.params
 
 # ====================================================================
-# Evaluate component 
-function evaluate!(::Lorentzian_1D, domain::Domain{1}, output::Vector,
+function evaluate!(::Lorentzian, domain::Domain{1}, output::Vector,
                    norm, center, fwhm)
     X = coords(domain)
     output .= @. norm / (1. + ((X - center) / fwhm)^2.)
 end
 
 
-function evaluate!(::Lorentzian_2D, domain::Domain{2}, output::Vector,
+function evaluate!(::Lorentzian, domain::Domain{2}, output::Vector,
                    norm, centerX, centerY, fwhmX, fwhmY)
     x = coords(domain, 1)
     y = coords(domain, 2)
@@ -63,7 +51,7 @@ function evaluate!(::Lorentzian_2D, domain::Domain{2}, output::Vector,
 end
 
 
-function evaluate!(::Lorentzian_2D, domain::CartesianDomain{2}, output::Matrix,
+function evaluate!(::Lorentzian, domain::CartesianDomain{2}, output::Matrix,
                    norm, centerX, centerY, fwhmX, fwhmY)
     x = axes(domain, 1)
     y = axes(domain, 2)

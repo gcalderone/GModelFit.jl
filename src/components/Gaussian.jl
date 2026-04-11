@@ -1,59 +1,53 @@
-# ====================================================================
-# Component structure
-#
-mutable struct Gaussian_1D <: AbstractComponent
-    norm::Parameter
-    center::Parameter
-    sigma::Parameter
+struct Gaussian <: AbstractComponent
+    params::OrderedDict{Symbol, Parameter}
 
-    function Gaussian_1D(norm::Number, center::Number, sigma::Number)
+    function Gaussian(norm::Real, center::Real, sigma::Real)
         @assert norm  > 0
         @assert sigma > 0
-
-        out = new(Parameter(norm), Parameter(center), Parameter(sigma))
-        out.norm.low = 0
-        out.sigma.low = 0
-        return out
+        p = OrderedDict{Symbol, Parameter}(
+            :norm   => Parameter(norm),
+            :center => Parameter(center),
+            :sigma  => Parameter(sigma))
+        p[:norm].low  = 0
+        p[:sigma].low = 0
+        return new(p)
     end
-end
 
+    function Gaussian(norm::Real, centerX::Real, centerY::Real, sigma::Real)
+        @assert norm   > 0
+        @assert sigma  > 0
+        p = OrderedDict{Symbol, Parameter}(
+            :norm    => Parameter(norm),
+            :centerX => Parameter(centerX),
+            :centerY => Parameter(centerY),
+            :sigma   => Parameter(sigma))
+        p[:norm].low  = 0
+        p[:sigma].low = 0
+        return new(p)
+    end
 
-mutable struct Gaussian_2D <: AbstractComponent
-    norm::Parameter
-    centerX::Parameter
-    centerY::Parameter
-    sigmaX::Parameter
-    sigmaY::Parameter
-    angle::Parameter
-
-    function Gaussian_2D(norm::Number, centerX::Number, centerY::Number, sigmaX::Number, sigmaY::Number, angle::Number)
+    function Gaussian(norm::Real, centerX::Real, centerY::Real, sigmaX::Real, sigmaY::Real, angle::Real)
         @assert norm   > 0
         @assert sigmaX > 0
         @assert sigmaY > 0
-
-        out = new(Parameter(norm), Parameter(centerX), Parameter(centerY), Parameter(sigmaX), Parameter(sigmaY), Parameter(angle))
-        out.norm.low = 0
-        out.sigmaX.low = 0
-        out.sigmaY.low = 0
-        return out
+        p = OrderedDict{Symbol, Parameter}(
+            :norm    => Parameter(norm),
+            :centerX => Parameter(centerX),
+            :centerY => Parameter(centerY),
+            :sigmaX  => Parameter(sigmaX),
+            :sigmaY  => Parameter(sigmaY),
+            :angle   => Parameter(angle))
+        p[:norm].low  = 0
+        p[:sigmaX].low = 0
+        p[:sigmaY].low = 0
+        return new(p)
     end
 end
 
+getparams(comp::Gaussian) = comp.params
 
 # ====================================================================
-Gaussian(norm, center, sigma) = Gaussian_1D(norm, center, sigma)
-Gaussian(norm, centerX, centerY, sigmaX, sigmaY, angle) = Gaussian_2D(norm, centerX, centerY, sigmaX, sigmaY, angle)
-function Gaussian(norm, centerX, centerY, sigma)
-    out = Gaussian_2D(norm, centerX, centerY, sigma, sigma, 0.)
-    out.sigmaX.fixed = true
-    out.angle.fixed = true
-    return out
-end
-
-
-# ====================================================================
-# Evaluate component
-function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
+function evaluate!(::Gaussian, domain::Domain{1}, output::Vector,
                    norm, center, sigma)
     X = coords(domain)
     output .= @. exp( ((X - center) / sigma)^2. / (-2.)) /
@@ -61,7 +55,11 @@ function evaluate!(::Gaussian_1D, domain::Domain{1}, output::Vector,
 end
 
 
-function evaluate!(::Gaussian_2D, domain::Domain{2}, output::Vector,
+evaluate!(comp::Gaussian, domain::AbstractDomain{2}, output::AbstractArray,
+          norm, centerX, centerY, sigma) = evaluate!(comp, domain, output,
+                                                     norm, centerX, centerY, sigma, sigma, 0.)
+
+function evaluate!(::Gaussian, domain::Domain{2}, output::Vector,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2
@@ -80,7 +78,7 @@ function evaluate!(::Gaussian_2D, domain::Domain{2}, output::Vector,
 end
 
 
-function evaluate!(::Gaussian_2D, domain::CartesianDomain{2}, output::Matrix,
+function evaluate!(::Gaussian, domain::CartesianDomain{2}, output::Matrix,
                    norm, centerX, centerY, sigmaX, sigmaY, angle)
     angle *= -pi / 180.
     a =  (cos(angle) / sigmaX)^2 / 2  +  (sin(angle) / sigmaY)^2 / 2

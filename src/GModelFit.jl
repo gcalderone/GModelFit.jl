@@ -13,27 +13,21 @@ import Base.ndims
 import Base.size
 import Base.axes
 import Base.length
-import Base.haskey
+import Base.iterate
 import Base.keys
+import Base.haskey
 import Base.getindex
 import Base.setindex!
-import Base.reshape
-import Base.propertynames
-import Base.getproperty
-import Base.iterate
 import Base.values
-import Base.push!
-import Base.empty!
 
 import ForwardDiff: Dual
 
 export AbstractDomain, Domain, CartesianDomain, coords, Measures, uncerts,
-    Model, @fd, SumReducer, domain, comptype, comptypes,
-    isfreezed, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
+    Model, ModelSet, @fd, SumReducer, domain, compnames,
+    isfrozen, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
+
 
 include("PV.jl")
-using .PV
-
 include("domain.jl")
 
 # ====================================================================
@@ -100,8 +94,8 @@ A structure representing a model parameter.
  - `low::Float64`: lower limit for the value (default: `-Inf`);
  - `high::Float64`: upper limit for the value (default: `+Inf`);
  - `fixed::Bool`: whether the parameter is fixed during fitting (default: `false`);
- - `patch::Union{Nothing, Symbol, FunctDesc}`: patch prescription within the same model;
- - `mpatch::Union{Nothing, FunctDesc}`: patch prescription in a multi-model analysis;
+ - `patch::Union{Nothing, Symbol, FunctDesc}`: patch prescription;
+ - `cast::Union{Nothing, FunctDesc}`: re-interpret prescription;
  - `actual::Float64`: actual value for the parameter (i.e. after applying the patch prescription)`;
  - `unc::Float64`: 1σ uncertainty associated to the parameter value.
 
@@ -113,12 +107,12 @@ mutable struct Parameter
     high::Float64             # upper limit value
     fixed::Bool
     patch::Union{Nothing, Symbol, FunctDesc}
-    mpatch::Union{Nothing, FunctDesc}
+    cast::Union{Nothing, FunctDesc}
     actual::Float64
     unc::Float64
+    actually_fixed::Bool
 end
-Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN)
-
+Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, nothing, NaN, NaN, false)
 
 
 # ====================================================================
@@ -126,43 +120,29 @@ Parameter(value::Number) = Parameter(float(value), -Inf, +Inf, false, nothing, n
 #
 # A *component* is a generic implementation of a building block for a
 # model. It must inherit `AbstractComponent` and implement the
-# `evaluate!` method.  The structure should contain zero or more field
-# of type Parameter, or have all parameters collected in a single
-# field of type OrderedDict{Symbol, Parameter}()
+# `evaluate!` method.  The structure is expected to have `Parameter`
+# among its fields, or to implement a new method for the `getparams()`
+# function.
 abstract type AbstractComponent end
 
-# Note: this function must mirror setparams!()
-function getparams(comp::AbstractComponent)
+function getparams(comp::T) where T <: AbstractComponent
     out = OrderedDict{Symbol, Parameter}()
-    for name in fieldnames(typeof(comp))
-        field = getfield(comp, name)
-        if isa(field, Parameter)
-            out[name] = field
-        elseif isa(field, OrderedDict{Symbol, Parameter})
-            @assert length(out) == 0  # avoid parameter name clash
-            return field
+    for name in fieldnames(T)
+        if fieldtype(T, name) == Parameter
+            out[name] = getfield(comp, name)
         end
     end
-    return out
-end
 
-# Note: this function must mirror getparams()
-function setparams!(comp::AbstractComponent, params::PVComp{Parameter})
-    for name in fieldnames(typeof(comp))
-        field = getfield(comp, name)
-        if isa(field, Parameter)
-            field.val    = params[name].val
-            field.unc    = params[name].unc
-            field.actual = params[name].actual
-        elseif isa(field, OrderedDict{Symbol, Parameter})
-            for (name, par) in field
-                par.val    = params[name].val
-                par.unc    = params[name].unc
-                par.actual = params[name].actual
-            end
+    dict_fields = Vector{Symbol}()
+    for name in fieldnames(T)
+        if fieldtype(T, name) <: AbstractDict{Symbol, Parameter}
+            push!(dict_fields, name)
         end
     end
-    nothing
+
+    (length(dict_fields) == 0)  &&  (return out)
+    @assert (length(out) != 0)  ||  (length(dict_fields) != 1) "Ambiguous set of Parameters in structure $T"
+    return getfield(comp, dict_fields[1])
 end
 
 
@@ -190,9 +170,6 @@ include("instrument_response.jl")
 
 
 # ====================================================================
-# Model
-#
-
 """
     Model
 
@@ -204,9 +181,9 @@ Constructor is: `Model(components...)`.  Components may be specified as:
 - a single `FunctDesc` which will be wrapped into an `FComp` component and a default name will be assigned (`:main`);
 - one or more `Pair{Symbol, AbstractComponent}`, where the first element is the name and the second is the component.
 
-You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same syntax.  Finally, you may use the `keys()` and `haskey()` functions with their usual meanings.
+You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same syntax.  Finally, you may use the `compnames()` function to retrieve the list of component names.
 
-Individual components may be *freezed* (i.e. have all its parameters fixed during fitting, despite the individual `Parameter` settings) or *thawed* using the `freeze!()` and `thaw!()` functions.  Use the `isfreezed()` function to check if a component is freezed.
+Individual components may be *frozen* (i.e. have all its parameters fixed during fitting, despite the individual `Parameter` settings) or *thawed* using the `freeze!()` and `thaw!()` functions.  Use the `isfrozen()` function to check if a component is frozen.
 
 The main component, i.e. the one whose evaluation corresponds to the overall model evaluation, is automatically identified by analyzing the component dependencies.  However a specific component may be forced to be the main one by invoking `select_maincomp!`.
 
@@ -216,150 +193,66 @@ The model and all component evaluation can be evaluated has if they were a funct
 """
 mutable struct Model
     comps::OrderedDict{Symbol, AbstractComponent}
-    fixed::OrderedDict{Symbol, Bool}
+    frozen::OrderedDict{Symbol, Bool}
     maincomp::Union{Nothing, Symbol}
     IR::AbstractInstrumentResponse
 
-    Model() = new(OrderedDict{Symbol, AbstractComponent}(), OrderedDict{Symbol, Bool}(), nothing, IdealInstrument())
-
-    function Model(dict::AbstractDict)
-        model = Model()
-        for (name, item) in dict
-            # isa(item, Number)  &&  (item = SimplePar(item))
-            @assert isa(name, Symbol)
-            @assert isa(item, AbstractComponent)
-            model[name] = item
-        end
-        return model
-    end
-
-    function Model(args::Vararg{Pair})
-        model = Model()
-        for arg in args
-            @assert isa(arg[1], Symbol)
-            if isa(arg[2], AbstractComponent)
-                model[arg[1]] = arg[2]
-            elseif isa(arg[2], FunctDesc)
-                model[arg[1]] = FComp(arg[2])
-            else
-                error("Unsupported data type: " * string(typeof(arg[2])) *
-                    ".  (accepted types ar T <: AbstractComponent or FunctDesc.")
-            end
-        end
-        return model
-    end
-    Model(arg::AbstractComponent) = Model(:main => arg)
-    Model(arg::FunctDesc) = Model(:main => FComp(arg))
+    Model() = new(OrderedDict{Symbol, AbstractComponent}(),
+                  OrderedDict{Symbol, Bool}(), nothing, IdealInstrument())
 end
 
-
-struct DependencyNode
-    cname::Symbol
-    level::Int
-    parent::Union{Nothing, Symbol}
-    childs::Vector{DependencyNode}
-    DependencyNode(cname::Symbol, level::Int, parent) = new(cname, level, parent, Vector{DependencyNode}())
+function Model(dict::AbstractDict)
+    model = Model()
+    for (name, item) in dict
+        @assert isa(name, Symbol)
+        @assert isa(item, AbstractComponent)
+        model[name] = item
+    end
+    return model
 end
 
-
-function deptree(model::Model)
-    function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
-        out = DependencyNode(cname, level, parent)
-        for d in dependencies(model, cname)
-            push!(out.childs, deptree(model, d, level+1, cname))
-        end
-        return out
-    end
-
-    # Identify parent for all comps
-    parent = OrderedDict{Symbol, Symbol}()
-    for (cname, comp) in model.comps
-        for d in GModelFit.dependencies(model, cname)
-            @assert !haskey(parent, d) "Component $d has two parent nodes: $(parent[d]) and $cname"
-            parent[d] = cname
-        end
-    end
-
-    # Ensure no circular dependency is present by checking all parent
-    # nodes of a given component to be different from the component
-    # itself.  Also collect components with no parent.
-    comps_with_no_parent = Vector{Symbol}()
-    for cname in keys(model.comps)
-        if haskey(parent, cname)
-            p = parent[cname]
-            @assert p != cname "Component $cname depends on itself"
-            while haskey(parent, p)
-                p = parent[p]
-                if cname == p
-                    display(parent)
-                    error("Circular dependency detected for component $cname")
-                end
-            end
+function Model(args::Vararg{Pair})
+    model = Model()
+    for arg in args
+        @assert isa(arg[1], Symbol)
+        if isa(arg[2], AbstractComponent)
+            model[arg[1]] = arg[2]
+        elseif isa(arg[2], FunctDesc)
+            model[arg[1]] = FComp(arg[2])
         else
-            push!(comps_with_no_parent, cname)
+            error("Unsupported data type: " * string(typeof(arg[2])) *
+                ".  (accepted types ar T <: AbstractComponent or FunctDesc.")
         end
     end
-
-    # Neglect components with no parent and no dependencies
-    while length(comps_with_no_parent) > 1
-        if length(dependencies(model, comps_with_no_parent[1])) == 0
-            deleteat!(comps_with_no_parent, 1)
-        end
-    end
-
-    # Main component
-    if isnothing(model.maincomp)
-        maincomp = comps_with_no_parent[end]
-    else
-        maincomp = model.maincomp
-    end
-
-    return deptree(model, maincomp, 1, nothing)
+    return model
 end
-
-
-function flatten(node::DependencyNode)
-    out = [node]
-    for child in node.childs
-        append!(out, flatten(child))
-    end
-    return out
-end
-
-
-function dependencies(model::Model, cname::Symbol)
-    output = Vector{Symbol}()
-    comp = model.comps[cname]
-    for d in dependencies(comp)
-        @assert haskey(model.comps, d)  ||  isa(comp, FComp)  "No component has name $d"
-        haskey(model.comps, d)  &&  push!(output, d)
-    end
-    return output
-end
-
+Model(arg::AbstractComponent) = Model(:main => arg)
+Model(arg::FunctDesc) = Model(:main => FComp(arg))
 
 # User interface
 setindex!(model::Model, f::FunctDesc, cname::Symbol) = model[cname] = FComp(f)
 function setindex!(model::Model, comp::AbstractComponent, cname::Symbol)
-    model.comps[cname] = deepcopy(comp)
-    model.fixed[cname] = false
-end
-
-function iterate(model::Model, i=1)
-    k = collect(keys(model))
-    (i > length(k))  &&  return nothing
-    return (k[i] => model[k[i]], i+1)
+    comp = deepcopy(comp)
+    model.comps[cname] = comp
+    model.frozen[cname] = false
 end
 
 
 """
-    isfreezed(model::Model, cname::Symbol)
+    comptype(model::Model, cname::Symbol)
 
-Check whether a component is *freezed* in the model.
+Return the type of a component as a String.
 """
-function isfreezed(model::Model, cname::Symbol)
-    @assert cname in keys(model.fixed) "Component $cname is not defined"
-    return model.fixed[cname]
+comptype(model::Model, cname::Symbol) = replace(string(typeof(model[cname])), "GModelFit." => "")
+
+"""
+    isfrozen(model::Model, cname::Symbol)
+
+Check whether a component is *frozen* in the model.
+"""
+function isfrozen(model::Model, cname::Symbol)
+    @assert cname in keys(model.frozen) "Component $cname is not defined"
+    return model.frozen[cname]
 end
 
 """
@@ -368,67 +261,21 @@ end
 Freeze a component in the model (i.e. treat all component parameters as fixed for fitting).
 """
 function freeze!(model::Model, cname::Symbol)
-    @assert cname in keys(model.fixed) "Component $cname is not defined"
-    model.fixed[cname] = true
+    @assert cname in keys(model.frozen) "Component $cname is not defined"
+    model.frozen[cname] = true
     nothing
 end
 
 """
     thaw!(model::Model, cname::Symbol)
 
-Thaw a freezed component in the model (i.e. treat component parameters as fixed only if explicitly set in the corresponding `Parameter` structure).
+Thaw a frozen component in the model (i.e. treat component parameters as fixed only if explicitly set in the corresponding `Parameter` structure).
 """
 function thaw!(model::Model, cname::Symbol)
-    @assert cname in keys(model.fixed) "Component $cname is not defined"
-    model.fixed[cname] = false
+    @assert cname in keys(model.frozen) "Component $cname is not defined"
+    model.frozen[cname] = false
     nothing
 end
-
-
-Base.keys(model::Model) = collect(keys(model.comps))
-
-
-"""
-    haskey(m::Model, name::Symbol)
-
-Check whether a component exists in model.
-"""
-Base.haskey(model::Model, cname::Symbol) = haskey(model.comps, cname)
-
-
-"""
-    getindex(model::Model, cname::Symbol)
-
-Return the model component with name `cname`.
-"""
-function Base.getindex(model::Model, cname::Symbol)
-    @assert cname in keys(model.comps) "Component $cname is not defined"
-    return model.comps[cname]
-end
-
-"""
-    length(model::Model)
-
-Return number of components in a model.
-"""
-Base.length(model::Model) = length(model.comps)
-
-
-"""
-    comptype(model::Model, cname::Symbol)
-
-Return the type of a component within a Model.  Return type is a String.
-"""
-comptype(model::Model, cname::Symbol) = replace(string(typeof(model[cname])), "GModelFit." => "")
-
-
-"""
-    comptypes(model::Model)
-
-Return a `OrderedDict{Symbol, String}` with the types of all components within a Model.
-"""
-comptypes(model::Model) = OrderedDict([cname => comptype(model, cname) for cname in keys(model)])
-
 
 """
     select_maincomp!(model::Model, cname::Symbol)
@@ -439,7 +286,6 @@ function select_maincomp!(model::Model, cname::Symbol)
     @assert haskey(model, cname) "Component $cname is not defined"
     model.maincomp = cname
 end
-
 
 """
     set_IR!(model::Model, IR::AbstractInstrumentResponse)
@@ -452,9 +298,39 @@ function set_IR!(model::Model, IR::AbstractInstrumentResponse)
     model.IR = IR
 end
 
+# ====================================================================
+struct ModelSet
+    dict::OrderedDict{Symbol, Model}
+    ModelSet() = new(OrderedDict{Symbol, Model}())
+end
 
+function ModelSet(dict::AbstractDict{Symbol, Model})
+    ms = ModelSet()
+    for (name, item) in dict
+        ms[name] = item
+    end
+    return ms
+end
+
+function ModelSet(args::Vararg{Pair{Symbol, Model}})
+    ms = ModelSet()
+    for arg in args
+        ms[arg[1]] = arg[2]
+    end
+    return ms
+end
+
+function setindex!(ms::ModelSet, model::Model, key::Symbol)
+    ms.dict[key] = model
+end
+
+select_free(d::AbstractDict{K, Parameter}) where K = filter(p -> !p.second.actually_fixed, d)
+
+# ====================================================================
+include("dependencies.jl")
 include("evaluation.jl")
 include("snapshot.jl")
+include("interface.jl")
 include("fit.jl")
 include("serialize.jl")
 include("show.jl")

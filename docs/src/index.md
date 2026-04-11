@@ -96,8 +96,8 @@ saveas("simple_example"); # hide
 Also, you can easily access the numerical results for further analysis, e.g.:
 ```@example abc
 println("Best fit value for the offset parameter: ", 
-	bestfit[:main].a0.val, " ± ", 
-	bestfit[:main].a0.unc, "\n",
+         bestfit[:main, :a0].val, " ± ",
+         bestfit[:main, :a0].unc, "\n",
 	"Reduced χ^2: ", fsumm.fitstat)
 ```
 

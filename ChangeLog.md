@@ -1,3 +1,8 @@
+# Version 0.9.0
+	* Breaking changes:
+		- the syntax `model[:component_name].parameter_name` is deprecated since it assumes the underlying structure defines the `Parameter` as fields or properties.  The new syntax is `model[:component_name, :parameter_name]` or `model[:component_name][:parameter_name]`;
+		
+
 # Version 0.8.0
 	* The `FComp` component now requires a number of arguments which is at least equal to the number of domain dimensions;
 

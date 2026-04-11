@@ -10,6 +10,7 @@ TypedJSON.reconstruct(::Val{Symbol("GModelFit.CartesianDomain")}, dict) = Cartes
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.Parameter")}, dict) = GModelFit.Parameter(values(dict)...)
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.ComponentSnapshot")}, dict) = GModelFit.ComponentSnapshot(values(dict)...)
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.ModelSnapshot")}, dict) = GModelFit.ModelSnapshot(values(dict)...)
+TypedJSON.reconstruct(::Val{Symbol("GModelFit.ModelSetSnapshot")}, dict) = GModelFit.ModelSetSnapshot(values(dict)...)
 
 TypedJSON.reconstruct(::Val{Symbol("GModelFit.FunctDesc")}, dict) =
     GModelFit.FunctDesc((args...) -> nothing,

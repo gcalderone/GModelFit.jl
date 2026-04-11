@@ -10,15 +10,13 @@ function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
                         keep=Symbol[], skip=Symbol[])
     @assert ndims(domain(model)) == 1
     out = Vector{Gnuplot.AbstractGPSpec}()
-    for (cname, comp) in model
+    for (cname, comp) in getcomps(model)
         (cname in skip)  &&  continue
         if (length(keep) == 0)  ||  (cname in keep)
             #isa(v.comp, GModelFit.FComp)  ||  isa(v.comp, GModelFit.SumReducer)  ||  continue
-            append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(cname),
-                                            "with lines t '$(cname)'"))
+            append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(cname), "with lines t '$(cname)'"))
         end
     end
-    append!(out, Gnuplot.parseSpecs(coords(folded_domain(model)), folded(model),
-                                    "with lines t 'Model' lc rgb 'black' lw 2"))
+    append!(out, Gnuplot.parseSpecs(coords(folded_domain(model)), folded(model), "with lines t 'Model' lc rgb 'black' lw 2"))
     return out
 end

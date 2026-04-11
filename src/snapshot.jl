@@ -1,17 +1,15 @@
 struct ComponentSnapshot
     comptype::String
-    isfreezed::Bool
+    params::OrderedDict{Symbol, Parameter}
+    isfrozen::Bool
     deps::Vector{Symbol}
     evalcounter::Int
-    params::OrderedDict{Symbol, Parameter}
     buffer::Array{Float64}
 end
-getproperty(comp::ComponentSnapshot, name::Symbol) = getfield(comp, :params)[name]
-getindex(comp::ComponentSnapshot, name::Symbol)    = getfield(comp, :params)[name]
-propertynames(comp::ComponentSnapshot) = collect(keys(getfield(comp, :params)))
 
-getparams(comp::ComponentSnapshot) = getfield(comp, :params)
+getparams(comp::ComponentSnapshot) = comp.params
 
+# ====================================================================
 """
     ModelSnapshot
 
@@ -26,28 +24,23 @@ struct ModelSnapshot
     folded_domain::AbstractDomain
     folded::Array{Float64}
 end
-function ModelSnapshot(meval::ModelEval, bestfit::PVModel{Parameter})
+function ModelSnapshot(meval::ModelEval, params::OrderedDict{NTuple{2, Symbol}, Parameter})
     comps = OrderedDict{Symbol, ComponentSnapshot}()
     for cname in keys(meval.model.comps)
-        (cname in keys(meval.cevals))  ||  continue
-        params = OrderedDict{Symbol, Parameter}()
-        for (pname, par) in bestfit[cname]
-            params[pname] = par
-        end
-        comps[cname] = ComponentSnapshot(comptype(meval.model, cname),
-                                         isfreezed(meval.model, cname),
+        # TODO is this needed ? (cname in keys(meval.cevals))  ||  continue
+        p = OrderedDict([k[2] => p for (k,p) in
+                             filter(p -> p.first[1] .== cname, params)])
+        comps[cname] = ComponentSnapshot(comptype(meval.model, cname), p,
+                                         isfrozen(meval.model, cname),
                                          dependencies(meval.model, cname),
                                          evalcounter(meval, cname),
-                                         params,
-                                         meval.cevals[cname].buffer)
+                                         deepcopy(meval.cevals[cname].buffer))
     end
-
     ModelSnapshot(deepcopy(meval.domain), comps,
                   meval.seq[end], meval.folded_domain, meval.folded)
 end
 
 domain(model::ModelSnapshot) = model.domain
-Base.keys(model::ModelSnapshot) = collect(keys(model.comps))
 (model::ModelSnapshot)() = model(model.maincomp)
 
 function deptree(model::ModelSnapshot)
@@ -61,22 +54,13 @@ function deptree(model::ModelSnapshot)
     return deptree(model, model.maincomp, 1, nothing)
 end
 
-Base.haskey(m::ModelSnapshot, name::Symbol) = haskey(m.comps, name)
-function Base.getindex(model::ModelSnapshot, name::Symbol)
-    @assert name in keys(model.comps) "$name is not a component in the model"
-    return model.comps[name]
-end
-
-Base.length(model::ModelSnapshot) = length(model.comps)
-
-function iterate(model::ModelSnapshot, i=1)
-    k = collect(keys(model))
-    (i > length(k))  &&  return nothing
-    return (k[i] => model[k[i]], i+1)
+function Base.getindex(model::ModelSnapshot, cname::Symbol)
+    @assert cname in keys(model.comps) "$cname is not a component in the model"
+    return model.comps[cname]
 end
 
 (model::ModelSnapshot)(cname::Symbol) =             getfield(model.comps[cname], :buffer)
-isfreezed(model::ModelSnapshot, cname::Symbol) =    getfield(model.comps[cname], :isfreezed)
+isfrozen(model::ModelSnapshot, cname::Symbol) =     getfield(model.comps[cname], :isfrozen)
 dependencies(model::ModelSnapshot, cname::Symbol) = getfield(model.comps[cname], :deps)
 evalcounter(model::ModelSnapshot, cname::Symbol) =  getfield(model.comps[cname], :evalcounter)
 comptype(model::ModelSnapshot, cname::Symbol) =     getfield(model.comps[cname], :comptype)
@@ -84,3 +68,21 @@ comptype(model::ModelSnapshot, cname::Symbol) =     getfield(model.comps[cname],
 
 folded_domain(model::ModelSnapshot) = model.folded_domain
 folded(model::ModelSnapshot) = model.folded
+
+
+# ====================================================================
+struct ModelSetSnapshot
+    dict::OrderedDict{Symbol, ModelSnapshot}
+end
+
+function ModelSetSnapshot(mseval::ModelSetEval)
+    out = ModelSetSnapshot(OrderedDict{Symbol, ModelSnapshot}())
+    i = 0
+    for (mname, model) in mseval.ms
+        i += 1
+        params = OrderedDict([(k[2], k[3]) => p for (k,p) in
+                                  filter(p -> p.first[1] .== mname, getparams(mseval))])
+        out.dict[mname] = ModelSnapshot(mseval.vec[i], params)
+    end
+    return out
+end

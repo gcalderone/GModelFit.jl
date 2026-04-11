@@ -45,7 +45,7 @@ include("setup.jl")
   model[:sum] = @fd (x, comp1, comp2) -> comp1 .+ comp2
   
   # Modify a parameter value:
-  model[:comp1].center.val = 5
+  model[:comp1, :center].val = 5
   
   # Evaluate the model on a user defined domain
   dom = Domain(0:0.1:10)

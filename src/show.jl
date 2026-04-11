@@ -2,16 +2,15 @@ mutable struct ShowSettings
     plain::Bool
     tableborders::TextTableBorders
     floatformat::String
-    showfixed::Bool
     border::Crayon
     header::Crayon
     fixed::Crayon
     error::Crayon
     highlighted::Crayon
     section::Crayon
-    ShowSettings() = new(false, text_table_borders__unicode_rounded, "%9.4g", true,
+    ShowSettings() = new(false, text_table_borders__unicode_rounded, "%9.4g",
                          crayon"light_blue",
-                         crayon"light_blue negative bold", crayon"dark_gray",
+                         crayon"light_blue negative", crayon"dark_gray",
                          crayon"light_red", crayon"negative", crayon"green bold")
 end
 
@@ -115,186 +114,175 @@ function show(io::IO, par::Parameter)
 end
 
 
-function preparetable(comp::Union{AbstractComponent, GModelFit.ComponentSnapshot};
-                      cname::String="?", ctype="?", cfixed=false)
+function show(io::IO, red::FunctDesc)
+    println(io, red.display)
+end
+
+
+function prepare_params_table(input::Union{Model, ModelSnapshot, AbstractComponent, ComponentSnapshot})
     table = Matrix{Union{String,Float64}}(undef, 0, 8)
     fixed = Vector{Bool}()
     warns = Vector{Bool}()
 
-    for (pname, param) in getparams(comp)
-        (!showsettings.showfixed)  &&  param.fixed  &&  continue
-        range = strip(@sprintf("%7.2g:%-7.2g", param.low, param.high))
-        # (range == "-Inf:Inf")  &&  (range = "")
+    for (key, param) in getparams(input)
+        if isa(key, Tuple)
+            cname = key[1]
+            pname = key[2]
+        else
+            cname = Symbol("")
+            pname = key
+        end
+
+        range =  (isfinite(param.low )  ?  strip(@sprintf("%7.2g", param.low ))  :  (param.low  > 0  ?  "+∞"  :  "-∞")) * " : "
+        range *= (isfinite(param.high)  ?  strip(@sprintf("%7.2g", param.high))  :  (param.high > 0  ?  "+∞"  :  "-∞"))
         patch = ""
+        cast  = ""
         isa(param.patch, Symbol)     &&  (patch = string(param.patch))
         isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
-        isa(param.mpatch,FunctDesc)  &&  (patch = param.mpatch.display)
+        isa(param.cast , FunctDesc)  &&  (cast  = string(param.cast))
         table = vcat(table,
-                     permutedims([cname * (cfixed  ?  " (fixed)"  :  ""), ctype,
-                                  string(pname), range, param.val,
-                                  (param.fixed | cfixed  ?  " (fixed)"  :  param.unc),
-                                  (patch == ""  ?  ""  :  param.actual), patch]))
+                     permutedims([string(cname),
+                                  string(pname) * (param.fixed  ?  " (fixed) "  :  ""),
+                                  range, param.val, param.unc,
+                                  ((patch == "")  &&  (cast == "")  ?  ""  :  param.actual),
+                                  patch, cast]))
         push!(fixed, param.fixed)
+        isnan(param.unc)     &&  (table[end, 5] = "")  # avoid displaying NaNs
+        isnan(param.actual)  &&  (table[end, 6] = "")  # avoid displaying NaNs
         if !param.fixed  &&  isnan(param.unc)
             push!(warns, true)
-            table[end,6] = ""
         else
             push!(warns, false)
-        end
-        if !showsettings.plain
-            cname = ""  # delete from following lines within the same component box
-            ctype = ""
-            cfixed = false
         end
     end
     return (table, fixed, warns)
 end
 
 
-function show(io::IO, comp::Union{AbstractComponent, GModelFit.ComponentSnapshot})
-    ctype = isa(comp, AbstractComponent)  ?  string(typeof(comp))  :  "?"
-    (table, fixed, warns) = preparetable(comp, ctype=ctype)
+function show(io::IO, input::Union{AbstractComponent, ComponentSnapshot})
+    table, fixed, warns = prepare_params_table(input)
     if showsettings.plain
         highlighters = nothing
     else
-        highlighters = [TextHighlighter((data,i,j) -> (fixed[i]  &&  (j in (3,4,5,6))), showsettings.fixed),
-                        TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error)]
+        highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                        TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3:5))), showsettings.error)]
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               formatters=[fmt__printf(showsettings.floatformat, 5:7)],
+    printtable(io, table[:, 2:end], ["Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Cast"],
+               formatters=[fmt__printf(showsettings.floatformat, 3:5)],
                highlighters=highlighters)
 end
 
 
-function show(io::IO, red::FunctDesc)
-    println(io, red.display)
-end
+function show(io::IO, model::Union{Model, ModelSnapshot})
+    function tree_prefix(ff::Vector{DependencyNode})
+        BRANCH = showsettings.plain  ?  "+ "  :  "├─╴"
+        BRCONT = showsettings.plain  ?  "| "  :  "│  "
+        BREND  = showsettings.plain  ?  "+ "  :  "└─╴"
 
+        function set_tree_prefix!(prefix, ff::Vector{DependencyNode}, node::DependencyNode)
+            cnames = getfield.(ff, :cname)
+            irow = findfirst(cnames .== node.cname)
+            prefix[irow, node.level] = string(node.cname)
+            if length(node.childs) > 0
+                i1 = findfirst(cnames .== node.childs[1  ].cname)
+                i2 = findfirst(cnames .== node.childs[end].cname)
+                prefix[i1:i2, node.level] .= BRCONT
 
-function tree_prefix(ff::Vector{DependencyNode})
-    BRANCH = showsettings.plain  ?  "+ "  :  "├─╴"
-    BRCONT = showsettings.plain  ?  "| "  :  "│  "
-    BREND  = showsettings.plain  ?  "+ "  :  "└─╴"
+                for ichild in 1:length(node.childs)
+                    child = node.childs[ichild]
+                    i = findfirst(cnames .== child.cname)
+                    if ichild < length(node.childs)
+                        prefix[i, node.level] = BRANCH
+                    else
+                        prefix[i, node.level] = BREND
+                    end
 
-    function set_tree_prefix!(prefix, ff::Vector{DependencyNode}, node::DependencyNode)
-        cnames = getfield.(ff, :cname)
-        irow = findfirst(cnames .== node.cname)
-        prefix[irow, node.level] = string(node.cname)
-        if length(node.childs) > 0
-            i1 = findfirst(cnames .== node.childs[1  ].cname)
-            i2 = findfirst(cnames .== node.childs[end].cname)
-            prefix[i1:i2, node.level] .= BRCONT
-
-            for ichild in 1:length(node.childs)
-                child = node.childs[ichild]
-                i = findfirst(cnames .== child.cname)
-                if ichild < length(node.childs)
-                    prefix[i, node.level] = BRANCH
-                else
-                    prefix[i, node.level] = BREND
+                    set_tree_prefix!(prefix, ff, child)
                 end
-
-                set_tree_prefix!(prefix, ff, child)
             end
         end
+
+        prefix = fill("", length(ff), maximum(getfield.(ff, :level)))
+        set_tree_prefix!(prefix, ff, ff[1])
+        prefix[prefix .== ""] .= " "^length(BRANCH)
+        return [string(rstrip(join(prefix[i,:]))) for i in 1:length(ff)]
     end
+    section(io, "Components:")
+    (length(keys(model.comps)) == 0)  &&  (return nothing)
 
-    prefix = fill("", length(ff), maximum(getfield.(ff, :level)))
-    set_tree_prefix!(prefix, ff, ff[1])
-    prefix[prefix .== ""] .= " "^length(BRANCH)
-    return [string(rstrip(join(prefix[i,:]))) for i in 1:length(ff)]
-end
-
-function tabledeps(model::Union{Model, ModelSnapshot})
     tree = deptree(model)
     allcomps = flatten(tree)
     prefix = tree_prefix(allcomps)
-
-    table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 8)
+    table = Matrix{Union{String,Int,Float64}}(undef, length(allcomps), 7)
     fixed = Vector{Bool}()
     for i in 1:length(allcomps)
         cname = allcomps[i].cname
         table[i, 1] = prefix[i]
         table[i, 2] = comptype(model, cname)
-        table[i, 3] = count(getproperty.(values(getparams(model[cname])), :fixed) .== false)
-        (table[i, 3] == 0)  &&  (table[i, 3] = "")
-        if !isa(model, Model)
-            table[i, 4] = evalcounter(model, cname)
+        if isa(model, ModelSnapshot)
+            table[i, 3] = evalcounter(model, cname)
             result = model(cname)
             v = view(result, findall(isfinite.(result)))
             if length(v) > 0
-                table[i, 5:7] .= [minimum(v), maximum(v), mean(v)]
+                table[i, 4:6] .= [minimum(v), maximum(v), mean(v)]
             else
-                table[i, 5:7] .= ["", "", ""]
+                table[i, 4:6] .= ["", "", ""]
             end
-            table[i, 8] = count(isnan.(result)) + count(isinf.(result))
+            table[i, 7] = count(isnan.(result)) + count(isinf.(result))
         end
-        push!(fixed, isfreezed(model, cname))
+        push!(fixed, isfrozen(model, cname))
     end
-    return table, fixed
-end
 
-
-function show(io::IO, model::Union{Model, ModelSnapshot})
-    section(io, "Components:")
-    (length(keys(model)) == 0)  &&  (return nothing)
-    table, fixed = tabledeps(model)
     if showsettings.plain
         highlighters = nothing
     else
         highlighters = [TextHighlighter((data,i,j) -> fixed[i], showsettings.fixed)]
     end
-    if !isa(model, Model)
-        printtable(io, table, ["Component", "Type", "#Free", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
-                   formatters=[fmt__printf(showsettings.floatformat, 5:7)],
+    if isa(model, ModelSnapshot)
+        printtable(io, table, ["Comp.", "Type", "Eval. count", "Min", "Max", "Mean", "NaN/Inf"],
+                   formatters=[fmt__printf(showsettings.floatformat, 4:6)],
                    highlighters=highlighters)
     else
-        printtable(io, table[:, 1:3], ["Component", "Type", "#Free"],
-                   formatters=[fmt__printf(showsettings.floatformat, 5:7)],
+        printtable(io, table[:, 1:2], ["Component", "Type"],
                    highlighters=highlighters)
     end
     println(io)
 
+    # -----------------------
     section(io, "Parameters:")
-    (length(keys(model)) == 0)  &&  (return nothing)
+    table, fixed, warns = prepare_params_table(model)
 
-    table = Matrix{Union{String,Float64}}(undef, 0, 8)
-    fixed = Vector{Bool}()
-    warns = Vector{Bool}()
     hrule = Vector{Int}()
-    for cname in keys(model)
-        comp = model[cname]
-        (t, f, w) = preparetable(comp,
-                                 cname=string(cname),
-                                 ctype=comptype(model, cname),
-                                 cfixed=isfreezed(model, cname))
-        table = vcat(table, t)
-        append!(fixed, f .| isfreezed(model, cname))
-        append!(warns, w)
-        (length(fixed) > 0)  &&  push!(hrule, length(fixed))
+    prevcname = ""
+    for i in 1:size(table)[1]
+        cname = table[i, 1]
+        if prevcname != cname
+            (i == 1)  ||  push!(hrule, i-1)
+            prevcname = cname
+            isfrozen(model, Symbol(cname))  &&  (table[i, 1] *= " (frozen)")
+        else
+            table[i, 1] = ""
+        end
+        isfrozen(model, Symbol(cname))  &&  (fixed[i] = true)
     end
 
     if showsettings.plain
         highlighters = nothing
     else
-        if !isa(model, Model)
-            highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
-                            TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3,4,5,6))), showsettings.error)]
-        else
-            highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed)]
-        end
+        highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
+                        TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (4:6))), showsettings.error)]
     end
-    printtable(io, table, ["Component", "Type", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch"],
-               hlines=hrule, formatters=[fmt__printf(showsettings.floatformat, 5:7)],
+    printtable(io, table, ["Comp.", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Cast"],
+               hlines=hrule, formatters=[fmt__printf(showsettings.floatformat, 4:6)],
                highlighters=highlighters)
 end
 
 
-function show(io::IO, multi::Union{Vector{Model}, Vector{ModelSnapshot}})
-    for id in 1:length(multi)
+function show(io::IO, ms::ModelSet)
+    for (mname, model) in ms
         println(io)
-        section(io, join(fill("=", 30)) * "  Model $id  " * join(fill("=", 30)))
-        show(io, multi[id])
+        section(io, join(fill("=", 30)) * "  Model $mname  " * join(fill("=", 30)))
+        show(io, model)
     end
     println(io)
 end

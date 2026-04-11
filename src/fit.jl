@@ -3,20 +3,18 @@
 abstract type AbstractFitStat end
 
 # ====================================================================
-struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
-    multi::MultiEval
+struct Likelihood{M <: AbstractMeasures, FS <: AbstractFitStat}
+    mseval::ModelSetEval
     data::Vector{M}
-    bestfit::Vector{PVModel{Parameter}}
     buffer::Vector  # local buffer used to calculate fit statistic
     fitstat::FS
 
-    function FitProblem(models::Vector{Model}, datasets::Vector{M}, fitstat::AbstractFitStat=default_fitstat(datasets[1]); use_AD=false) where {M <: AbstractMeasures}
-        @assert length(models) == length(datasets)
+    function Likelihood(datasets::Vector{M}, ms::ModelSet, fitstat::AbstractFitStat=default_fitstat(datasets[1]); use_AD=false) where {M <: AbstractMeasures}
+        @assert length(ms) == length(datasets)
         T = use_AD  ?  Union{Dual, Float64}  :  Float64
-        multi = MultiEval{T}(models, getfield.(datasets, :domain))
+        mseval = ModelSetEval{T}(ms, getfield.(datasets, :domain))
 
-        out = new{M, typeof(fitstat)}(multi, datasets,
-                                      Vector{PVModel{Parameter}}(),
+        out = new{M, typeof(fitstat)}(mseval, datasets,
                                       Vector{T}(undef, sum(length.(datasets))),
                                       fitstat)
         out.buffer .= 0.  # needed to avoid errors with CMPFit
@@ -25,63 +23,33 @@ struct FitProblem{M <: AbstractMeasures, FS <: AbstractFitStat}
 end
 
 
-free_params(fitprob::FitProblem) = free_params(fitprob.multi)
-nfree(fitprob::FitProblem) = nfree(fitprob.multi)
-ndata(fitprob::FitProblem) = sum(length.(fitprob.data))
-
-function set_bestfit!(fitprob::FitProblem, pvalues::Vector{Float64}, puncerts::Vector{Float64})
-    update_eval!(fitprob.multi, pvalues)
-
-    empty!(fitprob.bestfit)
-    for id in 1:length(fitprob.multi)
-        push!(fitprob.bestfit, PVModel{Parameter}())
-    end
-
-    for (id, i1, i2) in free_params_indices(fitprob.multi)
-        meval = fitprob.multi.v[id]
-        i = 1
-        for (cname, comp) in meval.model.comps
-            for (pname, _par) in getparams(comp)
-                par = deepcopy(_par)
-                par.val    = meval.pvalues[cname][pname]
-                par.actual = meval.pactual[cname][pname]
-                par.unc = NaN
-                push!(fitprob.bestfit[id], cname, pname, par)
-                if length(fitprob.bestfit[id].data) in meval.ifree
-                    par.unc = puncerts[i1:i2][i]
-                    (par.unc == 0)  &&  (par.unc = NaN)
-                    par.fixed = false
-                    i += 1
-                else
-                    par.fixed = true
-                end
-            end
-        end
-    end
-    nothing
-end
+getparams(lh::Likelihood; kws...) = getparams(lh.mseval; kws...)
+nfree(lh::Likelihood) = nfree(lh.mseval)
+ndata(lh::Likelihood) = length(lh.buffer)
+set_bestfit!(lh::Likelihood, pvalues::Vector{Float64}, puncerts::Vector{Float64}) = set_bestfit!(lh.mseval, pvalues, puncerts)
 
 
 # ChiSquared fit statistic ===========================================
 struct ChiSquared <: AbstractFitStat; end
 
 default_fitstat(::Measures) = ChiSquared()
-dof(fitprob::FitProblem{M, ChiSquared}) where M = ndata(fitprob) - nfree(fitprob)
-fitstat(fitprob::FitProblem{M, ChiSquared}) where M = sum(abs2, fitprob.buffer) / dof(fitprob)
+dof(lh::Likelihood{M, ChiSquared}) where M = ndata(lh) - nfree(lh)
+fitstat(lh::Likelihood{M, ChiSquared}) where M = loglikelihood(lh) / (-0.5) / dof(lh)
+loglikelihood(lh::Likelihood{M, ChiSquared}) where M = -0.5 * sum(abs2, lh.buffer)
 
-function update_eval!(fitprob::FitProblem{M, ChiSquared}, pvalues::Vector{T}) where {M,T}
-    update_eval!(fitprob.multi, pvalues)
+function update_eval!(lh::Likelihood{M, ChiSquared}, pvalues::Vector{T}) where {M,T}
+    update_eval!(lh.mseval, pvalues)
     i1 = 1
-    for i in 1:length(fitprob.multi)
-        model = fitprob.multi.v[i].folded
+    for i in 1:length(lh.mseval.vec)
+        model = lh.mseval.vec[i].folded
         nn = length(model)
         if nn > 0
             i2 = i1 + nn - 1
-            fitprob.buffer[i1:i2] .= view((model .- values(fitprob.data[i])) ./ uncerts(fitprob.data[i]), :)
+            lh.buffer[i1:i2] .= view((model .- values(lh.data[i])) ./ uncerts(lh.data[i]), :)
             i1 += nn
         end
     end
-    return convert(Vector{T}, fitprob.buffer)
+    return convert(Vector{T}, lh.buffer)
 end
 
 
@@ -96,32 +64,29 @@ using .Solvers
 
 Compare a model to a dataset and return the fit statistic.
 """
-fitstat(model::Model, data::AbstractMeasures) = fitstat(FitProblem(model, data))
+fitstat(model::Model, data::AbstractMeasures) = fitstat(Likelihood(data, model))
 
 """
     fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures})
 
 Compare a multi-model to a multi-dataset and return fit statistic.
 """
-fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures}) = fitstat(FitProblem(models, data))
+fitstat(ms::ModelSet, data::Vector{<: AbstractMeasures}) = fitstat(Likelihood(data, ms))
 
 
-function fit(fitprob::FitProblem, solver::AbstractSolver)
-    @assert nfree(fitprob) > 0 "No free parameter in the model"
-    fsumm = Solvers.solve!(fitprob, solver)
-    bestfit = [ModelSnapshot(fitprob.multi.v[i], fitprob.bestfit[i]) for i in 1:length(fitprob.multi)]
+function fit(lh::Likelihood, solver::AbstractSolver)
+    @assert nfree(lh) > 0 "No free parameter in the model"
+    fsumm = Solvers.solve!(lh, solver)
+    bestfit = ModelSetSnapshot(lh.mseval)
     return bestfit, fsumm
 end
 
-function fit!(fitprob::FitProblem, solver::AbstractSolver)
-    bestfit, fsumm = fit(fitprob, solver) # invoke non-modifying fit() function
-    for i in 1:length(fitprob.multi)
-        for (cname, comp) in fitprob.multi.v[i].model
-            for (pname, par) in getparams(comp)
-                par.val = bestfit[i][cname][pname].val
-                par.unc = bestfit[i][cname][pname].unc
-            end
-        end
+function fit!(lh::Likelihood, solver::AbstractSolver)
+    bestfit, fsumm = fit(lh, solver) # invoke non-modifying fit() function
+    newpars = getparams(lh)
+    for (key, par) in getparams(lh.mseval.ms)
+        par.val = newpars[key].val
+        par.unc = newpars[key].unc
     end
     return bestfit, fsumm
 end
@@ -131,16 +96,16 @@ end
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
-fit(models::Vector{Model}, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
-    fit(FitProblem(models, datasets, use_AD=use_AD(solver)), solver)
+fit(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
+    fit(Likelihood(datasets, ms, use_AD=use_AD(solver)), solver)
 
 """
     fit!(multi::Vector{Model}, data::Vector{Measures{N}}, solver=lsqfit())
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
 """
-fit!(models::Vector{Model}, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
-    fit!(FitProblem(models, datasets, use_AD=use_AD(solver)), solver)
+fit!(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
+    fit!(Likelihood(datasets, ms, use_AD=use_AD(solver)), solver)
 
 """
     fit(model::Model, data::Measures, solver=lsqfit())
@@ -148,10 +113,9 @@ fit!(models::Vector{Model}, datasets::Vector{<: AbstractMeasures}, solver::Abstr
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
 function fit(model::Model, data::AbstractMeasures, args...)
-    bestfit, fsumm = fit([model], [data], args...)
-    return bestfit[1], fsumm
+    bestfit, fsumm = fit(ModelSet(:_ => model), [data], args...)
+    return bestfit[:_], fsumm
 end
-
 
 """
     fit!(model::Model, data::Measures, solver=lsqfit())
@@ -159,6 +123,6 @@ end
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
 function fit!(model::Model, data::AbstractMeasures, args...)
-    bestfit, fsumm = fit!([model], [data], args...)
-    return bestfit[1], fsumm
+    bestfit, fsumm = fit!(ModelSet(:_ => model), [data], args...)
+    return bestfit[:_], fsumm
 end
