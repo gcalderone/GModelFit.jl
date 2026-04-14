@@ -28,7 +28,8 @@ struct PPLData{T <: FitProblem}
                     else
                         params[Symbol(cname, :_, pname)] = par
                     end
-                    push!(priors, Uniform(par.low, par.high))
+                    push!(priors, Uniform(max(par.val - 5 * par.unc, par.low),
+                                          min(par.val + 5 * par.unc, par.high)))
                 end
             end
         end
