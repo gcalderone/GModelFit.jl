@@ -35,13 +35,14 @@ No systematic error is considered when generating mock dataset(s).
 function mock(::Type{Measures}, mseval::ModelSetEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     update_eval!(mseval)
     out = Vector{Measures}()
+    rng = isnothing(seed)  ?  Random.default_rng()  :  MersenneTwister(seed)
     for mname in keys(mseval.dict)
-        values = last_eval_folded(mseval, mname)
+        values = deepcopy(last_eval_folded(mseval, mname))
         ee = extrema(values)
         range = ee[2] - ee[1]
         @assert range > 0
         err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
-        values .+= err .* randn(MersenneTwister(seed), size(values))
+        values .+= err .* randn(rng, size(values))
         push!(out, Measures(mseval.dict[mname].folded_domain, values, err))
     end
     return out

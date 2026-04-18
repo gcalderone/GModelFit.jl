@@ -232,7 +232,7 @@ bestfit, fsumm = fit(ms, data, GModelFit.Solvers.cmpfit())
 @test isnan(bestfit[:b, :bkg, :slope].unc)
 @test fsumm.ndata == 242
 @test fsumm.nfree == 12
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
+@test isapprox(fsumm.fitstat, 1., atol=0.2)
 
 
 thaw!(model1, :bkg);
@@ -265,7 +265,7 @@ bestfit, fsumm = fit(ms, data)
 @test isnan(bestfit[:b, :bkg, :slope].unc)
 @test fsumm.ndata == 242
 @test fsumm.nfree == 13
-@test isapprox(fsumm.fitstat, 1.3, atol=0.2)
+@test isapprox(fsumm.fitstat, 1., atol=0.2)
 
 
 

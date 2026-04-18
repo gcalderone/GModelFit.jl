@@ -29,7 +29,7 @@ function ModelSnapshot(meval::ModelEval, params::OrderedDict{NTuple{2, Symbol}, 
     for cname in keys(meval.model.comps)
         # TODO is this needed ? (cname in keys(meval.cevals))  ||  continue
         p = OrderedDict([k[2] => p for (k,p) in
-                             filter(p -> p.first[1] .== cname, params)])
+                             filter(p -> p.first[1] == cname, params)])
         comps[cname] = ComponentSnapshot(comptype(meval.model, cname), p,
                                          isfrozen(meval.model, cname),
                                          dependencies(meval.model, cname),

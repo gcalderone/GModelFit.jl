@@ -27,7 +27,7 @@ struct OffsetSlope <: AbstractComponent
             :offset => Parameter(offset),
             :x0     => Parameter(x0),
             :y0     => Parameter(y0),
-            :z0     => Parameter(y0),
+            :z0     => Parameter(z0),
             :slopeX => Parameter(slopeX),
             :slopeY => Parameter(slopeY),
             :slopeZ => Parameter(slopeZ))

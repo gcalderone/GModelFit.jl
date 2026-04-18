@@ -82,8 +82,9 @@ function show(io::IO, data::Measures)
     error = Vector{Bool}()
     for vv in [values(data), uncerts(data)]
         nan = length(findall(isnan.(vv))) + length(findall(isinf.(vv)))
-        vv = vv[findall(isfinite.(vv))]
         push!(error, nan > 0)
+        vv = vv[findall(isfinite.(vv))]
+        (length(vv) == 0)  &&  (vv = [NaN])
         table = vcat(table, ["" minimum(vv) maximum(vv) mean(vv) median(vv) std(vv) (nan > 0  ?  string(nan)  :  "") ])
     end
     table[:, 1] .= ["values", "uncerts"]

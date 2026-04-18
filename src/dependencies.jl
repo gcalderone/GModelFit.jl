@@ -3,63 +3,58 @@ struct DependencyNode
     level::Int
     parent::Union{Nothing, Symbol}
     childs::Vector{DependencyNode}
-    DependencyNode(cname::Symbol, level::Int, parent) = new(cname, level, parent, Vector{DependencyNode}())
+    DependencyNode(cname::Symbol, level::Int, parent) = new(cname, level, parent, DependencyNode[])
 end
 
 
 function deptree(model::Model)
-    function deptree(model, cname::Symbol, level::Int, parent::Union{Nothing, Symbol})
-        out = DependencyNode(cname, level, parent)
+    function build_tree(cname::Symbol, level::Int, p::Union{Nothing, Symbol})
+        node = DependencyNode(cname, level, p)
         for d in dependencies(model, cname)
-            push!(out.childs, deptree(model, d, level+1, cname))
+            push!(node.childs, build_tree(d, level + 1, cname))
         end
-        return out
+        return node
     end
 
     # Identify parent for all comps
     parent = OrderedDict{Symbol, Symbol}()
-    for (cname, comp) in model.comps
-        for d in GModelFit.dependencies(model, cname)
+    for cname in keys(model.comps)
+        for d in dependencies(model, cname)
             @assert !haskey(parent, d) "Component $d has two parent nodes: $(parent[d]) and $cname"
             parent[d] = cname
         end
     end
 
-    # Ensure no circular dependency is present by checking all parent
-    # nodes of a given component to be different from the component
-    # itself.  Also collect components with no parent.
-    comps_with_no_parent = Vector{Symbol}()
+    # Ensure no circular dependency is present and collect root components
+    comps_with_no_parent = Symbol[]
     for cname in keys(model.comps)
         if haskey(parent, cname)
             p = parent[cname]
-            @assert p != cname "Component $cname depends on itself"
+            visited = Set{Symbol}([cname])
             while haskey(parent, p)
+                @assert p ∉ visited "Circular dependency detected for component $p"
+                push!(visited, p)
                 p = parent[p]
-                if cname == p
-                    display(parent)
-                    error("Circular dependency detected for component $cname")
-                end
             end
         else
             push!(comps_with_no_parent, cname)
         end
     end
 
-    # Neglect components with no parent and no dependencies
-    while length(comps_with_no_parent) > 1
-        if length(dependencies(model, comps_with_no_parent[1])) == 0
-            deleteat!(comps_with_no_parent, 1)
+    # Determine the main component
+    if !isnothing(model.maincomp)
+        maincomp = model.maincomp
+    else
+        # Consider as possible main comp the ones with no parent but having dependencies
+        valid_roots = filter(c -> !isempty(dependencies(model, c)), comps_with_no_parent)
+        if isempty(valid_roots)
+            maincomp = comps_with_no_parent[end]
+        else
+            maincomp = valid_roots[end]
         end
     end
 
-    # Main component
-    if isnothing(model.maincomp)
-        maincomp = comps_with_no_parent[end]
-    else
-        maincomp = model.maincomp
-    end
-
-    return deptree(model, maincomp, 1, nothing)
+    return build_tree(maincomp, 1, nothing)
 end
 
 
@@ -73,7 +68,7 @@ end
 
 
 function dependencies(model::Model, cname::Symbol)
-    output = Vector{Symbol}()
+    output = Symbol[]
     comp = model.comps[cname]
     for d in dependencies(comp)
         @assert haskey(model.comps, d)  ||  isa(comp, FComp)  "No component has name $d"

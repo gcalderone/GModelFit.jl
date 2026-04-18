@@ -12,8 +12,5 @@ getparams(comp::Polynomial) = comp.params
 
 function evaluate!(::Polynomial, domain::Domain{1}, output::Vector,
                    params...)
-    output .= params[1]
-    for deg in 1:length(params)-1
-        output .+= coords(domain).^deg .* params[deg+1]
-    end
+    output .= evalpoly.(coords(domain), Ref(params))
 end

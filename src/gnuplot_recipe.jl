@@ -13,7 +13,6 @@ function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
     for (cname, comp) in model
         (cname in skip)  &&  continue
         if (length(keep) == 0)  ||  (cname in keep)
-            #isa(v.comp, GModelFit.FComp)  ||  isa(v.comp, GModelFit.SumReducer)  ||  continue
             append!(out, Gnuplot.parseSpecs(coords(domain(model)), model(cname), "with lines t '$(cname)'"))
         end
     end
