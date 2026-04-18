@@ -43,10 +43,10 @@ import GModelFit: PVModel, PVSet
 
     # ====================================================================
     @testset "2. Core Logic & Components" begin
-        @testset "Patch and Cast Mutually Exclusive" begin
+        @testset "Patch and Reparam Mutually Exclusive" begin
             comp = GModelFit.Polynomial(1.0, 2.0)
             comp.params[:p0].patch = :p1
-            comp.params[:p0].cast = @fd (p, v) -> v * 2
+            comp.params[:p0].reparam = @fd (p, v) -> v * 2
             m = Model(comp)
             @test_throws AssertionError GModelFit.getparams(m)
         end
@@ -228,7 +228,7 @@ import GModelFit: PVModel, PVSet
     end
 
     # ====================================================================
-    @testset "6. Parameter Patches & Casts" begin
+    @testset "6. Parameter Patches & Reparams" begin
         x = 0:0.05:6
         model = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
                       :l2  => GModelFit.Gaussian(1, 3, 0.5),
@@ -270,9 +270,9 @@ import GModelFit: PVModel, PVSet
             @test isapprox(fsumm.fitstat, 1.3, atol=0.2)
         end
 
-        @testset "Parameter Casting (Lambda Functions)" begin
+        @testset "Parameter Reparametrizing (Lambda Functions)" begin
             model[:l2, :norm].patch = nothing
-            model[:l2, :norm].cast = @fd (m, v) -> v + m[:l1, :norm]
+            model[:l2, :norm].reparam = @fd (m, v) -> v + m[:l1, :norm]
             data = GModelFit.mock(Measures, model, Domain(x), seed=1)
             bestfit, fsumm = fit(model, data)
             @test abs(bestfit[:l1, :norm].val    - 1)   / bestfit[:l1, :norm].unc < 3

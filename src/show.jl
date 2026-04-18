@@ -137,16 +137,16 @@ function prepare_params_table(input::Union{Model, ModelSnapshot, AbstractCompone
         range =  (isfinite(param.low )  ?  strip(@sprintf("%7.2g", param.low ))  :  (param.low  > 0  ?  "+∞"  :  "-∞")) * " : "
         range *= (isfinite(param.high)  ?  strip(@sprintf("%7.2g", param.high))  :  (param.high > 0  ?  "+∞"  :  "-∞"))
         patch = ""
-        cast  = ""
-        isa(param.patch, Symbol)     &&  (patch = string(param.patch))
-        isa(param.patch, FunctDesc)  &&  (patch = param.patch.display)
-        isa(param.cast , FunctDesc)  &&  (cast  = string(param.cast))
+        reparam = ""
+        isa(param.patch, Symbol)       &&  (patch = string(param.patch))
+        isa(param.patch, FunctDesc)    &&  (patch = param.patch.display)
+        isa(param.reparam, FunctDesc)  &&  (reparam = string(param.reparam))
         table = vcat(table,
                      permutedims([string(cname),
                                   string(pname) * (param.fixed  ?  " (fixed) "  :  ""),
                                   range, param.val, param.unc,
-                                  ((patch == "")  &&  (cast == "")  ?  ""  :  param.actual),
-                                  patch, cast]))
+                                  ((patch == "")  &&  (reparam == "")  ?  ""  :  param.actual),
+                                  patch, reparam]))
         push!(fixed, param.fixed)
         isnan(param.unc)     &&  (table[end, 5] = "")  # avoid displaying NaNs
         isnan(param.actual)  &&  (table[end, 6] = "")  # avoid displaying NaNs
@@ -168,7 +168,7 @@ function show(io::IO, input::Union{AbstractComponent, ComponentSnapshot})
         highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
                         TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (3:5))), showsettings.error)]
     end
-    printtable(io, table[:, 2:end], ["Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Cast"],
+    printtable(io, table[:, 2:end], ["Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Reparam"],
                formatters=[fmt__printf(showsettings.floatformat, 3:5)],
                highlighters=highlighters)
 end
@@ -273,7 +273,7 @@ function show(io::IO, model::Union{Model, ModelSnapshot})
         highlighters = [TextHighlighter((data,i,j) -> (fixed[i]), showsettings.fixed),
                         TextHighlighter((data,i,j) -> (warns[i]  &&  (j in (4:6))), showsettings.error)]
     end
-    printtable(io, table, ["Comp.", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Cast"],
+    printtable(io, table, ["Comp.", "Param.", "Range", "Value", "Uncert.", "Actual", "Patch", "Reparam"],
                hlines=hrule, formatters=[fmt__printf(showsettings.floatformat, 4:6)],
                highlighters=highlighters)
 end

@@ -14,7 +14,7 @@ using PrecompileTools
                       :l2  => GModelFit.Gaussian(1, 3, 0.5),
                       :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
                       :main => SumReducer(:l1, :l2, :bkg));
-        model[:l2, :norm].cast = @fd (m, v) -> v + m[:l1, :norm]
+        model[:l2, :norm].reparam = @fd (m, v) -> v + m[:l1, :norm]
         data = GModelFit.mock(Measures, model, Domain(x), seed=1)
         bestfit, fsumm = fit(model, data, GModelFit.Solvers.cmpfit())
         show(io, bestfit)

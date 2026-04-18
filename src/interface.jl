@@ -8,7 +8,7 @@ function getparams(model::Union{Model, ModelSnapshot})
             @assert par.low < par.high
             @assert par.val >= par.low  "Value for [:$(cname), :$(pname)] is smaller than the minimum allowed value"
             @assert par.val <= par.high "Value for [:$(cname), :$(pname)] is larger than the maximum allowed value"
-            @assert isnothing(par.patch)  ||  isnothing(par.cast) "Parameter [:$(cname), :$(pname)] can either be patched to another value, or re-interpreted (cast), but not both."
+            @assert isnothing(par.patch)  ||  isnothing(par.reparam) "Parameter [:$(cname), :$(pname)] can either be patched to another value, or re-parametrized (reparam), but not both."
             par.actually_fixed = par.fixed  ||  !isnothing(par.patch)  ||  isfrozen(model, cname)
             out[(cname, pname)] = par
         end

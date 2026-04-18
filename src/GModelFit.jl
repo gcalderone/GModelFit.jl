@@ -95,7 +95,7 @@ A structure representing a model parameter.
  - `high::Float64`: upper limit for the value (default: `+Inf`);
  - `fixed::Bool`: whether the parameter is fixed during fitting (default: `false`);
  - `patch::Union{Nothing, Symbol, FunctDesc}`: patch prescription;
- - `cast::Union{Nothing, FunctDesc}`: re-interpret prescription;
+ - `reparam::Union{Nothing, FunctDesc}`: re-interpret prescription;
  - `actual::Float64`: actual value for the parameter (i.e. after applying the patch prescription)`;
  - `unc::Float64`: 1σ uncertainty associated to the parameter value.
 
@@ -107,7 +107,7 @@ mutable struct Parameter
     high::Float64             # upper limit value
     fixed::Bool
     patch::Union{Nothing, Symbol, FunctDesc}
-    cast::Union{Nothing, FunctDesc}
+    reparam::Union{Nothing, FunctDesc}
     actual::Float64
     unc::Float64
     actually_fixed::Bool

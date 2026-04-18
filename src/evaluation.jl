@@ -115,7 +115,7 @@ struct ModelEval{T <: Real}
                        domain2buffer(T, folded_domain))
 
         for (key, par) in getparams(model)
-            if !isnothing(par.patch)  ||  !isnothing(par.cast)
+            if !isnothing(par.patch)  ||  !isnothing(par.reparam)
                 meval.patched[(key[1], key[2])] = par
             end
         end
@@ -206,7 +206,7 @@ function update_eval!(meval::ModelEval)
                 meval.pactual[key...] = par.patch(meval.pvalues)
             end
         else
-            meval.pactual[key...] = par.cast(meval.pvalues, meval.pvalues[key...])
+            meval.pactual[key...] = par.reparam(meval.pvalues, meval.pvalues[key...])
         end
     end
     for cname in meval.seq
