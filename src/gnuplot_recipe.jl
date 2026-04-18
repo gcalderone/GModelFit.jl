@@ -10,7 +10,7 @@ function Gnuplot.recipe(model::GModelFit.ModelSnapshot;
                         keep=Symbol[], skip=Symbol[])
     @assert ndims(domain(model)) == 1
     out = Vector{Gnuplot.AbstractGPSpec}()
-    for (cname, comp) in getcomps(model)
+    for (cname, comp) in model
         (cname in skip)  &&  continue
         if (length(keep) == 0)  ||  (cname in keep)
             #isa(v.comp, GModelFit.FComp)  ||  isa(v.comp, GModelFit.SumReducer)  ||  continue

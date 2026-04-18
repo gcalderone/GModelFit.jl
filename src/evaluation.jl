@@ -246,29 +246,11 @@ function set_bestfit!(mseval::ModelSetEval, pvalues::Vector{Float64}, puncerts::
 end
 
 
-#=
-evalcounter(meval::ModelEval, cname::Symbol)
-
-Return the number of times the component with name `cname` has been evaluated.
-=#
+# Return the number of times the component with name `cname` has been evaluated.
 evalcounter(meval::ModelEval, cname::Symbol) = meval.cevals[cname].counter
-# TODO is this needed? evalcounter(model::Model, cname::Symbol) = "???"
 
 
-#=
-evalcounters(meval::ModelEval)
-
-Return a `OrderedDict{Symbol, Int}` with the number of times each component has been evaluated.
-=#
-evalcounters(meval::ModelEval) = OrderedDict([cname => evalcounter(meval, cname) for cname in keys(meval.cevals)])
-
-
-#=
-last_eval(meval::ModelEval)
-last_eval(meval::ModelEval, name::Symbol)
-
-Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
-=#
+# Return last evaluation of a component whose name is `cname` in a `ModelEval` object.  If `cname` is not provided the evaluation of the main component is returned.
 last_eval(meval::ModelEval) = last_eval(meval, meval.seq[end])
 last_eval(meval::ModelEval, cname::Symbol) = meval.cevals[cname].buffer
 last_eval_folded(meval::ModelEval) = meval.folded
@@ -278,8 +260,6 @@ function fold_model(meval::ModelEval{T}, cname::Symbol) where T
     return output
 end
 
-#last_eval(multi::ModelSetEval{1}) = last_eval(multi, 1)
-#last_eval(multi::ModelSetEval{1}, cname::Symbol) = last_eval(multi, 1, cname)
 last_eval(mseval::ModelSetEval, mname::Symbol) = last_eval(mseval.dict[mname])
 last_eval(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = last_eval(mseval.dict[mname], cname)
 
@@ -287,7 +267,7 @@ last_eval(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = last_eval(mseval
 last_eval_folded(mseval::ModelSetEval, mname::Symbol) = last_eval_folded(mseval.dict[mname])
 
 #fold_model(multi::ModelSetEval{1}, cname::Symbol) = fold_model(multi, 1, cname)
-fold_model(multi::ModelSetEval, mname::Symbol, cname::Symbol) = fold_model(mseval.dict[mname], cname)
+fold_model(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = fold_model(mseval.dict[mname], cname)
 
 
 # ====================================================================
@@ -296,5 +276,5 @@ function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=no
     mseval = ModelSetEval{Float64}(ModelSet(:_ => model), [domain])
     update_eval!(mseval)
     isnothing(cname)  &&  (return last_eval_folded(mseval, :_))
-    return fold_model(mseval, cname)
+    return fold_model(mseval, :_, cname)
 end
