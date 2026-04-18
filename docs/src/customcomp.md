@@ -107,7 +107,7 @@ nothing  # hide
 
 It is possible to modify the `param1` and re-evaluate with:
 ```@example abc
-model[:mycomp].param1.val = 4.5
+model[:mycomp, :param1].val = 4.5
 model(dom)
 nothing  # hide
 ```

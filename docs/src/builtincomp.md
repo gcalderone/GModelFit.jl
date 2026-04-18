@@ -46,8 +46,8 @@ show((bestfit, fsumm)) # hide
 The best fit parameter values can be retrieved with:
 ```@example abc
 println("Best fit values:")
-println("b:  ", bestfit[:linear].offset.val, " ± ", bestfit[:linear].offset.unc)
-println("m:  ", bestfit[:linear].slope.val , " ± ", bestfit[:linear].slope.unc)
+println("b:  ", bestfit[:linear, :offset].val, " ± ", bestfit[:linear, :offset].unc)
+println("m:  ", bestfit[:linear, :slope].val , " ± ", bestfit[:linear, :slope].unc)
 ```
 
 A similar example in 2D is as follows:
@@ -248,9 +248,9 @@ show((bestfit, fsumm)) # hide
 The keywords given when defining the function are interpreted as component parameters, hence their properties can be retrieved with:
 ```@example abc
 println("Best fit values:")
-println("b:  ", bestfit[:linear].b.val    , " ± ", bestfit[:linear].b.unc)
-println("m:  ", bestfit[:linear].m.val    , " ± ", bestfit[:linear].m.unc)
-println("p2: ", bestfit[:quadratic].p2.val, " ± ", bestfit[:quadratic].p2.unc)
+println("b:  ", bestfit[:linear, :b].val    , " ± ", bestfit[:linear, :b].unc)
+println("m:  ", bestfit[:linear, :m].val    , " ± ", bestfit[:linear, :m].unc)
+println("p2: ", bestfit[:quadratic, :p2].val, " ± ", bestfit[:quadratic, :p2].unc)
 ```
 
 ## SumReducer

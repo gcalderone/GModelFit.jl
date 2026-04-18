@@ -79,7 +79,7 @@ showing the best fit parameter values and the associated uncertaintites, as well
 
 If not saitisfied with the result you may, for instance, change the initial value for a parameter and re-run the fit:
 ```@example abc
-model[:main].a0.val = 5
+model[:main, :a0].val = 5
 bestfit, fsumm = fit(model, data)
 nothing # hide
 ```
@@ -95,10 +95,10 @@ saveas("simple_example"); # hide
 
 Also, you can easily access the numerical results for further analysis, e.g.:
 ```@example abc
-println("Best fit value for the offset parameter: ", 
+println("Best fit value for the offset parameter: ",
          bestfit[:main, :a0].val, " ± ",
          bestfit[:main, :a0].unc, "\n",
-	"Reduced χ^2: ", fsumm.fitstat)
+         "Reduced χ^2: ", fsumm.fitstat)
 ```
 
 The above example is definitely a simple one, but more complex ones follow essentially the same workflow.

@@ -56,7 +56,7 @@ The `cmpfit()` solver allows to specify several options to fine-tune the solver 
   solver.ftol_after_maxiter = 1e-8
   
   # Run the fit
-  model[:main].T.val = 10  # guess value, purposely far from true one
+  model[:main, :T].val = 10  # guess value, purposely far from true one
   bestfit, fsumm = fit(model, data, solver)
   println(); # hide
   ```

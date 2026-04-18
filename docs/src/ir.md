@@ -18,7 +18,7 @@ It is however possible to implement a custom instrument responses as follows:
 As an example we copy here the implementation for the `IdealInstrument`:
 ```julia
 # Define IdealInstrument structure
-struct IdealInstrument <: AbstractInstrumentResponse
+struct IdealInstrument <: GModelFit.AbstractInstrumentResponse
 end
 
 # Method to retrieve the unfolded model domain.  In this case it simply is the same as the folded domain.

@@ -43,28 +43,28 @@ println() # hide
 Assume that, for the model to be meaningful, the parameters should satisfy the following constraints:
 - the `bkg` should have a fixed value of 1 at `x`=1, and a slope which is in the range [0:0.2]:
 ```@example abc
-model[:bkg].offset.val = 1
-model[:bkg].offset.fixed = true
+model[:bkg, :offset].val = 1
+model[:bkg, :offset].fixed = true
 
-model[:bkg].slope.low  = 0
-model[:bkg].slope.high = 0.2
+model[:bkg, :slope].low  = 0
+model[:bkg, :slope].high = 0.2
 println() # hide
 ```
 - the normalization of `l1` and `l2` must be the same:
 ```@example abc
-model[:l2].norm.patch = :l1
+model[:l2, :norm].patch = :l1
 println() # hide
 ```
 - the width of `l2` must be twice that of `l1` (patched parameter):
 ```@example abc
-model[:l2].sigma.patch = @fd m -> 2 * m[:l1].sigma
+model[:l2, :sigma].patch = @fd m -> 2 * m[:l1, :sigma]
 println() # hide
 ```
 - the center of `l2` must be at a larger coordinate with respect to the center of `l1`.  In this case we re-interpret the `model[:l2].center` parameter as the distance between the two centers, and create a parametrized patch expression to calculate the actual center value of `l2`:
 ```@example abc
-model[:l2].center.patch = @fd (m, v) -> v + m[:l1].center
-model[:l2].center.val = 1   # guess value for the distance between the centers
-model[:l2].center.low = 0   # ensure [l2].center > [l1].center
+model[:l2, :center].cast = @fd (m, v) -> v + m[:l1, :center]
+model[:l2, :center].val = 1   # guess value for the distance between the centers
+model[:l2, :center].low = 0   # ensure [l2, :center] > [l1, :center]
 println() # hide
 ```
 
