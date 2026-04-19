@@ -9,20 +9,23 @@ struct Likelihood{M <: AbstractMeasures, FS <: AbstractFitStat}
     buffer::Vector  # local buffer used to calculate fit statistic
     fitstat::FS
 
-    function Likelihood(datasets::Vector{M}, ms::ModelSet, fitstat::AbstractFitStat=default_fitstat(datasets[1]); use_AD=false) where {M <: AbstractMeasures}
-        @assert length(ms) == length(datasets)
+    function Likelihood(datasets::AbstractDict{Symbol, M}, ms::ModelSet,
+                        fitstat::AbstractFitStat=default_fitstat(first(values(datasets))); use_AD=false) where {M <: AbstractMeasures}
+        @assert keys(ms) == keys(datasets)
         T = use_AD  ?  Union{Dual, Float64}  :  Float64
-        mseval = ModelSetEval{T}(ms, getfield.(datasets, :domain))
 
-        out = new{M, typeof(fitstat)}(mseval, datasets,
-                                      Vector{T}(undef, sum(length.(datasets))),
+        data = [datasets[k] for k in keys(ms)]
+        mseval = ModelSetEval{T}(ms, Dict([k => domain(datasets[k]) for k in keys(ms)]))
+
+        out = new{M, typeof(fitstat)}(mseval, data,
+                                      Vector{T}(undef, sum(length.(data))),
                                       fitstat)
-        out.buffer .= 0.  # needed to avoid errors with CMPFit
+        update_eval!(out)
         return out
     end
 end
 
-
+update_eval!(lh::Likelihood) = update_eval!(lh, getfield.(collect(values(select_free(getparams(lh)))), :val))
 getparams(lh::Likelihood; kws...) = getparams(lh.mseval; kws...)
 nfree(lh::Likelihood) = nfree(lh.mseval)
 ndata(lh::Likelihood) = length(lh.buffer)
@@ -64,14 +67,14 @@ using .Solvers
 
 Compare a model to a dataset and return the fit statistic.
 """
-fitstat(model::Model, data::AbstractMeasures) = fitstat(Likelihood(data, model))
+fitstat(model::Model, data::AbstractMeasures) = fitstat(ModelSet(:_ => model), Dict(:_ => data))
 
 """
     fitstat(models::Vector{Model}, data::Vector{<: AbstractMeasures})
 
 Compare a multi-model to a multi-dataset and return fit statistic.
 """
-fitstat(ms::ModelSet, data::Vector{<: AbstractMeasures}) = fitstat(Likelihood(data, ms))
+fitstat(ms::ModelSet, data::AbstractDict{Symbol, <: AbstractMeasures}) = fitstat(Likelihood(data, ms))
 
 
 function fit(lh::Likelihood, solver::AbstractSolver)
@@ -96,7 +99,7 @@ end
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
-fit(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
+fit(ms::ModelSet, datasets::AbstractDict{Symbol, <: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
     fit(Likelihood(datasets, ms, use_AD=use_AD(solver)), solver)
 
 """
@@ -104,7 +107,7 @@ fit(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=
 
 Fit a multi-model to a set of empirical data sets using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` objects are set to the best fit ones.
 """
-fit!(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
+fit!(ms::ModelSet, datasets::AbstractDict{Symbol, <: AbstractMeasures}, solver::AbstractSolver=Solvers.lsqfit()) =
     fit!(Likelihood(datasets, ms, use_AD=use_AD(solver)), solver)
 
 """
@@ -113,7 +116,7 @@ fit!(ms::ModelSet, datasets::Vector{<: AbstractMeasures}, solver::AbstractSolver
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  See also `fit!`.
 """
 function fit(model::Model, data::AbstractMeasures, args...)
-    bestfit, fsumm = fit(ModelSet(:_ => model), [data], args...)
+    bestfit, fsumm = fit(ModelSet(:_ => model), Dict(:_ => data), args...)
     return bestfit[:_], fsumm
 end
 
@@ -123,6 +126,6 @@ end
 Fit a model to an empirical data set using the specified solver (default: `lsqfit()`).  Upon return the parameter values in the `Model` object are set to the best fit ones.  See also `fit`.
 """
 function fit!(model::Model, data::AbstractMeasures, args...)
-    bestfit, fsumm = fit!(ModelSet(:_ => model), [data], args...)
+    bestfit, fsumm = fit!(ModelSet(:_ => model), Dict(:_ => data), args...)
     return bestfit[:_], fsumm
 end

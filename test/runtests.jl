@@ -13,7 +13,7 @@ import GModelFit: PVModel, PVSet
         m[:M1, :ca, :pa1] = 1
         m[:M1, :ca, :pa2] = 2
         m[:M2, :cb, :pb1] = 3
-        
+
         # Test overwrite protection
         @test_throws Exception (m[:M1, :ca, :pa1] = 1)
 
@@ -33,7 +33,7 @@ import GModelFit: PVModel, PVSet
         @test all(m[:M1, :ca] .== [1, 2])
         @test all(m[:M2, :cb] .== [3])
         @test length(m[:M1, :nonexisting]) == 0
-        
+
         # Explicit allow_overwrite test
         m_allow = PVSet{Int64}(allow_overwrite=true)
         m_allow[:M1, :ca, :pa1] = 1
@@ -56,11 +56,11 @@ import GModelFit: PVModel, PVSet
             comp.params[:p0].low = 5.0 # Set lower bound higher than current val
             m = Model(comp)
             @test_throws AssertionError GModelFit.getparams(m)
-            
+
             comp.params[:p0].low = -Inf
             comp.params[:p0].high = 0.0 # Set upper bound lower than current val
             @test_throws AssertionError GModelFit.getparams(m)
-            
+
             # Physical bounds on standard components
             g_comp = GModelFit.Gaussian(1.0, 0.0, 1.0)
             g_comp[:norm].val = -1.0 # Force negative norm
@@ -73,13 +73,13 @@ import GModelFit: PVModel, PVSet
             m = Model(:comp1 => c1, :comp2 => c2)
             @test_throws AssertionError GModelFit.deptree(m)
         end
-        
+
         @testset "Component Specifics" begin
             # 3D z0 Parameter Assignment mapping
             offset, x0, y0, z0, slopeX, slopeY, slopeZ = 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0
             comp = GModelFit.OffsetSlope(offset, x0, y0, z0, slopeX, slopeY, slopeZ)
             @test comp[:z0].val == 4.0
-            
+
             # FComp Splatting Rejection
             @test_throws AssertionError GModelFit.FComp(@fd (x, args...) -> x)
         end
@@ -94,7 +94,7 @@ import GModelFit: PVModel, PVSet
             eval_copy = copy(baseline_eval)
             mock_data = GModelFit.mock(Measures, m, dom)
             # Ensure internal cache wasn't modified in-place
-            @test m(dom) == eval_copy 
+            @test m(dom) == eval_copy
         end
 
         @testset "Base.show Handles NaN-Only Measures Gracefully" begin
@@ -109,7 +109,7 @@ import GModelFit: PVModel, PVSet
             m = Model(:poly => comp)
             dom = Domain(collect(1.0:10.0))
             m(dom) # Prime evaluation
-            mseval = GModelFit.ModelSetEval{Float64}(ModelSet(:_ => m), [dom])
+            mseval = GModelFit.ModelSetEval{Float64}(ModelSet(:_ => m), Dict(:_ => dom))
             GModelFit.update_eval!(mseval)
             snapshot = GModelFit.ModelSnapshot(mseval.vec[1], GModelFit.getparams(m))
             recipe_out = Gnuplot.recipe(snapshot)
@@ -123,8 +123,10 @@ import GModelFit: PVModel, PVSet
             x = 0:0.1:5
             model = Model(:main => @fd (x, a2=1, a1=1, a0=5) -> @. (a2 * x^2  +  a1 * x  + a0))
             data = GModelFit.mock(Measures, model, Domain(x), seed=1)
+            initial_fitstat = fitstat(model, data)
             bestfit, fsumm = fit(model, data)
-            
+
+            @test initial_fitstat > fsumm.fitstat
             @test isapprox(bestfit[:main, :a2].val, 1, atol=3 * bestfit[:main, :a2].unc)
             @test isapprox(bestfit[:main, :a1].val, 1, atol=3 * bestfit[:main, :a1].unc)
             @test isapprox(bestfit[:main, :a0].val, 5, atol=3 * bestfit[:main, :a0].unc)
@@ -138,8 +140,10 @@ import GModelFit: PVModel, PVSet
             x = 1.:50:10000
             model = Model(f)
             data = GModelFit.mock(Measures, model, Domain(x), seed=1)
+            initial_fitstat = fitstat(model, data)
             bestfit, fsumm = fit(model, data)
-            
+
+            @test initial_fitstat > fsumm.fitstat
             @test abs(bestfit[:main, :p1].val - 1)    / bestfit[:main, :p1].unc < 3
             @test abs(bestfit[:main, :p2].val - 1e-3) / bestfit[:main, :p2].unc < 3
             @test abs(bestfit[:main, :p3].val - 1e-6) / bestfit[:main, :p3].unc < 3
@@ -156,13 +160,13 @@ import GModelFit: PVModel, PVSet
             f3 = @fd (x) -> cos.(x)
 
             x = 1.:50:10000
-            
+
             # Setup 1 (All at once)
             model_a = Model(:f1 => f1, :f2 => f2, :f3 => f3,
                             :main => @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3)
             data_a = GModelFit.mock(Measures, model_a, Domain(x), seed=1)
             bestfit_a, fsumm_a = fit(model_a, data_a)
-            
+
             # Setup 2 (Incremental construction)
             model_b = Model(:f1 => f1)
             model_b[:f2] = f2
@@ -170,7 +174,7 @@ import GModelFit: PVModel, PVSet
             model_b[:main] = @fd (x, f1, f2, f3) -> (f1 .+ f2) .* f3
             data_b = GModelFit.mock(Measures, model_b, Domain(x), seed=1)
             bestfit_b, fsumm_b = fit(model_b, data_b)
-            
+
             for (bestfit, fsumm) in [(bestfit_a, fsumm_a), (bestfit_b, fsumm_b)]
                 @test abs(bestfit[:f1, :p1].val - 1)    / bestfit[:f1, :p1].unc < 3
                 @test abs(bestfit[:f1, :p2].val - 1e-3) / bestfit[:f1, :p2].unc < 3
@@ -234,7 +238,7 @@ import GModelFit: PVModel, PVSet
                       :l2  => GModelFit.Gaussian(1, 3, 0.5),
                       :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
                       :main => SumReducer(:l1, :l2, :bkg))
-        
+
         @testset "Baseline Multi-Component" begin
             data = GModelFit.mock(Measures, model, Domain(x), seed=1)
             bestfit, fsumm = fit(model, data)
@@ -293,24 +297,26 @@ import GModelFit: PVModel, PVSet
     # ====================================================================
     @testset "7. Multi-Model Sets (ModelSet)" begin
         x = 0:0.05:6
-        model1 = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
+        ms = ModelSet()
+        ms[:a] = Model(:l1  => GModelFit.Gaussian(1, 2, 0.2),
                        :l2  => GModelFit.Gaussian(1, 3, 0.5),
                        :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
                        :main => SumReducer(:l1, :l2, :bkg))
 
-        model2 = Model(:l1  => GModelFit.Gaussian(0.8, 2.1, 0.1),
+        ms[:b] = Model(:l1  => GModelFit.Gaussian(0.8, 2.1, 0.1),
                        :l2  => GModelFit.Gaussian(1.2, 2.5, 0.4),
                        :bkg => GModelFit.OffsetSlope(0.5, 1, 0.1),
                        :main => SumReducer(:l1, :l2, :bkg))
 
-        ms = ModelSet(:a => model1, :b => model2)
-        
+
         @testset "Freezing Components Across Models" begin
-            freeze!(model1, :bkg)
-            freeze!(model2, :bkg)
-            data = GModelFit.mock(Measures, ms, [Domain(x), Domain(x)], seed=1)
+            freeze!(ms[:a], :bkg)
+            freeze!(ms[:b], :bkg)
+            data = GModelFit.mock(Measures, ms, Dict(:a => Domain(x), :b => Domain(x)), seed=1)
+            initial_fitstat = fitstat(ms, data)
             bestfit, fsumm = fit(ms, data, GModelFit.Solvers.cmpfit())
 
+            @test initial_fitstat > fsumm.fitstat
             @test abs(bestfit[:a, :l1, :norm].val    - 1)   / bestfit[:a, :l1, :norm].unc < 3
             @test abs(bestfit[:a, :l1, :center].val  - 2)   / bestfit[:a, :l1, :center].unc < 3
             @test abs(bestfit[:a, :l1, :sigma].val   - 0.2) / bestfit[:a, :l1, :sigma].unc < 3
@@ -320,7 +326,7 @@ import GModelFit: PVModel, PVSet
             @test isnan(bestfit[:a, :bkg, :offset].unc)
             @test isnan(bestfit[:a, :bkg, :x0].unc)
             @test isnan(bestfit[:a, :bkg, :slope].unc)
-            
+
             @test abs(bestfit[:b, :l1, :norm].val    - 0.8) / bestfit[:b, :l1, :norm].unc < 3
             @test abs(bestfit[:b, :l1, :center].val  - 2.1) / bestfit[:b, :l1, :center].unc < 3
             @test abs(bestfit[:b, :l1, :sigma].val   - 0.1) / bestfit[:b, :l1, :sigma].unc < 3
@@ -330,20 +336,20 @@ import GModelFit: PVModel, PVSet
             @test isnan(bestfit[:b, :bkg, :offset].unc)
             @test isnan(bestfit[:b, :bkg, :x0].unc)
             @test isnan(bestfit[:b, :bkg, :slope].unc)
-            
+
             @test fsumm.ndata == 242
             @test fsumm.nfree == 12
             @test isapprox(fsumm.fitstat, 1., atol=0.2)
         end
 
         @testset "Patching Across Models" begin
-            thaw!(model1, :bkg)
-            thaw!(model2, :bkg)
+            thaw!(ms[:a], :bkg)
+            thaw!(ms[:b], :bkg)
             ms[:b, :bkg, :offset].patch = @fd m -> m[:a, :bkg, :offset]
             ms[:b, :bkg, :slope].patch  = @fd m -> m[:a, :bkg, :slope]
             ms[:a, :l2 , :center].patch = @fd m -> m[:b, :l2, :center]
-            
-            data = GModelFit.mock(Measures, ms, [Domain(x), Domain(x)], seed=1)
+
+            data = GModelFit.mock(Measures, ms, Dict(:a => Domain(x), :b => Domain(x)), seed=1)
             bestfit, fsumm = fit(ms, data)
 
             @test abs(bestfit[:a, :l1, :norm].val    - 1)   / bestfit[:a, :l1, :norm].unc < 3
@@ -355,7 +361,7 @@ import GModelFit: PVModel, PVSet
             @test abs(bestfit[:a, :bkg, :offset].val - 0.5) / bestfit[:a, :bkg, :offset].unc < 3
             @test isnan(bestfit[:a, :bkg, :x0].unc)
             @test abs(bestfit[:a, :bkg, :slope].val  - 0.1) / bestfit[:a, :bkg, :slope].unc < 3
-            
+
             @test abs(bestfit[:b, :l1, :norm].val    - 0.8) / bestfit[:b, :l1, :norm].unc < 3
             @test abs(bestfit[:b, :l1, :center].val  - 2.1) / bestfit[:b, :l1, :center].unc < 3
             @test abs(bestfit[:b, :l1, :sigma].val   - 0.1) / bestfit[:b, :l1, :sigma].unc < 3
@@ -366,7 +372,7 @@ import GModelFit: PVModel, PVSet
             @test isnan(bestfit[:b, :bkg, :x0].unc)
             @test abs(bestfit[:b, :bkg, :slope].actual - 0.1) < 0.2
             @test isnan(bestfit[:b, :bkg, :slope].unc)
-            
+
             @test fsumm.ndata == 242
             @test fsumm.nfree == 13
             @test isapprox(fsumm.fitstat, 1., atol=0.2)

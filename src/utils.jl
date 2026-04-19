@@ -34,7 +34,7 @@ No systematic error is considered when generating mock dataset(s).
 """
 function mock(::Type{Measures}, mseval::ModelSetEval; properr=0.01, rangeerr=0.05, abserr=0., seed=nothing)
     update_eval!(mseval)
-    out = Vector{Measures}()
+    out = OrderedDict{Symbol, Measures}()
     rng = isnothing(seed)  ?  Random.default_rng()  :  MersenneTwister(seed)
     for mname in keys(mseval.dict)
         values = deepcopy(last_eval_folded(mseval, mname))
@@ -43,13 +43,13 @@ function mock(::Type{Measures}, mseval::ModelSetEval; properr=0.01, rangeerr=0.0
         @assert range > 0
         err = (properr .* abs.(values) .+ rangeerr .* range .+ abserr)
         values .+= err .* randn(rng, size(values))
-        push!(out, Measures(mseval.dict[mname].folded_domain, values, err))
+        out[mname] = Measures(mseval.dict[mname].folded_domain, values, err)
     end
     return out
 end
 
 mock(::Type{T}, model::Model, domain::AbstractDomain; kws...) where T =
-    mock(T, ModelSet(:_ => model), [domain]; kws...)[1]
+    mock(T, ModelSet(:_ => model), Dict(:_ => domain); kws...)[:_]
 
-mock(::Type{T}, ms::ModelSet, domains::Vector{<: AbstractDomain}; kws...) where T =
+mock(::Type{T}, ms::ModelSet, domains::AbstractDict{Symbol, <: AbstractDomain}; kws...) where T =
     mock(T, ModelSetEval{Float64}(ms, domains); kws...)

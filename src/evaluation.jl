@@ -169,9 +169,10 @@ struct ModelSetEval{T <: Real}
     pactual::PVSet{T}
     ifree::Vector{Int}
 
-    function ModelSetEval{T}(ms::ModelSet, domains::Vector{<: AbstractDomain}) where {T <: Real}
+    function ModelSetEval{T}(ms::ModelSet, _domains::AbstractDict{Symbol, <: AbstractDomain}) where {T <: Real}
         N = length(ms)
-        @assert N == length(domains)
+        @assert keys(ms) == keys(_domains)
+        domains = [_domains[k] for k in keys(ms)]
         out = new{T}(ms, OrderedDict{Symbol, ModelEval{T}}(),
                      Vector{ModelEval{T}}(),
                      OrderedDict{NTuple{3, Symbol}, Parameter}(),
@@ -228,6 +229,7 @@ function update_eval!(mseval::ModelSetEval)
     update_eval!.(mseval.vec)
 end
 
+length(mseval::ModelSetEval) = length(mseval.ms)
 getparams(mseval::ModelSetEval) = mseval.params
 nfree(mseval::ModelSetEval) = length(mseval.ifree)
 
@@ -262,18 +264,14 @@ end
 
 last_eval(mseval::ModelSetEval, mname::Symbol) = last_eval(mseval.dict[mname])
 last_eval(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = last_eval(mseval.dict[mname], cname)
-
-#last_eval_folded(multi::ModelSetEval{1}) = last_eval_folded(multi, 1)
 last_eval_folded(mseval::ModelSetEval, mname::Symbol) = last_eval_folded(mseval.dict[mname])
-
-#fold_model(multi::ModelSetEval{1}, cname::Symbol) = fold_model(multi, 1, cname)
 fold_model(mseval::ModelSetEval, mname::Symbol, cname::Symbol) = fold_model(mseval.dict[mname], cname)
 
 
 # ====================================================================
 # Evaluate Model on the given domain
 function (model::Model)(domain::AbstractDomain, cname::Union{Nothing, Symbol}=nothing)
-    mseval = ModelSetEval{Float64}(ModelSet(:_ => model), [domain])
+    mseval = ModelSetEval{Float64}(ModelSet(:_ => model), Dict(:_ => domain))
     update_eval!(mseval)
     isnothing(cname)  &&  (return last_eval_folded(mseval, :_))
     return fold_model(mseval, :_, cname)
