@@ -113,48 +113,6 @@ struct ModelEval{T <: Real}
                        Vector{Symbol}(),
                        folded_domain,
                        domain2buffer(T, folded_domain))
-
-        for (key, par) in getparams(model)
-            if !isnothing(par.patch)  ||  !isnothing(par.reparam)
-                meval.patched[(key[1], key[2])] = par
-            end
-        end
-
-        # Update evaluation sequence
-        ftree = flatten(deptree(model))
-        append!(meval.seq, reverse(getfield.(ftree, :cname)))
-
-        # Walk dependency tree and create relevant CompEval structures (if
-        # not yet existing)
-        for d in ftree
-            cname = d.cname
-            if !(cname in keys(meval.cevals))
-                meval.cevals[cname] = CompEval{T}(model.comps[cname], meval.domain)  # all components share the same domain
-            end
-        end
-
-        # Update references to dependencies
-        for (cname, ceval) in meval.cevals
-            deps = dependencies(ceval.comp)
-            if isa(ceval.comp, FComp)
-                _domdeps = Vector{Symbol}()
-                _compdeps = Vector{Symbol}()
-                for d in deps
-                    if haskey(meval.cevals, d)  # dependency with known name
-                        push!(_compdeps, d)
-                    else # dependency with unknown name is intended as a domain dimension
-                        @assert length(_compdeps) == 0 "Domain dependencies for component $cname must be listed before other component name(s)"
-                        push!(_domdeps, d)
-                    end
-                end
-                @assert length(_domdeps) == ndims(meval.domain) "Domain has $(ndims(meval.domain)) dimensions but component $cname accepts $(length(_domdeps)) domain arguments: " * join(string.(_domdeps), ", ")
-                deps = _compdeps
-            end
-            for d in deps
-                @assert haskey(meval.cevals, d) "No component has name $d"
-                push!(ceval.deps, meval.cevals[d])
-            end
-        end
         return meval
     end
 end
@@ -179,24 +137,77 @@ struct ModelSetEval{T <: Real}
                      PVSet{T}(),
                      PVSet{T}(allow_overwrite=true),
                      Vector{Int}())
-        for (key, par) in getparams(ms)
-            out.params[ key]    = deepcopy(par) # local copy, these will contain best fit nd uncertainties
-            out.pvalues[key...] = par.val
-            out.pactual[key...] = par.val
-            if !par.actually_fixed
-                push!(out.ifree, length(out.params))
-            end
-        end
         for (mname, model) in ms
             out.dict[mname] = ModelEval{T}(model, domains[length(out.vec) + 1],
                                         PVModel(mname, out.pvalues),
                                         PVModel(mname, out.pactual))
             push!(out.vec, out.dict[mname])
         end
+        scan_model!(out)
         return out
     end
 end
 
+
+function scan_model!(meval::ModelEval{T}) where T
+    for (key, par) in getparams(meval.model)
+        if !isnothing(par.patch)  ||  !isnothing(par.reparam)
+            meval.patched[(key[1], key[2])] = par
+        end
+    end
+
+    # Update evaluation sequence
+    ftree = flatten(deptree(meval.model))
+    append!(meval.seq, reverse(getfield.(ftree, :cname)))
+
+    # Walk dependency tree and create relevant CompEval structures (if
+    # not yet existing)
+    for d in ftree
+        cname = d.cname
+        if !(cname in keys(meval.cevals))
+            meval.cevals[cname] = CompEval{T}(meval.model.comps[cname], meval.domain)  # all components share the same domain
+        end
+    end
+
+    # Update references to dependencies
+    for (cname, ceval) in meval.cevals
+        deps = dependencies(ceval.comp)
+        if isa(ceval.comp, FComp)
+            _domdeps = Vector{Symbol}()
+            _compdeps = Vector{Symbol}()
+            for d in deps
+                if haskey(meval.cevals, d)  # dependency with known name
+                    push!(_compdeps, d)
+                else # dependency with unknown name is intended as a domain dimension
+                    @assert length(_compdeps) == 0 "Domain dependencies for component $cname must be listed before other component name(s)"
+                    push!(_domdeps, d)
+                end
+            end
+            @assert length(_domdeps) == ndims(meval.domain) "Domain has $(ndims(meval.domain)) dimensions but component $cname accepts $(length(_domdeps)) domain arguments: " * join(string.(_domdeps), ", ")
+                deps = _compdeps
+        end
+        for d in deps
+            @assert haskey(meval.cevals, d) "No component has name $d"
+            push!(ceval.deps, meval.cevals[d])
+        end
+    end
+end
+
+function scan_model!(mseval::ModelSetEval)
+    empty!(mseval.params)
+    empty!(mseval.pvalues)
+    empty!(mseval.pactual)
+    empty!(mseval.ifree)
+    for (key, par) in getparams(mseval.ms)
+        mseval.params[ key]    = deepcopy(par) # local copy, these will contain best fit nd uncertainties
+        mseval.pvalues[key...] = par.val
+        mseval.pactual[key...] = par.val
+        if !par.actually_fixed
+            push!(mseval.ifree, length(mseval.params))
+        end
+    end
+    scan_model!.(mseval.vec)
+end
 
 function update_eval!(meval::ModelEval)
     for (key, par) in meval.patched

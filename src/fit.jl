@@ -25,11 +25,22 @@ struct Likelihood{M <: AbstractMeasures, FS <: AbstractFitStat}
     end
 end
 
+# Likelihood interface
 update_eval!(lh::Likelihood) = update_eval!(lh, getfield.(collect(values(select_free(getparams(lh)))), :val))
 getparams(lh::Likelihood) = getparams(lh.mseval)
 nfree(lh::Likelihood) = nfree(lh.mseval)
 ndata(lh::Likelihood) = length(lh.buffer)
 set_bestfit!(lh::Likelihood, pvalues::Vector{Float64}, puncerts::Vector{Float64}) = set_bestfit!(lh.mseval, pvalues, puncerts)
+
+scan_model!(lh::Likelihood) = scan_model!(lh.mseval)
+getmodel( lh::Likelihood, mname::Symbol) = lh.mseval.dict[mname].model
+getdomain(lh::Likelihood, mname::Symbol) = lh.mseval.dict[mname].domain
+getdata(  lh::Likelihood, mname::Symbol) = lh.data[findfirst(keys(lh.mseval.dict) .== mname)]
+
+last_eval( lh::Likelihood, mname::Symbol)                = last_eval( lh.mseval, mname)
+last_eval( lh::Likelihood, mname::Symbol, cname::Symbol) = last_eval( lh.mseval, mname, cname)
+fold_model(lh::Likelihood, mname::Symbol, cname::Symbol) = fold_model(lh.mseval, mname, cname)
+last_eval_folded(lh::Likelihood, mname::Symbol)          = last_eval_folded(lh.mseval, mname)
 
 
 # ChiSquared fit statistic ===========================================
@@ -77,14 +88,14 @@ Compare a multi-model to a multi-dataset and return fit statistic.
 fitstat(ms::ModelSet, data::AbstractDict{Symbol, <: AbstractMeasures}) = fitstat(Likelihood(data, ms))
 
 
-function fit(lh::Likelihood, solver::AbstractSolver)
+function fit(lh::Likelihood, solver::AbstractSolver=Solvers.lsqfit())
     @assert nfree(lh) > 0 "No free parameter in the model"
     fsumm = Solvers.solve!(lh, solver)
     bestfit = ModelSetSnapshot(lh.mseval)
     return bestfit, fsumm
 end
 
-function fit!(lh::Likelihood, solver::AbstractSolver)
+function fit!(lh::Likelihood, solver::AbstractSolver=Solvers.lsqfit())
     bestfit, fsumm = fit(lh, solver) # invoke non-modifying fit() function
     newpars = getparams(lh)
     for (key, par) in getparams(lh.mseval.ms)

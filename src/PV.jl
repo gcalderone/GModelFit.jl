@@ -10,6 +10,12 @@ struct PVSet{T}
                Vector{T}(), allow_overwrite)
 end
 
+function empty!(pv::PVSet)
+    empty!(pv.icomp)
+    empty!(pv.index)
+    empty!(pv.vec)
+end
+
 getindex(pv::PVSet, key::Vararg{Symbol, 2}) = view(pv.vec, get(pv.icomp, key, Int[]))  # allow for components with no parameters
 getindex(pv::PVSet, key::Vararg{Symbol, 3}) = pv.vec[pv.index[key]]
 

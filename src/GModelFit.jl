@@ -19,6 +19,7 @@ import Base.haskey
 import Base.getindex
 import Base.setindex!
 import Base.values
+import Base.empty!
 
 import ForwardDiff: Dual
 

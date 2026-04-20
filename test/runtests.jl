@@ -379,8 +379,39 @@ import GModelFit: PVModel, PVSet
         end
     end
 
+
     # ====================================================================
-    @testset "8. Serialization & Deserialization" begin
+    @testset "8. Likelihood and incremental model construction" begin
+        model = Model(:main => SumReducer())
+        model[:c1] = GModelFit.Polynomial(2, 0.5)
+        GModelFit.add_dep!(model[:main], :c1)
+
+        data = Measures([4.01, 7.58, 12.13, 19.78, 29.04], 0.4)
+        lh = GModelFit.Likelihood(Dict(:_ => data), ModelSet(:_ => model))
+        bestfit, fsumm = fit(lh)
+
+        model = GModelFit.getmodel(lh, :_)
+        model[:c2] = GModelFit.Polynomial(0, 0, 1)
+        model[:c2, :p0].fixed = true
+        model[:c2, :p1].fixed = true
+        GModelFit.add_dep!(model[:main], :c2)
+        GModelFit.scan_model!(lh)
+        bestfit2, fsumm2 = fit(lh)
+
+        GModelFit.last_eval(lh, :_)
+        GModelFit.last_eval(lh, :_, :c2)
+        GModelFit.fold_model(lh, :_, :c2)
+        GModelFit.last_eval_folded(lh, :_)
+
+        @test fsumm.nfree == 2
+        @test fsumm2.nfree == 3
+        @test fsumm.fitstat > fsumm2.fitstat
+        @test all(values(GModelFit.getdata(lh, :_)) .== values(data))
+    end
+
+
+    # ====================================================================
+    @testset "9. Serialization & Deserialization" begin
         # Generate some quick data to serialize from the previous tests context
         x = 0:0.05:6
         model = Model(:l1 => GModelFit.Gaussian(1, 2, 0.2))
