@@ -26,9 +26,10 @@ ms[:second, :main, :center].patch = @fd m -> m[:first, :main, :center]
 
 # Create datasets and fit
 dom = Domain(-5.:5)
-data1 = Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04)
-data2 = Measures(dom, [-0.072, -0.033, -0.070,  0.108,  0.168,  0.765,  0.113, -0.054,  0.032,  0.013,  0.015], 0.04)
-bestfit, fsumm = fit(ms, [data1, data2])
+data = Dict(
+	:first  => Measures(dom, [-0.006,  0.015,  0.001,  0.049,  0.198,  0.430,  0.226,  0.048,  0.017, -0.001, -0.006], 0.04),
+	:second => Measures(dom, [-0.072, -0.033, -0.070,  0.108,  0.168,  0.765,  0.113, -0.054,  0.032,  0.013,  0.015], 0.04))
+bestfit, fsumm = fit(ms, data)
 show((bestfit, fsumm)) # hide
 ```
 

@@ -23,7 +23,7 @@ import Base.values
 import ForwardDiff: Dual
 
 export AbstractDomain, Domain, CartesianDomain, coords, Measures, uncerts,
-    Model, ModelSet, @fd, SumReducer, domain, compnames,
+    Model, ModelSet, @fd, SumReducer, domain, comptype,
     isfrozen, thaw!, freeze!, set_IR!, fit, fit!, fitstat, select_maincomp!
 
 
@@ -181,7 +181,7 @@ Constructor is: `Model(components...)`.  Components may be specified as:
 - a single `FunctDesc` which will be wrapped into an `FComp` component and a default name will be assigned (`:main`);
 - one or more `Pair{Symbol, AbstractComponent}`, where the first element is the name and the second is the component.
 
-You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same syntax.  Finally, you may use the `compnames()` function to retrieve the list of component names.
+You may access the individual component in a `Model` using the indexing syntax, as if it was a `Dict{Symbol, AbstractComponent}`.  Also, you may add new components to a `Model` after it has been created using the same syntax.  Finally, you may use the `keys()` function to retrieve the list of component names.
 
 Individual components may be *frozen* (i.e. have all its parameters fixed during fitting, despite the individual `Parameter` settings) or *thawed* using the `freeze!()` and `thaw!()` functions.  Use the `isfrozen()` function to check if a component is frozen.
 

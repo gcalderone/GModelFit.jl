@@ -26,7 +26,7 @@ struct Likelihood{M <: AbstractMeasures, FS <: AbstractFitStat}
 end
 
 update_eval!(lh::Likelihood) = update_eval!(lh, getfield.(collect(values(select_free(getparams(lh)))), :val))
-getparams(lh::Likelihood; kws...) = getparams(lh.mseval; kws...)
+getparams(lh::Likelihood) = getparams(lh.mseval)
 nfree(lh::Likelihood) = nfree(lh.mseval)
 ndata(lh::Likelihood) = length(lh.buffer)
 set_bestfit!(lh::Likelihood, pvalues::Vector{Float64}, puncerts::Vector{Float64}) = set_bestfit!(lh.mseval, pvalues, puncerts)
